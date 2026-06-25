@@ -27,3 +27,6 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | discard | Ignora | Ignora le modifiche non salvate; pulsante «Ignora tutte le modifiche». |
 | unsaved changes | Modifiche non salvate | Modifiche a una bozza non ancora salvate. |
 | keep editing | Continua a modificare | Pulsante per restare nell'editor invece di salvare o ignorare. |
+| yes | Sì | Pulsante di conferma nei messaggi Sì/No (es. eliminazione). |
+| no | No | Pulsante di annullamento/rifiuto nei messaggi Sì/No. |
+| delete draft | Elimina bozza | Azione per rimuovere definitivamente una bozza locale. |

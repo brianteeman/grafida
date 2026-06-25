@@ -53,6 +53,10 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
 - `composer test` runs the suite; `composer linter:check` runs PHPStan (level max + strict rules).
 - Add new UI strings to `language/en-GB/en-GB.com_grafida.ini` (canonical) and the `UI_KEYS`
   list in `ApiController`, then translate. **See the translation flow below.**
+- Never build a localised sentence by concatenating fragments around an injected value — word
+  order differs per language. Keep each message a single string with `%s` placeholders and
+  interpolate in the SPA with `formatNodes(t('KEY'), node)` (returns text/DOM nodes to spread
+  into `el()`), mirroring Joomla's `Text::sprintf()`.
 
 ## Translation flow (must be followed every time)
 

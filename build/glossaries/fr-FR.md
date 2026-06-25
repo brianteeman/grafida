@@ -27,3 +27,6 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | discard | Abandonner | Abandonner les modifications non enregistrées ; bouton « Abandonner les modifications ». |
 | unsaved changes | Modifications non enregistrées | Modifications d'un brouillon pas encore enregistrées. |
 | keep editing | Continuer l'édition | Bouton pour rester dans l'éditeur au lieu d'enregistrer ou d'abandonner. |
+| yes | Oui | Bouton de confirmation dans les invites Oui/Non (ex. suppression). |
+| no | Non | Bouton d'annulation/refus dans les invites Oui/Non. |
+| delete draft | Supprimer le brouillon | Action de supprimer définitivement un brouillon local. |

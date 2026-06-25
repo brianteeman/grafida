@@ -27,3 +27,6 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | discard | Descartar | Descartar cambios sin guardar; botón «Descartar todos los cambios». |
 | unsaved changes | Cambios sin guardar | Modificaciones de un borrador aún no guardadas. |
 | keep editing | Seguir editando | Botón para permanecer en el editor en lugar de guardar o descartar. |
+| yes | Sí | Botón de confirmación en avisos Sí/No (p. ej. eliminación). |
+| no | No | Botón de cancelar/rechazar en avisos Sí/No. |
+| delete draft | Eliminar borrador | Acción para eliminar definitivamente un borrador local. |

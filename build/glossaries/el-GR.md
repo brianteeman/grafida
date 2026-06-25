@@ -27,3 +27,6 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | discard | Απόρριψη | Discard unsaved changes; button «Απόρριψη όλων των αλλαγών». |
 | unsaved changes | Μη αποθηκευμένες αλλαγές | Edits to a draft not yet saved. |
 | keep editing | Συνέχιση επεξεργασίας | Button to stay in the editor instead of saving or discarding. |
+| yes | Ναι | Confirmation button in Yes/No prompts (e.g. delete confirmation). |
+| no | Όχι | Cancel/decline button in Yes/No prompts. |
+| delete draft | Διαγραφή προχείρου | Action to permanently remove a local draft. |

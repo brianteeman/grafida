@@ -79,6 +79,33 @@ function txt(str) {
     return document.createTextNode(String(str));
 }
 
+/**
+ * Interpolate a localized template into a list of DOM nodes.
+ *
+ * The template is a single, whole sentence containing `%s` placeholders (one
+ * per substitution, in order) — this keeps each translatable string intact so
+ * translators control word order, instead of splitting a sentence around an
+ * injected value. Each `%s` is replaced by the matching substitution, which
+ * may be a DOM Node (e.g. a bold <strong>) or a string; everything else
+ * becomes plain text nodes.
+ *
+ * @param {string} template — localized string with `%s` placeholders
+ * @param {...(Node|string)} subs — substitutions, in placeholder order
+ * @returns {Node[]} text/substituted nodes, ready to spread into el()
+ */
+function formatNodes(template, ...subs) {
+    const parts = String(template).split('%s');
+    const nodes = [];
+    parts.forEach((part, i) => {
+        if (part !== '') nodes.push(txt(part));
+        if (i < parts.length - 1) {
+            const sub = subs[i];
+            nodes.push(sub instanceof Node ? sub : txt(sub == null ? '' : String(sub)));
+        }
+    });
+    return nodes;
+}
+
 /** Create a button with textContent and class names. */
 function btn(labelKey, ...classes) {
     const b = document.createElement('button');
@@ -216,6 +243,71 @@ function _modalEscHandler(e) {
 function closeModal() {
     document.getElementById('modal-overlay').classList.add('hidden');
     document.removeEventListener('keydown', _modalEscHandler);
+}
+
+/**
+ * Show a Yes/No confirmation modal with keyboard navigation.
+ *
+ * Yes is red (danger) and is the default active option; No is blue (info).
+ * ENTER or SPACE applies the active option; TAB (or Shift+TAB) cycles which
+ * option is active; ESC cancels (No). Clicking either button or the backdrop
+ * resolves accordingly.
+ *
+ * @param {string} titleText — modal heading
+ * @param {Node|Node[]} bodyNodes — DOM nodes for the body
+ * @returns {Promise<boolean>} resolves true for Yes, false for No/cancel.
+ */
+function confirmYesNo(titleText, bodyNodes) {
+    return new Promise(resolve => {
+        const yesBtn = el('button', 'btn btn-danger');
+        yesBtn.type = 'button';
+        yesBtn.textContent = t('GRAFIDA_BTN_YES');
+
+        const noBtn = el('button', 'btn btn-info');
+        noBtn.type = 'button';
+        noBtn.textContent = t('GRAFIDA_BTN_NO');
+
+        const buttons = [yesBtn, noBtn];
+        let active = 0; // default: Yes
+
+        const setActive = (i) => {
+            active = (i + buttons.length) % buttons.length;
+            buttons[active].focus();
+        };
+
+        const finish = (result) => {
+            document.removeEventListener('keydown', onKey, true);
+            closeModal();
+            resolve(result);
+        };
+
+        function onKey(e) {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                setActive(active + (e.shiftKey ? -1 : 1));
+            } else if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+                e.preventDefault();
+                finish(active === 0);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                finish(false);
+            }
+        }
+
+        yesBtn.addEventListener('click', () => finish(true));
+        noBtn.addEventListener('click', () => finish(false));
+
+        // Capture phase so we intercept SPACE/ENTER before the focused button's
+        // own native activation, keeping a single source of truth for the result.
+        document.addEventListener('keydown', onKey, true);
+
+        showModal(titleText, bodyNodes, buttons);
+        // showModal closes on backdrop click without resolving; route it to "No".
+        document.getElementById('modal-overlay').onclick = (e) => {
+            if (e.target === e.currentTarget) finish(false);
+        };
+        setActive(0);
+    });
 }
 
 // ============================================================
@@ -556,11 +648,7 @@ async function confirmDeleteSite(id) {
     if (!site) return;
 
     const siteNameStrong = el('strong', null, site.title || '');
-    const msgP = el('p', null,
-        txt('Delete site '),
-        siteNameStrong,
-        txt('? This cannot be undone.')
-    );
+    const msgP = el('p', null, ...formatNodes(t('GRAFIDA_MSG_DELETE_SITE_CONFIRM'), siteNameStrong));
 
     const cancelBtn = el('button', 'btn btn-secondary');
     cancelBtn.type = 'button';
@@ -666,8 +754,42 @@ function buildArticleItem(article, type) {
 
     item.appendChild(infoDiv);
     item.appendChild(badge);
+
+    // Local drafts can be deleted; remote articles are read-only here.
+    if (type === 'draft') {
+        const actions = el('div', 'article-item-actions');
+        const delBtn = el('button', 'btn-icon article-item-delete');
+        delBtn.type = 'button';
+        delBtn.title = t('GRAFIDA_BTN_DELETE');
+        delBtn.setAttribute('aria-label', t('GRAFIDA_BTN_DELETE'));
+        delBtn.textContent = '🗑';
+        delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            confirmDeleteDraft(article);
+        });
+        actions.appendChild(delBtn);
+        item.appendChild(actions);
+    }
+
     item.addEventListener('click', () => openEditorFor(article, type));
     return item;
+}
+
+async function confirmDeleteDraft(draft) {
+    const titleStrong = el('strong', null, draft.title || '(Untitled)');
+    const msgP = el('p', null, ...formatNodes(t('GRAFIDA_MSG_DELETE_DRAFT_CONFIRM'), titleStrong));
+
+    const confirmed = await confirmYesNo(t('GRAFIDA_MSG_DELETE_DRAFT_TITLE'), [msgP]);
+    if (!confirmed) return;
+
+    try {
+        await api.deleteDraft(draft.id);
+        State.drafts = State.drafts.filter(d => d.id !== draft.id);
+        renderArticlesList();
+        showToast(t('GRAFIDA_MSG_DRAFT_DELETED'), 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
 }
 
 async function openEditorFor(article, type) {

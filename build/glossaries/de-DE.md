@@ -33,3 +33,6 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | discard | Verwerfen | Ungespeicherte Änderungen verwerfen; Schaltfläche „Alle Änderungen verwerfen". |
 | unsaved changes | Nicht gespeicherte Änderungen | Noch nicht gespeicherte Bearbeitungen eines Entwurfs. |
 | keep editing | Weiter bearbeiten | Schaltfläche, um im Editor zu bleiben, statt zu speichern oder zu verwerfen. |
+| yes | Ja | Bestätigungsschaltfläche in Ja/Nein-Abfragen (z. B. Löschbestätigung). |
+| no | Nein | Abbrechen-/Ablehnen-Schaltfläche in Ja/Nein-Abfragen. |
+| delete draft | Entwurf löschen | Aktion zum endgültigen Entfernen eines lokalen Entwurfs. |

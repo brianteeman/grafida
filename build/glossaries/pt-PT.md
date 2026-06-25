@@ -27,3 +27,6 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | discard | Descartar | Descartar alterações não guardadas; botão «Descartar todas as alterações». |
 | unsaved changes | Alterações não guardadas | Edições a um rascunho ainda não guardadas. |
 | keep editing | Continuar a editar | Botão para permanecer no editor em vez de guardar ou descartar. |
+| yes | Sim | Botão de confirmação em avisos Sim/Não (ex.: eliminação). |
+| no | Não | Botão de cancelar/recusar em avisos Sim/Não. |
+| delete draft | Eliminar rascunho | Ação para remover definitivamente um rascunho local. |
