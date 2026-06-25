@@ -1116,11 +1116,33 @@ async function initTinyMCE(draft) {
         toolbar: 'undo redo | blocks | bold italic underline strikethrough | ' +
                  'alignleft aligncenter alignright alignjustify | ' +
                  'bullist numlist outdent indent | removeformat | ' +
-                 'link image | code | readmore',
+                 'readmore | link image | code',
+        // Wrap the toolbar onto multiple rows so no button (notably "readmore")
+        // is ever hidden inside the overflow menu on a narrow window.
+        toolbar_mode: 'wrap',
+        // Make the read-more break clearly visible inside the editor: a thick
+        // dashed coloured line that reads on both light and dark site CSS.
+        // (::before/::after can't be used here — <hr> is a void element.)
+        content_style:
+            'hr.readmore {' +
+            '  height: 0;' +
+            '  border: 0;' +
+            '  border-top: 3px dashed #ff7a45;' +
+            '  margin: 1.6em 0;' +
+            '  cursor: pointer;' +
+            '}',
         setup: (editor) => {
             State.tinyMCEEditor = editor;
 
+            editor.ui.registry.addIcon('readmore',
+                '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" ' +
+                'stroke="currentColor" stroke-width="1.6" stroke-linecap="round">' +
+                '<path d="M4 4h16"/><path d="M4 8h10"/>' +
+                '<path d="M4 12h16" stroke-dasharray="2 2.5"/>' +
+                '<path d="M4 16h16"/><path d="M4 20h10"/></svg>');
+
             editor.ui.registry.addButton('readmore', {
+                icon: 'readmore',
                 text: t('GRAFIDA_BTN_INSERT_READMORE'),
                 tooltip: t('GRAFIDA_BTN_INSERT_READMORE'),
                 onAction: () => {
