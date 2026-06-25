@@ -24,3 +24,6 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | title           | título                     | Article or site title.                                                                   |
 | token           | token                      | API authentication token. Kept untranslated; widely understood in technical contexts.    |
 | status | Estado | Joomla! publishing state: Publicado, Despublicado, Archivado, En la papelera. |
+| discard | Descartar | Descartar cambios sin guardar; botón «Descartar todos los cambios». |
+| unsaved changes | Cambios sin guardar | Modificaciones de un borrador aún no guardadas. |
+| keep editing | Seguir editando | Botón para permanecer en el editor en lugar de guardar o descartar. |

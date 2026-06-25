@@ -29,6 +29,12 @@ const State = {
     sites: [],
     currentSiteId: null,
     currentDraftId: null,
+    // True when the open draft was auto-created on entering the editor and has not
+    // been explicitly saved yet — such a draft is removed if the user backs out.
+    draftIsNew: false,
+    // JSON snapshot of the editor form taken when the draft opened / was last saved,
+    // used to detect unsaved changes.
+    editorBaseline: null,
     drafts: [],
     remoteArticles: [],
     references: null,
@@ -614,6 +620,10 @@ function buildArticleItem(article, type) {
 async function openEditorFor(article, type) {
     let draft = null;
 
+    // An existing local draft is already persisted; a remote import auto-creates a
+    // fresh local draft that should be discarded if the user backs out unchanged.
+    State.draftIsNew = type !== 'draft';
+
     if (type === 'draft') {
         draft = article;
     } else {
@@ -649,6 +659,7 @@ async function openEditorFor(article, type) {
 
 async function openNewArticle() {
     if (!State.currentSiteId) return;
+    State.draftIsNew = true;
     const draft = {
         siteId: State.currentSiteId,
         title: '',
@@ -701,6 +712,9 @@ async function openEditorScreen(draft) {
 
     renderEditorSidebar(draft);
     await initTinyMCE(draft);
+
+    // Snapshot the freshly-loaded form so we can detect unsaved changes later.
+    State.editorBaseline = JSON.stringify(collectDraftFormData());
 }
 
 function renderEditorSidebar(draft) {
@@ -1210,11 +1224,12 @@ async function initTinyMCE(draft) {
 //  Save draft
 // --------------------------------------------------------
 
-async function saveDraft() {
-    if (!State.currentDraftId) return;
+/**
+ * Read the current editor + sidebar state into a plain draft body object.
+ * Used both for saving and for change detection.
+ */
+function collectDraftFormData() {
     const editor = State.tinyMCEEditor;
-    if (!editor) return;
-
     const refs = State.references || { fields: { supported: [] } };
 
     const fields = {};
@@ -1243,27 +1258,111 @@ async function saveDraft() {
     const metakeyEl = document.getElementById('editor-metakey');
     const titleInputEl = document.getElementById('editor-title-input');
 
-    const body = {
+    return {
         title: titleInputEl ? titleInputEl.value.trim() : '',
         catid: catEl && catEl.value ? parseInt(catEl.value, 10) : null,
         access: accessEl ? parseInt(accessEl.value, 10) : 1,
         language: langEl ? langEl.value : '*',
         state: stateEl ? parseInt(stateEl.value, 10) : 1,
-        html: editor.getContent(),
+        html: editor ? editor.getContent() : '',
         fields,
         tags,
         metadesc: metadescEl ? metadescEl.value : '',
         metakey: metakeyEl ? metakeyEl.value : '',
     };
+}
+
+/** True when the editor form differs from the last saved/loaded snapshot. */
+function isEditorDirty() {
+    if (State.editorBaseline === null) return false;
+    return JSON.stringify(collectDraftFormData()) !== State.editorBaseline;
+}
+
+async function saveDraft() {
+    if (!State.currentDraftId) return;
+    if (!State.tinyMCEEditor) return;
+
+    const body = collectDraftFormData();
 
     try {
         const saved = await api.saveDraft(State.currentDraftId, body);
+        // The draft is now persisted with the user's content; reset the change
+        // tracking so it is no longer treated as a throwaway new draft.
+        State.draftIsNew = false;
+        State.editorBaseline = JSON.stringify(body);
         showToast(t('GRAFIDA_MSG_SAVED'), 'success');
         return saved;
     } catch (err) {
         showToast(err.message, 'error');
         throw err;
     }
+}
+
+// --------------------------------------------------------
+//  Leaving the editor (Back button)
+// --------------------------------------------------------
+
+/** Tear down the editor state and return to the articles list. */
+function leaveEditor() {
+    State.currentDraftId = null;
+    State.draftIsNew = false;
+    State.editorBaseline = null;
+    showScreen('articles');
+    loadArticlesScreen();
+}
+
+/** Discard the open draft from the database when it is a throwaway new draft. */
+async function discardNewDraftIfNeeded() {
+    if (State.draftIsNew && State.currentDraftId) {
+        try { await api.deleteDraft(State.currentDraftId); } catch {}
+    }
+}
+
+/**
+ * Handle the editor Back button: silently drop an untouched new draft, or prompt
+ * to save / keep editing / discard when there are unsaved changes.
+ */
+async function handleEditorBack() {
+    if (isEditorDirty()) {
+        showUnsavedChangesDialog();
+        return;
+    }
+    await discardNewDraftIfNeeded();
+    leaveEditor();
+}
+
+function showUnsavedChangesDialog() {
+    const msgP = el('p', null, t('GRAFIDA_MSG_UNSAVED_CHANGES'));
+
+    const saveBtn = el('button', 'btn btn-success');
+    saveBtn.type = 'button';
+    saveBtn.textContent = t('GRAFIDA_BTN_SAVE_AND_BACK');
+    saveBtn.addEventListener('click', async () => {
+        try {
+            await saveDraft();
+        } catch {
+            return; // Save failed — keep the editor open so nothing is lost.
+        }
+        closeModal();
+        leaveEditor();
+    });
+
+    const keepBtn = el('button', 'btn btn-info');
+    keepBtn.type = 'button';
+    keepBtn.textContent = t('GRAFIDA_BTN_KEEP_EDITING');
+    keepBtn.addEventListener('click', closeModal);
+
+    const discardBtn = el('button', 'btn btn-danger');
+    discardBtn.type = 'button';
+    discardBtn.textContent = t('GRAFIDA_BTN_DISCARD_CHANGES');
+    discardBtn.addEventListener('click', async () => {
+        closeModal();
+        await discardNewDraftIfNeeded();
+        leaveEditor();
+    });
+
+    showModal(t('GRAFIDA_MSG_UNSAVED_TITLE'), [msgP], [saveBtn, keepBtn, discardBtn]);
+    saveBtn.focus();
 }
 
 // --------------------------------------------------------
@@ -1477,10 +1576,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const btnBack = document.getElementById('btn-back-to-articles');
     if (btnBack) {
-        btnBack.addEventListener('click', () => {
-            showScreen('articles');
-            loadArticlesScreen();
-        });
+        btnBack.addEventListener('click', () => { handleEditorBack(); });
     }
 
     const langSel = document.getElementById('settings-language-select');

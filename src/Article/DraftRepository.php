@@ -52,9 +52,11 @@ final class DraftRepository
             'INSERT INTO drafts (site_id, remote_id, title, alias, catid, access, language, state, html, '
             . 'fields_json, tags_json, images_json, metadesc, metakey, created_at, updated_at) VALUES '
             . '(:site_id, :remote_id, :title, :alias, :catid, :access, :language, :state, :html, '
-            . ':fields, :tags, :images, :metadesc, :metakey, :now, :now)'
+            . ':fields, :tags, :images, :metadesc, :metakey, :created_at, :updated_at)'
         );
-        $stmt->execute($this->bind($draft) + [':now' => $now]);
+        // Distinct placeholders: PDO's native SQLite prepares (emulation off) reject
+        // re-using one named parameter twice with a "column index out of range" error.
+        $stmt->execute($this->bind($draft) + [':created_at' => $now, ':updated_at' => $now]);
 
         return (int) $this->pdo->lastInsertId();
     }
@@ -71,7 +73,11 @@ final class DraftRepository
             . 'tags_json = :tags, images_json = :images, metadesc = :metadesc, metakey = :metakey, '
             . 'updated_at = :now WHERE id = :id'
         );
-        $stmt->execute($this->bind($draft) + [':now' => gmdate('Y-m-d H:i:s'), ':id' => $draft->id]);
+        // The UPDATE does not touch site_id, so drop it: native SQLite prepares
+        // (emulation off) reject a bound parameter the statement does not name.
+        $params = $this->bind($draft);
+        unset($params[':site_id']);
+        $stmt->execute($params + [':now' => gmdate('Y-m-d H:i:s'), ':id' => $draft->id]);
     }
 
     public function setRemoteId(int $id, int $remoteId): void

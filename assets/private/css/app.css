@@ -236,6 +236,26 @@ nav#main-nav a .nav-icon {
     background: var(--color-border);
 }
 
+.btn-success {
+    background: var(--color-success);
+    color: #fff;
+    border-color: var(--color-success);
+}
+
+.btn-success:not(:disabled):hover {
+    filter: brightness(1.1);
+}
+
+.btn-info {
+    background: var(--color-info);
+    color: #fff;
+    border-color: var(--color-info);
+}
+
+.btn-info:not(:disabled):hover {
+    filter: brightness(1.1);
+}
+
 .btn-danger {
     background: transparent;
     color: var(--color-danger);

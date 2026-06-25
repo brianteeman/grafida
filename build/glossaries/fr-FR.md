@@ -24,3 +24,6 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | title           | titre                   | Article or site title.                                                                       |
 | token           | jeton                   | API authentication token. « API token » may be kept untranslated in technical contexts.     |
 | status | Statut | État de publication Joomla! : Publié, Dépublié, Archivé, Dans la corbeille. |
+| discard | Abandonner | Abandonner les modifications non enregistrées ; bouton « Abandonner les modifications ». |
+| unsaved changes | Modifications non enregistrées | Modifications d'un brouillon pas encore enregistrées. |
+| keep editing | Continuer l'édition | Bouton pour rester dans l'éditeur au lieu d'enregistrer ou d'abandonner. |

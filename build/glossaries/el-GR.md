@@ -24,3 +24,6 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | title           | τίτλος                  | Article or site title.                                                                  |
 | token           | διακριτικό              | API authentication token. «API token» may be kept untranslated in technical contexts.  |
 | status | Κατάσταση | Joomla! publishing state: Δημοσιευμένο, Μη δημοσιευμένο, Αρχειοθετημένο, Στον κάδο. |
+| discard | Απόρριψη | Discard unsaved changes; button «Απόρριψη όλων των αλλαγών». |
+| unsaved changes | Μη αποθηκευμένες αλλαγές | Edits to a draft not yet saved. |
+| keep editing | Συνέχιση επεξεργασίας | Button to stay in the editor instead of saving or discarding. |

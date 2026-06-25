@@ -30,3 +30,6 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | insert | Einfügen | Element in den Editor einfügen. |
 | auto-detect | Automatisch erkennen | Sprach- oder Einstellungserkennung; kurze Form: „(Automatisch)". |
 | status | Status | Joomla!-Veröffentlichungsstatus: Veröffentlicht, Versteckt, Archiviert, Im Papierkorb. |
+| discard | Verwerfen | Ungespeicherte Änderungen verwerfen; Schaltfläche „Alle Änderungen verwerfen". |
+| unsaved changes | Nicht gespeicherte Änderungen | Noch nicht gespeicherte Bearbeitungen eines Entwurfs. |
+| keep editing | Weiter bearbeiten | Schaltfläche, um im Editor zu bleiben, statt zu speichern oder zu verwerfen. |

@@ -24,3 +24,6 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | title             | titolo                 | Titolo di un articolo o di un sito.                                                                     |
 | token             | token                  | Token di autenticazione API. Mantenuto in inglese: è il termine standard nella documentazione tecnica.  |
 | status | Stato | Stato di pubblicazione Joomla!: Pubblicato, Non pubblicato, Archiviato, Nel cestino. |
+| discard | Ignora | Ignora le modifiche non salvate; pulsante «Ignora tutte le modifiche». |
+| unsaved changes | Modifiche non salvate | Modifiche a una bozza non ancora salvate. |
+| keep editing | Continua a modificare | Pulsante per restare nell'editor invece di salvare o ignorare. |
