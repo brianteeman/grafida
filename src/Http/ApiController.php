@@ -199,6 +199,10 @@ final class ApiController
             is_bool($allowInsecureVal) ? $allowInsecureVal : (bool) $allowInsecureVal,
         );
 
+        // Warm the categories/tags/languages cache the moment a site is connected,
+        // so the first article (new or existing) has its selectors populated.
+        $this->references->sync($site);
+
         return Json::ok($site->toArray(), 201);
     }
 
@@ -217,6 +221,9 @@ final class ApiController
             is_bool($allowInsecureVal) ? $allowInsecureVal : (bool) $allowInsecureVal,
         );
 
+        // Re-warm reference data in case the URL or token changed.
+        $this->references->sync($site);
+
         return Json::ok($site->toArray());
     }
 
@@ -231,13 +238,19 @@ final class ApiController
     {
         $site = $this->requireSite($siteId);
 
-        $fieldDefs = $this->references->fields($site, $refresh);
+        // Opening the editor (refresh = false) is a best-effort attempt: a list
+        // that cannot be fetched falls back to its cached copy with a short
+        // timeout. The explicit "refresh" button (refresh = true) is strict so
+        // the user sees why a refresh failed.
+        $bestEffort = !$refresh;
+
+        $fieldDefs = $this->references->fields($site, $refresh, $bestEffort);
 
         return Json::ok([
-            'categories' => $this->references->categories($site, $refresh),
-            'tags'       => $this->references->tags($site, $refresh),
-            'levels'     => $this->references->accessLevels($site, $refresh),
-            'languages'  => $this->references->contentLanguages($site, $refresh),
+            'categories' => $this->references->categories($site, $refresh, $bestEffort),
+            'tags'       => $this->references->tags($site, $refresh, $bestEffort),
+            'levels'     => $this->references->accessLevels($site, $refresh, $bestEffort),
+            'languages'  => $this->references->contentLanguages($site, $refresh, $bestEffort),
             'fields'     => $this->fields->partition($fieldDefs),
         ]);
     }

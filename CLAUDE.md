@@ -25,6 +25,9 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
 - `src/Secret/` — OS secret stores (macOS `security`, Linux `secret-tool`, Windows DPAPI) + factory.
 - `src/Site/` — site entity, repository, `SiteService` (token storage + connection test).
 - `src/Reference/` — cached categories/tags/levels/fields + `EditorCssService` (5s fetch, rebase, cache).
+  `ReferenceService` uses a short-timeout (8s) API client; `sync()` warms the cache best-effort
+  when a site is connected/updated, and opening the editor falls back to cache per-list (only the
+  manual refresh button surfaces fetch errors).
 - `src/Field/FieldSupport.php` — supported field-type subset + required-unsupported guard.
 - `src/Article/` — `Draft` entity + repository (local drafts).
 - `src/Media/` — offline image blobs (`media_blobs`).

@@ -59,7 +59,7 @@ final class Kernel
 
         $siteService = new SiteService(new SiteRepository($pdo), $apiClient, $secureStore);
         $referenceRepo = new ReferenceRepository($pdo);
-        $references  = new ReferenceService($referenceRepo, $apiClient, $siteService);
+        $references  = new ReferenceService($referenceRepo, $siteService);
         $editorCss   = new EditorCssService($referenceRepo);
         $drafts      = new DraftRepository($pdo);
         $media       = new MediaRepository($pdo);
