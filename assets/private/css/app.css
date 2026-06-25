@@ -133,6 +133,12 @@ nav#main-nav a:hover {
     background: var(--color-surface-2);
 }
 
+nav#main-nav a.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    pointer-events: none;
+}
+
 nav#main-nav a.active {
     color: var(--color-text);
     background: var(--color-surface-2);

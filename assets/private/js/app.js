@@ -237,14 +237,39 @@ function showScreen(name) {
 //  Site selector in sidebar
 // ============================================================
 
+const LAST_SITE_KEY = 'grafida.lastSiteId';
+
+function rememberLastSite(id) {
+    try {
+        if (id) localStorage.setItem(LAST_SITE_KEY, String(id));
+    } catch (e) { /* storage may be unavailable */ }
+}
+
+function recallLastSite() {
+    try {
+        const raw = localStorage.getItem(LAST_SITE_KEY);
+        return raw ? parseInt(raw, 10) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
 function renderSiteSelector() {
     const sel = document.getElementById('site-select');
     clearNode(sel);
 
-    const defaultOpt = document.createElement('option');
-    defaultOpt.value = '';
-    defaultOpt.textContent = `— ${t('GRAFIDA_MSG_NO_SITES')} —`;
-    sel.appendChild(defaultOpt);
+    // The placeholder is only meaningful when there is nothing to select.
+    if (!State.sites.length) {
+        const defaultOpt = document.createElement('option');
+        defaultOpt.value = '';
+        defaultOpt.textContent = `— ${t('GRAFIDA_MSG_NO_SITES')} —`;
+        sel.appendChild(defaultOpt);
+        sel.disabled = true;
+        State.currentSiteId = null;
+        updateNewArticleButton();
+        updateNavState();
+        return;
+    }
 
     State.sites.forEach(site => {
         const opt = document.createElement('option');
@@ -253,13 +278,41 @@ function renderSiteSelector() {
         sel.appendChild(opt);
     });
 
+    // Preselect: the current site, else the last used one, else the first.
+    let selectedId = null;
     if (State.currentSiteId && State.sites.find(s => s.id === State.currentSiteId)) {
-        sel.value = State.currentSiteId;
-    } else if (State.sites.length === 1) {
-        sel.value = State.sites[0].id;
-        State.currentSiteId = State.sites[0].id;
+        selectedId = State.currentSiteId;
+    } else {
+        const remembered = recallLastSite();
+        if (remembered && State.sites.find(s => s.id === remembered)) {
+            selectedId = remembered;
+        } else {
+            selectedId = State.sites[0].id;
+        }
     }
+
+    sel.value = selectedId;
+    State.currentSiteId = selectedId;
+    rememberLastSite(selectedId);
+
+    // A single-option drop-down offers no choice, so disable it.
+    sel.disabled = State.sites.length === 1;
+
     updateNewArticleButton();
+    updateNavState();
+}
+
+function updateNavState() {
+    const hasSites = State.sites.length > 0;
+    const articlesLink = document.querySelector('nav#main-nav a[data-screen="articles"]');
+    if (articlesLink) {
+        articlesLink.classList.toggle('disabled', !hasSites);
+        articlesLink.setAttribute('aria-disabled', hasSites ? 'false' : 'true');
+    }
+    // The Articles screen is unusable without a site; fall back to Sites.
+    if (!hasSites && State.activeScreen === 'articles') {
+        showScreen('sites');
+    }
 }
 
 function updateNewArticleButton() {
@@ -1523,6 +1576,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('nav#main-nav a[data-screen]').forEach(link => {
         link.addEventListener('click', (e) => {
             e.preventDefault();
+            if (link.classList.contains('disabled')) return;
             const screen = link.dataset.screen;
             showScreen(screen);
             if (screen === 'articles') loadArticlesScreen();
@@ -1535,6 +1589,7 @@ document.addEventListener('DOMContentLoaded', () => {
         siteSel.addEventListener('change', () => {
             const val = siteSel.value;
             State.currentSiteId = val ? parseInt(val, 10) : null;
+            rememberLastSite(State.currentSiteId);
             State.references = null;
             State.editorCss = null;
             updateNewArticleButton();
