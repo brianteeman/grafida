@@ -192,8 +192,14 @@ failing compile or a genuine packaging-tool error is fatal. Pieces:
   top-level JSON object of field values** — Joomla's JSON:API `{data:{type,attributes}}`
   envelope is for *responses only*; wrapping a write makes Joomla bind nothing and
   silently return the unchanged resource (a PATCH no-op). The record id for an update
-  comes from the URL, not the body. Send `articletext` with a `<hr id="system-readmore" />`
-  marker to split introtext/fulltext. Custom field values go under `com_fields`. Tags
+  comes from the URL, not the body. Send the body as the discrete `introtext` /
+  `fulltext` columns — **not** the combined `articletext` field. On a PATCH the API
+  controller backfills every real DB column we omit from the *existing* record, and
+  `Content::bind()` ends with `parent::bind()`, overwriting the introtext/fulltext it
+  derives from `articletext` with the backfilled OLD values — so a PATCH that sends
+  only `articletext` silently reverts the body (a create has no backfill, so it worked).
+  Sending `introtext`/`fulltext` keeps them present in the data, never backfilled.
+  Custom field values go under `com_fields`. Tags
   are an array of IDs. (`ApiClient::send()` posts the flat body; only responses are unwrapped.)
 - Media upload: `POST /v1/media/files` with `{path, content:<base64>}`; the response `url` is public.
 

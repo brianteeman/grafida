@@ -35,8 +35,6 @@ use Grafida\Site\SiteService;
  */
 final class PublishService
 {
-    private const READMORE_MARKER = "\n<hr id=\"system-readmore\" />\n";
-
     /** Sentinel an editor image carries until its offline blob is uploaded on publish. */
     private const MEDIA_REF_PREFIX = 'grafida-media://';
 
@@ -81,19 +79,27 @@ final class PublishService
 
         $tagIds = $this->resolveTags($draft->tags, $site, $base, $token);
 
-        $split      = $this->splitter->split($html);
-        $articletext = $split['fulltext'] === ''
-            ? $split['introtext']
-            : $split['introtext'] . self::READMORE_MARKER . $split['fulltext'];
+        $split = $this->splitter->split($html);
 
         // Always-present attributes.
+        //
+        // The body is sent as the canonical `introtext` / `fulltext` columns rather
+        // than the combined `articletext` field. On a PATCH, Joomla's API controller
+        // backfills every real DB column we omit from the *existing* record, and
+        // `Content::bind()` finishes with `parent::bind()` — which overwrites the
+        // introtext/fulltext it derived from `articletext` with whatever is in the
+        // array. Sending only `articletext` therefore restores the OLD body on every
+        // update (a create has no backfill, so it appeared to work). Sending the two
+        // columns directly keeps them present in the data, so they are never
+        // backfilled and bind writes our new values for both POST and PATCH.
         $attributes = [
-            'title'       => $draft->title,
-            'catid'       => $draft->catid,
-            'access'      => $draft->access,
-            'state'       => $draft->state,
-            'language'    => $draft->language,
-            'articletext' => $articletext,
+            'title'     => $draft->title,
+            'catid'     => $draft->catid,
+            'access'    => $draft->access,
+            'state'     => $draft->state,
+            'language'  => $draft->language,
+            'introtext' => $split['introtext'],
+            'fulltext'  => $split['fulltext'],
         ];
 
         // Optional attributes, included only when they carry a value.
