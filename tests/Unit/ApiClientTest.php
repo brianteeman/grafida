@@ -76,8 +76,10 @@ final class ApiClientTest extends TestCase
         $client->probeApiBase('https://example.com', 'bad-token');
     }
 
-    public function testCreateArticleWrapsAttributesInJsonApiDocument(): void
+    public function testCreateArticleSendsAFlatFieldBody(): void
     {
+        // Joomla's Web Services API takes a flat JSON object of field values for
+        // writes (the JSON:API data/attributes envelope is for responses only).
         $transport = new FakeTransport();
         $transport->on(
             'https://example.com/index.php/api/v1/content/articles',
@@ -91,9 +93,58 @@ final class ApiClientTest extends TestCase
         self::assertSame('Hello', $article['title']);
 
         $sent = json_decode((string) $transport->requests[0]['body'], true);
-        self::assertSame('articles', $sent['data']['type']);
-        self::assertSame('Hello', $sent['data']['attributes']['title']);
-        self::assertSame(2, $sent['data']['attributes']['catid']);
+        self::assertArrayNotHasKey('data', $sent);
+        self::assertSame('Hello', $sent['title']);
+        self::assertSame(2, $sent['catid']);
+    }
+
+    public function testCreateArticleRejectsCollectionResponseFromRedirectDowngrade(): void
+    {
+        // A POST silently downgraded to a GET lands on the collection endpoint and
+        // returns a *list* with a 200 status. That must not read as a success.
+        $transport = new FakeTransport();
+        $transport->on(
+            'https://example.com/index.php/api/v1/content/articles',
+            new HttpResponse(200, '{"data":[{"type":"articles","id":"1"},{"type":"articles","id":"2"}]}')
+        );
+
+        $client = new ApiClient($transport);
+
+        $this->expectException(ApiException::class);
+        $client->createArticle('https://example.com/index.php/api', 'tok', ['title' => 'Hello']);
+    }
+
+    public function testUpdateArticleRejectsResponseWithoutAResourceId(): void
+    {
+        $transport = new FakeTransport();
+        $transport->on(
+            'https://example.com/index.php/api/v1/content/articles/42',
+            new HttpResponse(200, '{"data":{"type":"articles","attributes":{"title":"Hello"}}}')
+        );
+
+        $client = new ApiClient($transport);
+
+        $this->expectException(ApiException::class);
+        $client->updateArticle('https://example.com/index.php/api', 'tok', 42, ['title' => 'Hello']);
+    }
+
+    public function testUpdateArticleSendsAFlatFieldBodyWithoutAnEnvelope(): void
+    {
+        // The record id for an update comes from the URL; the body is just the
+        // changed fields, flat. Wrapping in data/attributes makes Joomla bind
+        // nothing and silently return the unchanged article.
+        $transport = new FakeTransport();
+        $transport->on(
+            'https://example.com/index.php/api/v1/content/articles/42',
+            new HttpResponse(200, '{"data":{"type":"articles","id":"42","attributes":{"title":"Hello"}}}')
+        );
+
+        $client = new ApiClient($transport);
+        $client->updateArticle('https://example.com/index.php/api', 'tok', 42, ['title' => 'Hello']);
+
+        $sent = json_decode((string) $transport->requests[0]['body'], true);
+        self::assertArrayNotHasKey('data', $sent);
+        self::assertSame('Hello', $sent['title']);
     }
 
     public function testGetArticleExposesTextAttributeAndRelationships(): void

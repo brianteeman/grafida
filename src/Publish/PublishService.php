@@ -126,6 +126,8 @@ final class PublishService
             $created = false;
         }
 
+        $this->assertArticleSaved($article, $draft->title);
+
         $articleId = $article['id'] ?? null;
         $remoteId  = is_int($articleId) ? $articleId : (is_numeric($articleId) ? (int) $articleId : ($draft->remoteId ?? 0));
 
@@ -134,6 +136,51 @@ final class PublishService
         }
 
         return ['remoteId' => $remoteId, 'created' => $created];
+    }
+
+    /**
+     * Confirms the API actually saved what we submitted, rather than trusting the
+     * HTTP status alone — but only fails on *positive* contradiction, never on a
+     * mere absence of evidence, so a write that succeeded is never blocked.
+     *
+     *  - The response must carry a real article `id`. A write that returns no
+     *    resource id never reached the article (e.g. a redirect dropped the body
+     *    and we landed on a collection/error document).
+     *  - If the response echoes a `title`, it must match the one we sent. Joomla
+     *    stores the title verbatim, so a *different* title means the server
+     *    returned some other (older) state instead of our write. A missing/omitted
+     *    title is tolerated: write responses don't serialize the same field set on
+     *    every Joomla version, and a body-only edit we cannot verify must not be
+     *    reported as a failure.
+     *
+     * @param array<string, mixed> $article The flattened resource the API returned.
+     *
+     * @throws \Grafida\Joomla\ApiException
+     */
+    private function assertArticleSaved(array $article, string $sentTitle): void
+    {
+        $id    = $article['id'] ?? null;
+        $hasId = (is_int($id) && $id > 0) || (is_string($id) && is_numeric($id) && (int) $id > 0);
+
+        if (!$hasId) {
+            throw new \Grafida\Joomla\ApiException(
+                'The site reported success but returned no article id, so the change was not saved. '
+                . 'The request was likely redirected and its body dropped (an http→https or '
+                . 'trailing-slash rewrite), or a proxy served a read in place of the write.'
+            );
+        }
+
+        $rawTitle = $article['title'] ?? null;
+
+        if (is_string($rawTitle) && trim($rawTitle) !== trim($sentTitle)) {
+            throw new \Grafida\Joomla\ApiException(sprintf(
+                'The site reported success but returned a different article than the one submitted '
+                . '(sent title "%s", server returned id %s with title "%s"). The change was not published.',
+                $sentTitle,
+                (string) $id,
+                $rawTitle
+            ));
+        }
     }
 
     /**

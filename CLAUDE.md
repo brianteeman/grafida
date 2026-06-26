@@ -150,9 +150,13 @@ failing compile or a genuine packaging-tool error is fatal. Pieces:
   server rules. `ApiClient` normalises any pasted URL to the bare root and **probes** to find
   the working base, persisting it per site.
 - Auth header: `Authorization: Bearer <token>` (also sends `X-Joomla-Token`). User needs `core.login.api`.
-- Articles: `POST/PATCH /v1/content/articles`, JSON:API `{data:{type:"articles",attributes:{...}}}`.
-  Send `articletext` with a `<hr id="system-readmore" />` marker to split introtext/fulltext.
-  Custom field values go under `com_fields`. Tags are an array of IDs.
+- Articles: `POST/PATCH /v1/content/articles[/{id}]`. **Write bodies are a flat
+  top-level JSON object of field values** — Joomla's JSON:API `{data:{type,attributes}}`
+  envelope is for *responses only*; wrapping a write makes Joomla bind nothing and
+  silently return the unchanged resource (a PATCH no-op). The record id for an update
+  comes from the URL, not the body. Send `articletext` with a `<hr id="system-readmore" />`
+  marker to split introtext/fulltext. Custom field values go under `com_fields`. Tags
+  are an array of IDs. (`ApiClient::send()` posts the flat body; only responses are unwrapped.)
 - Media upload: `POST /v1/media/files` with `{path, content:<base64>}`; the response `url` is public.
 
 ## Conventions

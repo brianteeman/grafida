@@ -61,6 +61,12 @@ final class HttpClient implements Transport
             \CURLOPT_RETURNTRANSFER => true,
             \CURLOPT_FOLLOWLOCATION => true,
             \CURLOPT_MAXREDIRS      => 5,
+            // Preserve the method and body across 301/302/303 redirects. Without
+            // this, libcurl rewrites a redirected POST/PATCH into a bodyless GET,
+            // so a publish to a site that redirects (http→https, www, trailing
+            // slash) silently no-ops: Joomla returns the unchanged article with
+            // 200 OK and Grafida reports success while nothing was written.
+            \CURLOPT_POSTREDIR      => \CURL_REDIR_POST_ALL,
             \CURLOPT_CONNECTTIMEOUT => $this->timeout,
             \CURLOPT_TIMEOUT        => $this->timeout,
             \CURLOPT_HTTPHEADER     => $headerLines,

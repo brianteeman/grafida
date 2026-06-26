@@ -228,10 +228,13 @@ final class ApiClient
      */
     public function uploadMedia(string $base, string $token, string $path, string $rawContents): array
     {
+        // Media responses don't follow the same single-resource contract as
+        // articles/tags across Joomla versions; skip the resource assertion and
+        // rely on the `url` (with its own fallback in PublishService::uploadBlob).
         $response = $this->send($base, $token, 'POST', 'media/files', 'media', [
             'path'    => $path,
             'content' => base64_encode($rawContents),
-        ]);
+        ], false);
 
         return $this->unwrapResource($response);
     }
@@ -261,25 +264,63 @@ final class ApiClient
     // ---------------------------------------------------------------------
 
     /**
-     * Sends a write request whose attributes are wrapped in a JSON:API document.
+     * Sends a write request. Joomla's Web Services API uses the JSON:API
+     * `{data:{type,attributes}}` envelope only for *responses*; *write* requests
+     * (create/update) take a flat top-level JSON object of field values — wrapping
+     * them in `data`/`attributes` makes Joomla find no recognised fields and bind
+     * nothing (a silent no-op on PATCH, returning the unchanged resource). The
+     * record id for an update comes from the URL, not the body.
+     *
+     * `$type` is only the expected JSON:API type of the *response* resource, used
+     * to confirm the write actually returned the saved item (see assertWroteResource).
      *
      * @param array<string, mixed> $attributes
      */
-    private function send(string $base, string $token, string $method, string $route, string $type, array $attributes): HttpResponse
+    private function send(string $base, string $token, string $method, string $route, string $type, array $attributes, bool $expectResource = true): HttpResponse
     {
-        $documentEncoded = json_encode([
-            'data' => [
-                'type'       => $type,
-                'attributes' => $attributes,
-            ],
-        ], \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
-        $document = $documentEncoded !== false ? $documentEncoded : '{}';
+        $documentEncoded = json_encode($attributes, \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
+        $document        = $documentEncoded !== false ? $documentEncoded : '{}';
 
         $response = $this->raw($method, $base . '/v1/' . $route, $token, $document);
 
         $this->assertSuccess($response);
 
+        if ($expectResource) {
+            $this->assertWroteResource($response, $type);
+        }
+
         return $response;
+    }
+
+    /**
+     * A 2xx status only means the request was *accepted*, not that our write was
+     * *applied*. A redirect that strips the body (a proxy or a server rewrite
+     * turning a POST/PATCH into a GET) yields a perfectly valid 200 whose payload
+     * is a *collection* (for a create that landed on the list endpoint) or some
+     * unrelated document — never the single resource a write returns. Assert the
+     * response is the saved resource of the expected `type` carrying an `id`, so a
+     * silent no-op surfaces as an error instead of a false "published" success.
+     */
+    private function assertWroteResource(HttpResponse $response, string $type): void
+    {
+        $data = $response->json()['data'] ?? null;
+
+        $isSingleResource = is_array($data) && $data !== [] && !array_is_list($data);
+        $idValue          = $isSingleResource ? ($data['id'] ?? null) : null;
+        $hasId            = (is_int($idValue) || is_string($idValue)) && (string) $idValue !== '';
+        $typeMatches      = $isSingleResource
+            && (!isset($data['type']) || (is_string($data['type']) && $data['type'] === $type));
+
+        if ($isSingleResource && $hasId && $typeMatches) {
+            return;
+        }
+
+        throw new ApiException(
+            'The server returned a success status but not the saved resource — the request was likely '
+            . 'redirected and its body dropped (e.g. an http→https or trailing-slash rewrite). The change '
+            . 'was not applied.',
+            $response->status
+        );
     }
 
     /**
