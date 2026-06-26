@@ -224,6 +224,16 @@ function clearNode(node) {
 //  API helpers
 // ============================================================
 
+// Count of in-flight apiFetch() calls; while > 0 the Articles page shows a
+// network-activity indicator so it is clear data is still loading.
+let netActivityCount = 0;
+
+/** Reflects the current in-flight request count on the Articles page indicator. */
+function updateNetActivityIndicator() {
+    const ind = document.getElementById('articles-net-indicator');
+    if (ind) ind.classList.toggle('active', netActivityCount > 0);
+}
+
 async function apiFetch(method, path, body = null) {
     const opts = {
         method,
@@ -232,21 +242,28 @@ async function apiFetch(method, path, body = null) {
     if (body !== null) {
         opts.body = JSON.stringify(body);
     }
-    const res = await fetch('boson://app' + path, opts);
-    let json;
+    netActivityCount++;
+    updateNetActivityIndicator();
     try {
-        json = await res.json();
-    } catch {
-        throw new Error('Invalid JSON response from server');
+        const res = await fetch('boson://app' + path, opts);
+        let json;
+        try {
+            json = await res.json();
+        } catch {
+            throw new Error('Invalid JSON response from server');
+        }
+        if (!json.ok) {
+            const err = new Error(json.error || 'API error');
+            err.code = json.code || null;
+            err.fieldLabels = json.fieldLabels || null;
+            err.status = res.status;
+            throw err;
+        }
+        return json.data;
+    } finally {
+        netActivityCount = Math.max(0, netActivityCount - 1);
+        updateNetActivityIndicator();
     }
-    if (!json.ok) {
-        const err = new Error(json.error || 'API error');
-        err.code = json.code || null;
-        err.fieldLabels = json.fieldLabels || null;
-        err.status = res.status;
-        throw err;
-    }
-    return json.data;
 }
 
 const api = {
@@ -961,6 +978,16 @@ function buildArticlesTabs() {
     };
     tabs.appendChild(mk('drafts', 'GRAFIDA_LBL_LOCAL_DRAFTS'));
     tabs.appendChild(mk('remote', 'GRAFIDA_LBL_REMOTE_ARTICLES'));
+
+    // Network-activity indicator: visible (via updateNetActivityIndicator) only
+    // while one or more apiFetch() requests are in flight.
+    const indicator = el('span', 'articles-net-indicator',
+        el('span', 'spinner'),
+        el('span', null, t('GRAFIDA_MSG_LOADING')));
+    indicator.id = 'articles-net-indicator';
+    tabs.appendChild(indicator);
+    updateNetActivityIndicator();
+
     return tabs;
 }
 

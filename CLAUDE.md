@@ -70,7 +70,11 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
   offset]`. `ApiClient::listArticlesPage()` returns the page's items **and** the pagination total
   (Joomla's `meta['total-pages']`). Default sort is `a.id` desc. The Articles page is split into
   two tabs — **Local Drafts** and **Remote Articles** (`State.articlesTab`, default `drafts`) —
-  each with its own filter/sort toolbar, list and prev/next pagination. The Remote Articles tab
+  each with its own filter/sort toolbar, list and prev/next pagination. The tab strip carries a
+  right-aligned **network-activity indicator** (`#articles-net-indicator`): `apiFetch()` keeps a
+  global in-flight-request counter (`netActivityCount`) and `updateNetActivityIndicator()` shows a
+  spinner + the `GRAFIDA_MSG_LOADING` label while the counter is > 0, so it is clear whether data
+  is still loading. The Remote Articles tab
   renders the server-paginated toolbar (search, sort column + direction, category/tag/language/
   state/featured/checked-out dropdowns, per-page limit, clear-filters). The Local Drafts tab
   offers the same shape, but drafts are loaded in full per visit and **searched/sorted/filtered/

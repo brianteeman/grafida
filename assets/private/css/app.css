@@ -817,6 +817,32 @@ input[type="color"].form-control {
     border-bottom-color: var(--color-accent);
 }
 
+/* Network-activity indicator, pinned to the right of the tab strip. */
+.articles-net-indicator {
+    margin-left: auto;
+    align-self: center;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 4px 6px;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity var(--transition);
+}
+
+.articles-net-indicator.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.articles-net-indicator .spinner {
+    width: 14px;
+    height: 14px;
+    border-width: 2px;
+}
+
 /* Remote-article filter / sort toolbar */
 .articles-filter-bar {
     display: flex;
