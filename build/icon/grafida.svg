@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Grafida — edit Joomla! articles on your desktop.
+  Copyright (c) 2026 Nicholas K. Dionysopoulos
+  GNU General Public License version 3, or later.
+
+  Master application icon (clipart style): a pencil drawing a capital "J".
+  This is the single source of truth for every platform icon; run
+  scripts/make-icons.sh to rasterise it into .icns / .ico / PNG.
+-->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3a7bff"/>
+      <stop offset="1" stop-color="#1740c4"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0" y1="-60" x2="0" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f3c98a"/>
+      <stop offset="1" stop-color="#d99c4e"/>
+    </linearGradient>
+    <linearGradient id="barrel" x1="0" y1="-60" x2="0" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe06a"/>
+      <stop offset="0.5" stop-color="#f8c93b"/>
+      <stop offset="1" stop-color="#e0a81f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Rounded-square background -->
+  <rect x="64" y="64" width="896" height="896" rx="210" fill="url(#bg)"/>
+  <!-- Soft top-left sheen -->
+  <rect x="64" y="64" width="896" height="448" rx="210" fill="#ffffff" opacity="0.07"/>
+
+  <!-- The capital "J": navy outline first, white stroke on top -->
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M 470 300 L 700 300 M 610 300 L 610 600 C 610 706 540 752 452 752 C 388 752 342 720 326 664"
+          stroke="#0d2a73" stroke-width="150"/>
+    <path d="M 470 300 L 700 300 M 610 300 L 610 600 C 610 706 540 752 452 752 C 388 752 342 720 326 664"
+          stroke="#ffffff" stroke-width="104"/>
+  </g>
+
+  <!-- The pencil, drawn horizontally (tip at origin) then rotated into place.
+       Tip touches the bottom of the J's hook. -->
+  <g transform="translate(452,752) rotate(-37)" stroke="#0d2a73" stroke-width="12"
+     stroke-linejoin="round">
+    <!-- Eraser (pink, rounded far end) -->
+    <rect x="470" y="-58" width="78" height="116" rx="34" fill="#ef6f86"/>
+    <!-- Metal ferrule -->
+    <rect x="430" y="-58" width="56" height="116" fill="#cfd4dc"/>
+    <line x1="448" y1="-58" x2="448" y2="58" stroke="#9aa1ad" stroke-width="8"/>
+    <line x1="468" y1="-58" x2="468" y2="58" stroke="#9aa1ad" stroke-width="8"/>
+    <!-- Yellow barrel -->
+    <rect x="150" y="-58" width="288" height="116" fill="url(#barrel)"/>
+    <!-- Sharpened wood cone -->
+    <path d="M 150 -58 L 150 58 L 38 30 L 38 -30 Z" fill="url(#wood)"/>
+    <!-- Graphite tip -->
+    <path d="M 38 -30 L 38 30 L 0 0 Z" fill="#3b3b3b"/>
+  </g>
+</svg>

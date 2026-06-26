@@ -42,6 +42,17 @@ cp "$SRC_DIR"/*.dylib "$MACOS/" 2>/dev/null || true
 [ -d "$SRC_DIR/assets" ] && cp -R "$SRC_DIR/assets" "$MACOS/assets"
 chmod +x "$MACOS/grafida"
 
+# Application icon. Generate it from the master SVG if it is missing.
+ICNS="$ROOT/build/icon/Grafida.icns"
+if [ ! -f "$ICNS" ] && [ -x "$ROOT/scripts/make-icons.sh" ]; then
+  "$ROOT/scripts/make-icons.sh" >/dev/null
+fi
+if [ -f "$ICNS" ]; then
+  cp "$ICNS" "$APP/Contents/Resources/Grafida.icns"
+else
+  echo "Warning: $ICNS not found — bundle will use the generic app icon." >&2
+fi
+
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -53,6 +64,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleVersion</key><string>${VERSION}</string>
     <key>CFBundleShortVersionString</key><string>${VERSION}</string>
     <key>CFBundleExecutable</key><string>grafida</string>
+    <key>CFBundleIconFile</key><string>Grafida</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>

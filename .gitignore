@@ -11,6 +11,7 @@ Thumbs.db
 # Build artifacts and dependencies
 /build/*
 !/build/glossaries/
+!/build/icon/
 /vendor
 
 # Implementation step plans (working notes, not shipped)

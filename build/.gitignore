@@ -2,3 +2,5 @@
 !.gitignore
 !glossaries/
 !glossaries/**
+!icon/
+!icon/**

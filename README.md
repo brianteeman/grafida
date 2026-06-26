@@ -76,6 +76,27 @@ migrations are extracted once, on first launch, into the application data direct
 For distribution, sign the bundle with a Developer ID identity and notarise it (the script
 only applies an ad-hoc signature, which is enough to run locally).
 
+### Application icons
+
+The application icon (a pencil drawing a capital “J”) lives as a single master SVG at
+`build/icon/grafida.svg`. Regenerate every per-platform format from it with:
+
+```bash
+scripts/make-icons.sh
+```
+
+This writes `build/icon/Grafida.icns` (macOS), `build/icon/Grafida.ico` (Windows) and a PNG
+set under `build/icon/png/` (Linux), plus a 512px `build/icon/grafida.png`. The generated
+files are committed, so you only need to re-run this after editing the SVG.
+
+- **macOS** — `scripts/make-macos-app.sh` copies `Grafida.icns` into the bundle and references
+  it from `Info.plist` automatically (regenerating it first if missing).
+- **Windows** — embed `build/icon/Grafida.ico` into the compiled `grafida.exe`, e.g. with
+  [`rcedit`](https://github.com/electron/rcedit): `rcedit grafida.exe --set-icon Grafida.ico`.
+- **Linux** — install the PNGs into the hicolor icon theme (e.g.
+  `build/icon/png/grafida-256.png` → `~/.local/share/icons/hicolor/256x256/apps/grafida.png`)
+  and install `build/icon/grafida.desktop` (its `Icon=grafida` line resolves against the theme).
+
 ## Testing
 
 ```bash

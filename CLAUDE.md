@@ -94,6 +94,13 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
 - `language/<tag>/<tag>.com_grafida.ini` + `language/grafida.xml` — translations + manifest.
 - `storage/migrations/*.sql` — schema. `.plans/` — implementation step notes (gitignored).
 - `build/glossaries/` — per-language translation glossaries.
+- `build/icon/` — application icon. `grafida.svg` is the **single master** (clipart pencil
+  drawing a capital “J”); `scripts/make-icons.sh` rasterises it into `Grafida.icns` (macOS),
+  `Grafida.ico` (Windows), a `png/` set + `grafida.png` (Linux), all committed. Wiring:
+  `make-macos-app.sh` copies the `.icns` into the bundle + `Info.plist` (`CFBundleIconFile`);
+  Windows embeds the `.ico` into `grafida.exe` (rcedit); Linux ships `grafida.desktop` +
+  hicolor PNGs. `build/` is otherwise gitignored — `build/icon/` and `build/glossaries/` are
+  the whitelisted exceptions (see `build/.gitignore`). Re-run the script after editing the SVG.
 
 ## Key Joomla API facts (verified against Joomla 5.4 source)
 

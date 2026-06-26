@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Grafida
+GenericName=Joomla! Article Editor
+Comment=Edit Joomla! articles on your desktop
+Exec=grafida
+Icon=grafida
+Terminal=false
+Categories=Office;Publishing;WebDevelopment;
+Keywords=Joomla;article;editor;CMS;publishing;
+StartupWMClass=grafida
