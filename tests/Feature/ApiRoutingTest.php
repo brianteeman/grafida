@@ -72,6 +72,25 @@ final class ApiRoutingTest extends TestCase
         self::assertSame('Grafida', $json['data']['strings']['GRAFIDA_APP_TITLE']);
         self::assertArrayHasKey('el-GR', $json['data']['availableLanguages']);
         self::assertSame([], $json['data']['sites']);
+        // OS-probed appearance: true/false, or null when undetectable.
+        self::assertArrayHasKey('systemPrefersDark', $json['data']);
+        self::assertTrue(
+            $json['data']['systemPrefersDark'] === null
+            || \is_bool($json['data']['systemPrefersDark'])
+        );
+    }
+
+    public function testSystemThemeEndpoint(): void
+    {
+        [$status, $json] = $this->call($this->kernel(), 'GET', '/api/settings/system-theme');
+
+        self::assertSame(200, $status);
+        self::assertTrue($json['ok']);
+        self::assertArrayHasKey('systemPrefersDark', $json['data']);
+        self::assertTrue(
+            $json['data']['systemPrefersDark'] === null
+            || \is_bool($json['data']['systemPrefersDark'])
+        );
     }
 
     public function testBootstrapReturnsAppMetadata(): void

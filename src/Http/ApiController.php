@@ -127,6 +127,7 @@ final class ApiController
             $method === 'POST' && $path === '/api/markdown'        => $this->convertMarkdown($body),
             $method === 'POST' && $path === '/api/settings/language' => $this->setLanguage($body),
             $method === 'POST' && $path === '/api/settings/display-mode' => $this->setDisplayMode($body),
+            $method === 'GET'  && $path === '/api/settings/system-theme' => $this->systemTheme(),
             $method === 'GET'  && $path === '/api/settings/storage'  => $this->storageInfo(),
             $method === 'POST' && $path === '/api/settings/storage/open'  => $this->openStorageFolder(),
             $method === 'POST' && $path === '/api/settings/storage/reset' => $this->resetStorage(),
@@ -210,6 +211,7 @@ final class ApiController
             'languageOverride'    => $this->language->override(),
             'availableLanguages'  => LanguageService::AVAILABLE,
             'displayMode'         => $this->displayMode->current(),
+            'systemPrefersDark'   => $this->displayMode->systemPrefersDark(),
             'secureStore'         => $this->sites->hasSecureStore(),
             'supportedFieldTypes' => FieldSupport::SUPPORTED,
             'sites'               => array_map($this->siteArray(...), $this->sites->list()),
@@ -730,6 +732,12 @@ final class ApiController
         $mode = $this->displayMode->set($this->str($body, 'mode', DisplayModeService::AUTO));
 
         return Json::ok(['displayMode' => $mode]);
+    }
+
+    /** Re-probes the OS light/dark preference so "auto" can follow it at runtime. */
+    private function systemTheme(): ResponseInterface
+    {
+        return Json::ok(['systemPrefersDark' => $this->displayMode->systemPrefersDark()]);
     }
 
     private function storageInfo(): ResponseInterface

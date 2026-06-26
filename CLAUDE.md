@@ -78,9 +78,16 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
   inserted as its public URL.
 - `src/Display/DisplayModeService.php` — persists the interface display-mode preference
   (`auto`/`light`/`dark`) in `settings`; sent to the SPA as the `bootstrap` payload's
-  `displayMode` key and written via `POST /api/settings/display-mode`. The SPA resolves
-  `auto` against the OS `prefers-color-scheme` and sets `<html data-theme="light|dark">`;
-  `app.css`'s default `:root` is the dark theme, `:root[data-theme="light"]` the light one.
+  `displayMode` key and written via `POST /api/settings/display-mode`. Because Boson's
+  webview does **not** report `prefers-color-scheme` reliably (on macOS it always reports
+  dark), `systemPrefersDark()` probes the OS appearance directly (macOS `defaults read -g
+  AppleInterfaceStyle`, Windows `AppsUseLightTheme` registry DWORD, Linux gsettings
+  `color-scheme`/`gtk-theme`) → `true`/`false`/`null` when undetectable; it is sent in the
+  `bootstrap` payload as `systemPrefersDark` and re-probed on demand via
+  `GET /api/settings/system-theme`. The SPA's `systemPrefersDark()` trusts that value to
+  resolve `auto`, only falling back to the media query when it is `null`, and re-probes on
+  window `focus` so `auto` follows OS theme changes at runtime; it sets
+  `<html data-theme="light|dark">`;
   TinyMCE follows the app theme (skin `oxide`/`oxide-dark`); its editing surface switches to
   the dark built-in content CSS only when the site supplies no `editor.css`.
 - `src/Markdown/`, `src/I18n/`, `src/Storage/` — Markdown import, language service, SQLite + migrations.

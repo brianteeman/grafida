@@ -11,15 +11,18 @@ declare(strict_types=1);
 
 namespace Grafida\Display;
 
+use Grafida\Secret\ProcessRunner;
 use Grafida\Storage\SettingsRepository;
 
 /**
  * Stores the user's interface display-mode preference.
  *
- * The stored value is one of {@see self::AVAILABLE}; "auto" lets the front-end
- * follow the operating system's light/dark preference. Resolving "auto" to a
- * concrete light/dark value happens in the SPA, which is the only side that can
- * observe `prefers-color-scheme`.
+ * The stored value is one of {@see self::AVAILABLE}; "auto" follows the
+ * operating system's light/dark preference. The SPA would normally resolve
+ * "auto" against `prefers-color-scheme`, but Boson's webview does not reliably
+ * sync that media feature to the OS appearance (on macOS it reports dark
+ * regardless of the system setting), so {@see self::systemPrefersDark()} probes
+ * the OS directly and the result is handed to the SPA as the source of truth.
  */
 final class DisplayModeService
 {
@@ -33,6 +36,7 @@ final class DisplayModeService
 
     public function __construct(
         private readonly SettingsRepository $settings,
+        private readonly ProcessRunner $runner = new ProcessRunner(),
     ) {}
 
     /** The stored preference, defaulting to "auto". */
@@ -50,5 +54,91 @@ final class DisplayModeService
         $this->settings->set(self::SETTING_KEY, $mode);
 
         return $mode;
+    }
+
+    /**
+     * Probes the operating system's light/dark appearance preference.
+     *
+     * Returns true for dark, false for light, or null when the preference
+     * cannot be determined (in which case the SPA falls back to
+     * `prefers-color-scheme`). Best-effort and silent: any failure is treated
+     * as "unknown".
+     */
+    public function systemPrefersDark(): ?bool
+    {
+        return match (\PHP_OS_FAMILY) {
+            'Darwin'  => $this->macPrefersDark(),
+            'Windows' => $this->windowsPrefersDark(),
+            default   => $this->linuxPrefersDark(),
+        };
+    }
+
+    /**
+     * macOS exposes the global appearance through the `AppleInterfaceStyle`
+     * default, which is set to "Dark" in dark mode and simply absent (the
+     * command exits non-zero) in light mode.
+     */
+    private function macPrefersDark(): bool
+    {
+        [$code, $stdout] = $this->runner->run(['defaults', 'read', '-g', 'AppleInterfaceStyle']);
+
+        if ($code !== 0) {
+            // The key is missing in light mode — that is a definite "light".
+            return false;
+        }
+
+        return stripos(trim($stdout), 'dark') !== false;
+    }
+
+    /**
+     * Windows stores the apps appearance under the Personalize registry key:
+     * `AppsUseLightTheme` is a DWORD, 0 for dark and 1 for light.
+     */
+    private function windowsPrefersDark(): ?bool
+    {
+        [$code, $stdout] = $this->runner->run([
+            'reg', 'query',
+            'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize',
+            '/v', 'AppsUseLightTheme',
+        ]);
+
+        if ($code !== 0 || preg_match('/0x([0-9a-fA-F]+)/', $stdout, $m) !== 1) {
+            return null;
+        }
+
+        return hexdec($m[1]) === 0;
+    }
+
+    /**
+     * GNOME/freedesktop expose the preference via gsettings; a `color-scheme`
+     * of "prefer-dark" (or a dark GTK theme name) means dark mode.
+     */
+    private function linuxPrefersDark(): ?bool
+    {
+        [$code, $stdout] = $this->runner->run([
+            'gsettings', 'get', 'org.gnome.desktop.interface', 'color-scheme',
+        ]);
+
+        if ($code === 0) {
+            $value = strtolower(trim($stdout));
+
+            if (str_contains($value, 'dark')) {
+                return true;
+            }
+
+            if (str_contains($value, 'light') || str_contains($value, 'default')) {
+                return false;
+            }
+        }
+
+        [$code, $stdout] = $this->runner->run([
+            'gsettings', 'get', 'org.gnome.desktop.interface', 'gtk-theme',
+        ]);
+
+        if ($code === 0) {
+            return str_contains(strtolower(trim($stdout)), 'dark');
+        }
+
+        return null;
     }
 }

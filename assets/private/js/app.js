@@ -26,6 +26,10 @@ const State = {
     availableLanguages: {},
     // Interface display-mode preference: 'auto' (follow OS), 'light' or 'dark'.
     displayMode: 'auto',
+    // The OS light/dark preference as probed by the back-end (Boson's webview
+    // does not report `prefers-color-scheme` reliably): true/false, or null when
+    // undetectable (then we fall back to the media query).
+    systemPrefersDark: null,
     // The concrete theme currently applied ('light' | 'dark') after resolving
     // 'auto' against the OS preference. Drives the TinyMCE skin/content CSS.
     resolvedTheme: 'dark',
@@ -252,6 +256,7 @@ const api = {
     convertMarkdown: (markdown) => apiFetch('POST', '/api/markdown', { markdown }),
     setLanguage: (tag) => apiFetch('POST', '/api/settings/language', { tag }),
     setDisplayMode: (mode) => apiFetch('POST', '/api/settings/display-mode', { mode }),
+    systemTheme: () => apiFetch('GET', '/api/settings/system-theme'),
     getStorageInfo: () => apiFetch('GET', '/api/settings/storage'),
     openStorageFolder: () => apiFetch('POST', '/api/settings/storage/open'),
     resetStorage: () => apiFetch('POST', '/api/settings/storage/reset'),
@@ -2446,6 +2451,12 @@ const darkModeQuery = window.matchMedia
     : null;
 
 function systemPrefersDark() {
+    // The back-end probes the OS appearance directly because Boson's webview
+    // does not report `prefers-color-scheme` reliably; trust it when known and
+    // only fall back to the media query when the OS preference is undetectable.
+    if (State.systemPrefersDark !== null && State.systemPrefersDark !== undefined) {
+        return State.systemPrefersDark;
+    }
     return darkModeQuery ? darkModeQuery.matches : true;
 }
 
@@ -2497,16 +2508,33 @@ async function applyDisplayModeChange(mode) {
 }
 
 // Keep "auto" mode in step with the OS as it changes at runtime.
+const onSystemThemeChange = () => {
+    if ((State.displayMode || 'auto') === 'auto') applyTheme(true);
+};
 if (darkModeQuery) {
-    const onSystemThemeChange = () => {
-        if ((State.displayMode || 'auto') === 'auto') applyTheme(true);
-    };
     if (darkModeQuery.addEventListener) {
         darkModeQuery.addEventListener('change', onSystemThemeChange);
     } else if (darkModeQuery.addListener) {
         darkModeQuery.addListener(onSystemThemeChange);
     }
 }
+
+// Boson's webview doesn't fire the media-query change reliably, so when the
+// window regains focus we re-probe the OS appearance via the back-end and
+// re-apply the theme if "auto" is in effect and the preference flipped.
+window.addEventListener('focus', async () => {
+    if ((State.displayMode || 'auto') !== 'auto') return;
+    try {
+        const { systemPrefersDark } = await api.systemTheme();
+        const value = typeof systemPrefersDark === 'boolean' ? systemPrefersDark : null;
+        if (value !== State.systemPrefersDark) {
+            State.systemPrefersDark = value;
+            applyTheme(true);
+        }
+    } catch (err) {
+        // Best-effort; keep the current theme on failure.
+    }
+});
 
 // ============================================================
 //  App bootstrap
@@ -2522,6 +2550,9 @@ async function bootstrap() {
         State.languageOverride = data.languageOverride || 'auto';
         State.availableLanguages = data.availableLanguages || {};
         State.displayMode = data.displayMode || 'auto';
+        State.systemPrefersDark = typeof data.systemPrefersDark === 'boolean'
+            ? data.systemPrefersDark
+            : null;
         State.secureStore = data.secureStore !== false;
         State.supportedFieldTypes = data.supportedFieldTypes || [];
         State.app = data.app || {};
