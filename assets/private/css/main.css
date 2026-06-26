@@ -15,6 +15,19 @@
 
     --font-size-h1: 44px;
     --font-line-height-h1: 110%;
+
+    color-scheme: dark;
+}
+
+/* The splash window has no access to the stored preference yet, so it simply
+   follows the operating system's light/dark setting. */
+@media (prefers-color-scheme: light) {
+    :root {
+        --color-bg: #f3f4f6;
+        --color-text: rgba(17, 24, 39, 0.92);
+
+        color-scheme: light;
+    }
 }
 
 html,

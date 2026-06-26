@@ -48,3 +48,7 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | image class | Classe immagine | Joomla float_intro/float_fulltext: a free-text CSS class. |
 | media library | Media | The site's Media Manager, browsed when picking an image. |
 | decorative image | immagine decorativa | image_*_alt_empty: alt text intentionally empty. |
+| display mode | modalità di visualizzazione | Light/dark theme preference setting. |
+| follow system | segui il sistema | Display mode that follows the OS light/dark setting. |
+| light (theme) | chiaro | Light display theme. |
+| dark (theme) | scuro | Dark display theme. |

@@ -48,3 +48,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | image class | Clase de la imagen | Joomla float_intro/float_fulltext: a free-text CSS class. |
 | media library | Multimedia | The site's Media Manager, browsed when picking an image. |
 | decorative image | imagen decorativa | image_*_alt_empty: alt text intentionally empty. |
+| display mode | modo de visualización | Light/dark theme preference setting. |
+| follow system | seguir el sistema | Display mode that follows the OS light/dark setting. |
+| light (theme) | claro | Light display theme. |
+| dark (theme) | oscuro | Dark display theme. |

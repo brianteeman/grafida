@@ -16,6 +16,7 @@ use Boson\Component\Http\Static\StaticProviderInterface;
 use Boson\Contracts\Http\RequestInterface;
 use Boson\Contracts\Http\ResponseInterface;
 use Grafida\Article\DraftRepository;
+use Grafida\Display\DisplayModeService;
 use Grafida\Field\FieldSupport;
 use Grafida\Http\ApiController;
 use Grafida\I18n\LanguageService;
@@ -67,6 +68,7 @@ final class Kernel
         $media       = new MediaRepository($pdo);
         $publish     = new PublishService($siteService, $apiClient, $references, $drafts, $media);
         $language    = new LanguageService($settings, $basePath);
+        $displayMode = new DisplayModeService($settings);
         $storage     = new StorageService($pdo, $siteService);
 
         $this->api = new ApiController(
@@ -78,6 +80,7 @@ final class Kernel
             publish: $publish,
             markdown: new MarkdownService(),
             language: $language,
+            displayMode: $displayMode,
             fields: new FieldSupport(),
             apiClient: $apiClient,
             storage: $storage,

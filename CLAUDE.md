@@ -51,6 +51,13 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
   a local pick is inserted as `<img src="data:…" data-grafida-media-id="N">` (`GRAFIDA_MEDIA_ATTR`,
   mirroring `InlineMedia::ATTRIBUTE`) so `PublishService` uploads it on publish; a site-media pick is
   inserted as its public URL.
+- `src/Display/DisplayModeService.php` — persists the interface display-mode preference
+  (`auto`/`light`/`dark`) in `settings`; sent to the SPA as the `bootstrap` payload's
+  `displayMode` key and written via `POST /api/settings/display-mode`. The SPA resolves
+  `auto` against the OS `prefers-color-scheme` and sets `<html data-theme="light|dark">`;
+  `app.css`'s default `:root` is the dark theme, `:root[data-theme="light"]` the light one.
+  TinyMCE follows the app theme (skin `oxide`/`oxide-dark`); its editing surface switches to
+  the dark built-in content CSS only when the site supplies no `editor.css`.
 - `src/Markdown/`, `src/I18n/`, `src/Storage/` — Markdown import, language service, SQLite + migrations.
   `StorageService` reports the DB file path, opens its folder in the OS file browser
   (`open`/`explorer`/`xdg-open`), and resets local storage (deletes tokens + wipes all

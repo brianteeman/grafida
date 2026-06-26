@@ -112,6 +112,19 @@ final class ApiRoutingTest extends TestCase
         self::assertSame('fr-FR', $json['data']['language']);
     }
 
+    public function testDisplayModePersists(): void
+    {
+        $kernel = $this->kernel();
+
+        [$status, $json] = $this->call($kernel, 'POST', '/api/settings/display-mode', json_encode(['mode' => 'light']));
+
+        self::assertSame(200, $status);
+        self::assertSame('light', $json['data']['displayMode']);
+
+        [, $boot] = $this->call($kernel, 'GET', '/api/bootstrap');
+        self::assertSame('light', $boot['data']['displayMode']);
+    }
+
     public function testStorageInfoReportsDatabasePath(): void
     {
         [$status, $json] = $this->call($this->kernel(), 'GET', '/api/settings/storage');

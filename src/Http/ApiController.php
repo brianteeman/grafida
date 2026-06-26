@@ -15,6 +15,7 @@ use Boson\Contracts\Http\RequestInterface;
 use Boson\Contracts\Http\ResponseInterface;
 use Grafida\Article\Draft;
 use Grafida\Article\DraftRepository;
+use Grafida\Display\DisplayModeService;
 use Grafida\Field\FieldSupport;
 use Grafida\I18n\LanguageService;
 use Grafida\Joomla\ApiClient;
@@ -53,6 +54,8 @@ final class ApiController
         'GRAFIDA_LBL_SETTINGS', 'GRAFIDA_OPT_PUBLISHED', 'GRAFIDA_OPT_UNPUBLISHED',
         'GRAFIDA_OPT_ARCHIVED', 'GRAFIDA_OPT_TRASHED',
         'GRAFIDA_LBL_UI_LANGUAGE', 'GRAFIDA_OPT_AUTO',
+        'GRAFIDA_LBL_DISPLAY_MODE', 'GRAFIDA_OPT_DISPLAY_AUTO',
+        'GRAFIDA_OPT_DISPLAY_LIGHT', 'GRAFIDA_OPT_DISPLAY_DARK',
         'GRAFIDA_LBL_STORAGE', 'GRAFIDA_LBL_DB_LOCATION', 'GRAFIDA_BTN_OPEN_FOLDER',
         'GRAFIDA_LBL_RESET_STORAGE', 'GRAFIDA_MSG_RESET_STORAGE_DESC', 'GRAFIDA_BTN_RESET_STORAGE',
         'GRAFIDA_MSG_RESET_STORAGE_CONFIRM', 'GRAFIDA_MSG_RESET_STORAGE_DONE',
@@ -82,6 +85,7 @@ final class ApiController
         private readonly PublishService $publish,
         private readonly MarkdownService $markdown,
         private readonly LanguageService $language,
+        private readonly DisplayModeService $displayMode,
         private readonly FieldSupport $fields,
         private readonly ApiClient $apiClient,
         private readonly StorageService $storage,
@@ -120,6 +124,7 @@ final class ApiController
             $method === 'POST' && $path === '/api/sites'           => $this->createSite($body),
             $method === 'POST' && $path === '/api/markdown'        => $this->convertMarkdown($body),
             $method === 'POST' && $path === '/api/settings/language' => $this->setLanguage($body),
+            $method === 'POST' && $path === '/api/settings/display-mode' => $this->setDisplayMode($body),
             $method === 'GET'  && $path === '/api/settings/storage'  => $this->storageInfo(),
             $method === 'POST' && $path === '/api/settings/storage/open'  => $this->openStorageFolder(),
             $method === 'POST' && $path === '/api/settings/storage/reset' => $this->resetStorage(),
@@ -202,6 +207,7 @@ final class ApiController
             'language'            => $this->language->currentTag(),
             'languageOverride'    => $this->language->override(),
             'availableLanguages'  => LanguageService::AVAILABLE,
+            'displayMode'         => $this->displayMode->current(),
             'secureStore'         => $this->sites->hasSecureStore(),
             'supportedFieldTypes' => FieldSupport::SUPPORTED,
             'sites'               => array_map(static fn (Site $s): array => $s->toArray(), $this->sites->list()),
@@ -605,6 +611,14 @@ final class ApiController
             'language' => $this->language->currentTag(),
             'strings'  => $this->language->strings(self::UI_KEYS),
         ]);
+    }
+
+    /** @param array<string, mixed> $body */
+    private function setDisplayMode(array $body): ResponseInterface
+    {
+        $mode = $this->displayMode->set($this->str($body, 'mode', DisplayModeService::AUTO));
+
+        return Json::ok(['displayMode' => $mode]);
     }
 
     private function storageInfo(): ResponseInterface

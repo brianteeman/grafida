@@ -54,3 +54,7 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | image class | Bild-CSS-Klasse | Joomla float_intro/float_fulltext: a free-text CSS class. |
 | media library | Medien | The site's Media Manager, browsed when picking an image. |
 | decorative image | dekoratives Bild | image_*_alt_empty: alt text intentionally empty. |
+| display mode | Anzeigemodus | Light/dark theme preference setting. |
+| follow system | Systemeinstellung folgen | Display mode that follows the OS light/dark setting. |
+| light (theme) | Hell | Light display theme. |
+| dark (theme) | Dunkel | Dark display theme. |

@@ -28,6 +28,51 @@
     --spacing: 8px;
     --nav-width: 220px;
     --transition: 0.15s ease;
+
+    color-scheme: dark;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Light theme                                                        */
+/*  Applied when the SPA sets <html data-theme="light"> — see          */
+/*  applyTheme() in app.js. The default :root above is the dark theme. */
+/* ------------------------------------------------------------------ */
+
+:root[data-theme="light"] {
+    --color-bg: #f3f4f6;
+    --color-surface: #ffffff;
+    --color-surface-2: #eaecf1;
+    --color-border: #d6dae2;
+    --color-text: rgba(17, 24, 39, 0.92);
+    --color-text-muted: rgba(17, 24, 39, 0.55);
+    --color-text-brand: #F93904;
+    --color-accent: #F93904;
+    --color-accent-hover: #d42f03;
+    --color-success: #1f9d4d;
+    --color-warning: #b9740a;
+    --color-danger: #c62828;
+    --color-info: #1565c0;
+    --color-input-bg: #ffffff;
+    --color-input-border: #c4c9d4;
+    --color-input-focus: #F93904;
+
+    color-scheme: light;
+}
+
+/* Light-theme overrides for the handful of hardcoded colours that were
+   tuned for a dark background and would otherwise wash out. */
+:root[data-theme="light"] select.form-control {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='rgba(17,24,39,0.45)' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+:root[data-theme="light"] .alert-success { color: #1c7a3c; }
+:root[data-theme="light"] .alert-error   { color: #b02525; }
+:root[data-theme="light"] .alert-warning { color: #8a5800; }
+:root[data-theme="light"] .alert-info    { color: #15509c; }
+
+:root[data-theme="light"] .spinner {
+    border-color: rgba(17, 24, 39, 0.15);
+    border-top-color: var(--color-accent);
 }
 
 *, *::before, *::after {

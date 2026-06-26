@@ -24,6 +24,11 @@ const State = {
     language: 'en-GB',
     languageOverride: 'auto',
     availableLanguages: {},
+    // Interface display-mode preference: 'auto' (follow OS), 'light' or 'dark'.
+    displayMode: 'auto',
+    // The concrete theme currently applied ('light' | 'dark') after resolving
+    // 'auto' against the OS preference. Drives the TinyMCE skin/content CSS.
+    resolvedTheme: 'dark',
     secureStore: true,
     supportedFieldTypes: [],
     app: {},
@@ -228,6 +233,7 @@ const api = {
     getMediaBlob: (id) => apiFetch('GET', `/api/media/${id}`),
     convertMarkdown: (markdown) => apiFetch('POST', '/api/markdown', { markdown }),
     setLanguage: (tag) => apiFetch('POST', '/api/settings/language', { tag }),
+    setDisplayMode: (mode) => apiFetch('POST', '/api/settings/display-mode', { mode }),
     getStorageInfo: () => apiFetch('GET', '/api/settings/storage'),
     openStorageFolder: () => apiFetch('POST', '/api/settings/storage/open'),
     resetStorage: () => apiFetch('POST', '/api/settings/storage/reset'),
@@ -1442,8 +1448,10 @@ async function initTinyMCE(draft) {
         resize: false,
         promotion: false,
         branding: false,
-        skin: 'oxide-dark',
-        content_css: cssOpts.length ? cssOpts : 'dark',
+        skin: editorSkin(),
+        // The editor UI always follows the app theme; the editing surface only
+        // switches to the dark built-in CSS when the site supplies no editor.css.
+        content_css: cssOpts.length ? cssOpts : editorContentCss(),
         document_base_url: baseUrl,
         // Keep the offline-image tag (data-grafida-media-id) in the editor output
         // so it survives save/getContent and reaches PublishService.
@@ -2169,7 +2177,29 @@ function renderSettingsScreen() {
         sel.appendChild(opt);
     });
 
+    renderDisplayModeSetting();
     renderStorageSettings();
+}
+
+/** Populates the display-mode selector, reflecting the stored preference. */
+function renderDisplayModeSetting() {
+    const sel = document.getElementById('settings-display-mode-select');
+    if (!sel) return;
+    clearNode(sel);
+
+    const modes = [
+        ['auto', 'GRAFIDA_OPT_DISPLAY_AUTO'],
+        ['light', 'GRAFIDA_OPT_DISPLAY_LIGHT'],
+        ['dark', 'GRAFIDA_OPT_DISPLAY_DARK'],
+    ];
+
+    modes.forEach(([mode, key]) => {
+        const opt = document.createElement('option');
+        opt.value = mode;
+        opt.textContent = t(key);
+        if ((State.displayMode || 'auto') === mode) opt.selected = true;
+        sel.appendChild(opt);
+    });
 }
 
 /**
@@ -2302,6 +2332,78 @@ function showAboutDialog() {
 }
 
 // ============================================================
+//  Display mode / theme
+// ============================================================
+
+/** The OS-level media query used to resolve the "auto" display mode. */
+const darkModeQuery = window.matchMedia
+    ? window.matchMedia('(prefers-color-scheme: dark)')
+    : null;
+
+function systemPrefersDark() {
+    return darkModeQuery ? darkModeQuery.matches : true;
+}
+
+/** Resolves State.displayMode ('auto'|'light'|'dark') to a concrete theme. */
+function resolveTheme() {
+    const mode = State.displayMode || 'auto';
+    if (mode === 'light' || mode === 'dark') return mode;
+    return systemPrefersDark() ? 'dark' : 'light';
+}
+
+/**
+ * Applies the resolved theme to the document (CSS variables key off the
+ * `data-theme` attribute on <html>). When `reinitEditor` is true and the
+ * TinyMCE editor is open, it is re-created so its skin and built-in content
+ * CSS follow the new theme — unless the site supplies its own editor.css,
+ * in which case the editor content keeps the site's styling.
+ */
+function applyTheme(reinitEditor = false) {
+    const resolved = resolveTheme();
+    const changed = resolved !== State.resolvedTheme;
+    State.resolvedTheme = resolved;
+    document.documentElement.setAttribute('data-theme', resolved);
+
+    if (reinitEditor && changed && State.tinyMCEEditor && State.currentDraft) {
+        const html = State.tinyMCEEditor.getContent();
+        initTinyMCE({ ...State.currentDraft, html });
+    }
+}
+
+/** Returns the TinyMCE UI skin matching the current resolved theme. */
+function editorSkin() {
+    return State.resolvedTheme === 'dark' ? 'oxide-dark' : 'oxide';
+}
+
+/** Returns the built-in TinyMCE content CSS matching the resolved theme. */
+function editorContentCss() {
+    return State.resolvedTheme === 'dark' ? 'dark' : 'default';
+}
+
+async function applyDisplayModeChange(mode) {
+    try {
+        const result = await api.setDisplayMode(mode);
+        State.displayMode = result.displayMode || mode;
+        applyTheme(true);
+        showToast(t('GRAFIDA_MSG_SAVED'), 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+// Keep "auto" mode in step with the OS as it changes at runtime.
+if (darkModeQuery) {
+    const onSystemThemeChange = () => {
+        if ((State.displayMode || 'auto') === 'auto') applyTheme(true);
+    };
+    if (darkModeQuery.addEventListener) {
+        darkModeQuery.addEventListener('change', onSystemThemeChange);
+    } else if (darkModeQuery.addListener) {
+        darkModeQuery.addListener(onSystemThemeChange);
+    }
+}
+
+// ============================================================
 //  App bootstrap
 // ============================================================
 
@@ -2314,6 +2416,7 @@ async function bootstrap() {
         State.language = data.language || 'en-GB';
         State.languageOverride = data.languageOverride || 'auto';
         State.availableLanguages = data.availableLanguages || {};
+        State.displayMode = data.displayMode || 'auto';
         State.secureStore = data.secureStore !== false;
         State.supportedFieldTypes = data.supportedFieldTypes || [];
         State.app = data.app || {};
@@ -2323,6 +2426,7 @@ async function bootstrap() {
     }
 
     document.getElementById('app').style.opacity = '1';
+    applyTheme();
     applyStrings();
     renderSidebarFooter();
     renderSiteSelector();
@@ -2387,6 +2491,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const langSel = document.getElementById('settings-language-select');
     if (langSel) {
         langSel.addEventListener('change', () => applyLanguageChange(langSel.value));
+    }
+
+    const displayModeSel = document.getElementById('settings-display-mode-select');
+    if (displayModeSel) {
+        displayModeSel.addEventListener('change', () => applyDisplayModeChange(displayModeSel.value));
     }
 
     const btnModalClose = document.getElementById('btn-modal-close');

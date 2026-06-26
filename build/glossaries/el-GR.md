@@ -48,3 +48,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | image class | Κλάση εικόνας | Joomla float_intro/float_fulltext: a free-text CSS class. |
 | media library | Βιβλιοθήκη πολυμέσων | The site's Media Manager, browsed when picking an image. |
 | decorative image | διακοσμητική εικόνα | image_*_alt_empty: alt text intentionally empty. |
+| display mode | λειτουργία εμφάνισης | Light/dark theme preference setting. |
+| follow system | ακολούθηση συστήματος | Display mode that follows the OS light/dark setting. |
+| light (theme) | φωτεινή | Light display theme. |
+| dark (theme) | σκοτεινή | Dark display theme. |
