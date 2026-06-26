@@ -64,6 +64,14 @@ const State = {
     articlePaging: { page: 1, totalPages: 1 },
     articleListSiteId: null,
     articleListRefs: null,
+    // The local-drafts browse state. Drafts are loaded in full per visit and
+    // then searched / sorted / filtered / paginated entirely client-side (see
+    // filteredSortedDrafts / renderDraftsTab); the query is reset with the
+    // remote one whenever the active site changes.
+    draftQuery: null,
+    draftPaging: { page: 1, totalPages: 1 },
+    // Which Articles-page tab is showing: 'drafts' (Local Drafts) or 'remote'.
+    articlesTab: 'drafts',
     references: null,
     editorCss: null,
     tinyMCEEditor: null,
@@ -866,8 +874,10 @@ async function loadArticlesScreen() {
     if (State.articleListSiteId !== State.currentSiteId || !State.articleQuery) {
         State.articleListSiteId = State.currentSiteId;
         State.articleQuery = defaultArticleQuery();
+        State.draftQuery = defaultDraftQuery();
         State.articleListRefs = null;
     }
+    if (!State.draftQuery) State.draftQuery = defaultDraftQuery();
 
     clearNode(container);
     container.appendChild(el('div', 'loading-row', el('div', 'spinner'), txt(' ' + t('GRAFIDA_MSG_LOADING'))));
@@ -883,22 +893,34 @@ async function loadArticlesScreen() {
         State.drafts = drafts || [];
 
         clearNode(container);
-        const draftsSection = el('div', 'article-list-section');
-        draftsSection.id = 'articles-drafts';
-        container.appendChild(draftsSection);
+        container.appendChild(buildArticlesTabs());
 
-        const remoteSection = el('div', 'article-list-section');
-        remoteSection.appendChild(el('h3', null, t('GRAFIDA_LBL_REMOTE_ARTICLES')));
+        // Local-drafts tab: filter/sort toolbar + list + pagination.
+        const draftsPanel = el('div', 'article-list-section articles-tab-panel');
+        draftsPanel.id = 'articles-tab-drafts';
+        draftsPanel.appendChild(buildDraftFilterBar());
+        const draftsList = el('div', null);
+        draftsList.id = 'articles-drafts-list';
+        draftsPanel.appendChild(draftsList);
+        const draftsPager = el('div', 'articles-pagination');
+        draftsPager.id = 'articles-drafts-pagination';
+        draftsPanel.appendChild(draftsPager);
+        container.appendChild(draftsPanel);
+
+        // Remote-articles tab: filter/sort toolbar + list + pagination.
+        const remoteSection = el('div', 'article-list-section articles-tab-panel');
+        remoteSection.id = 'articles-tab-remote';
         remoteSection.appendChild(buildArticleFilterBar());
         const list = el('div', null);
         list.id = 'articles-remote-list';
         remoteSection.appendChild(list);
         const pager = el('div', 'articles-pagination');
-        pager.id = 'articles-pagination';
+        pager.id = 'articles-remote-pagination';
         remoteSection.appendChild(pager);
         container.appendChild(remoteSection);
 
-        renderDraftsSection();
+        applyArticlesTab();
+        renderDraftsTab();
         await reloadRemoteArticles();
     } catch (err) {
         clearNode(container);
@@ -922,14 +944,214 @@ async function loadArticleFilterRefs() {
     }
 }
 
-/** Renders just the local-drafts section (used on load and after a draft delete). */
-function renderDraftsSection() {
-    const section = document.getElementById('articles-drafts');
-    if (!section) return;
-    clearNode(section);
-    if (!State.drafts.length) return;
-    section.appendChild(el('h3', null, t('GRAFIDA_LBL_LOCAL_DRAFTS')));
-    State.drafts.forEach(draft => section.appendChild(buildArticleItem(draft, 'draft')));
+/** Builds the Local Drafts / Remote Articles tab strip. */
+function buildArticlesTabs() {
+    const tabs = el('div', 'articles-tabs');
+    const mk = (id, key) => {
+        const btn = el('button', 'articles-tab', t(key));
+        btn.type = 'button';
+        btn.dataset.tab = id;
+        if (State.articlesTab === id) btn.classList.add('active');
+        btn.addEventListener('click', () => {
+            if (State.articlesTab === id) return;
+            State.articlesTab = id;
+            applyArticlesTab();
+        });
+        return btn;
+    };
+    tabs.appendChild(mk('drafts', 'GRAFIDA_LBL_LOCAL_DRAFTS'));
+    tabs.appendChild(mk('remote', 'GRAFIDA_LBL_REMOTE_ARTICLES'));
+    return tabs;
+}
+
+/** Shows the active tab's panel (and highlights its button), hides the other. */
+function applyArticlesTab() {
+    const active = State.articlesTab;
+    const draftsPanel = document.getElementById('articles-tab-drafts');
+    const remotePanel = document.getElementById('articles-tab-remote');
+    if (draftsPanel) draftsPanel.classList.toggle('hidden', active !== 'drafts');
+    if (remotePanel) remotePanel.classList.toggle('hidden', active !== 'remote');
+    document.querySelectorAll('.articles-tabs .articles-tab').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === active);
+    });
+}
+
+// The columns the local-drafts list may be sorted by — only the fields a draft
+// actually carries (no hits/author/dates as Joomla's remote list has).
+const DRAFT_SORT_COLUMNS = [
+    ['id', 'GRAFIDA_SORT_ID'],
+    ['title', 'GRAFIDA_SORT_TITLE'],
+    ['category', 'GRAFIDA_SORT_CATEGORY'],
+    ['language', 'GRAFIDA_SORT_LANGUAGE'],
+    ['state', 'GRAFIDA_SORT_STATUS'],
+];
+
+/** The default filter/sort/page state for the local-drafts list. */
+function defaultDraftQuery() {
+    return {
+        search: '', ordering: 'id', direction: 'desc',
+        category: '', tag: '', language: '', state: '',
+        limit: 20, page: 1,
+    };
+}
+
+let _draftSearchTimer = null;
+
+/** Builds the search / sort / filter toolbar for local drafts. */
+function buildDraftFilterBar() {
+    const q = State.draftQuery;
+    const bar = el('div', 'articles-filter-bar');
+
+    // Search box (debounced, title + alias) + Enter to search immediately.
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.className = 'form-control';
+    search.placeholder = t('GRAFIDA_PLACEHOLDER_SEARCH');
+    search.value = q.search;
+    search.setAttribute('aria-label', t('GRAFIDA_PLACEHOLDER_SEARCH'));
+    search.addEventListener('input', () => {
+        clearTimeout(_draftSearchTimer);
+        _draftSearchTimer = setTimeout(() => setDraftQuery({ search: search.value }), 250);
+    });
+    search.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { clearTimeout(_draftSearchTimer); setDraftQuery({ search: search.value }); }
+    });
+    bar.appendChild(el('div', 'articles-filter-search', search));
+
+    // Sort column + direction.
+    bar.appendChild(filterSelect('GRAFIDA_LBL_SORT_BY',
+        DRAFT_SORT_COLUMNS.map(([v, k]) => [v, t(k)]), q.ordering, false,
+        (v) => setDraftQuery({ ordering: v })));
+    bar.appendChild(filterSelect('GRAFIDA_LBL_DIRECTION', [
+        ['desc', t('GRAFIDA_SORT_DIR_DESC')],
+        ['asc', t('GRAFIDA_SORT_DIR_ASC')],
+    ], q.direction, false, (v) => setDraftQuery({ direction: v })));
+
+    // Category / Tag / Language filters from the cached reference data. Drafts
+    // store tag *titles*, so the tag filter matches on title rather than id.
+    const refs = State.articleListRefs || { categories: [], tags: [], languages: [] };
+    bar.appendChild(filterSelect('GRAFIDA_FILTER_CATEGORY_ANY',
+        categoryFilterOptions(refs.categories), q.category, true,
+        (v) => setDraftQuery({ category: v })));
+    bar.appendChild(filterSelect('GRAFIDA_FILTER_TAG_ANY',
+        (refs.tags || []).map(tg => [tg.title, tg.title]), q.tag, true,
+        (v) => setDraftQuery({ tag: v })));
+    bar.appendChild(filterSelect('GRAFIDA_FILTER_LANGUAGE_ANY',
+        languageFilterOptions(refs.languages), q.language, true,
+        (v) => setDraftQuery({ language: v })));
+
+    // Published state filter (no featured/checked-out — drafts have neither).
+    bar.appendChild(filterSelect('GRAFIDA_FILTER_STATE_ANY', [
+        ['1', t('GRAFIDA_OPT_PUBLISHED')],
+        ['0', t('GRAFIDA_OPT_UNPUBLISHED')],
+        ['2', t('GRAFIDA_OPT_ARCHIVED')],
+        ['-2', t('GRAFIDA_OPT_TRASHED')],
+    ], q.state, true, (v) => setDraftQuery({ state: v })));
+
+    // Per-page limit.
+    bar.appendChild(filterSelect('GRAFIDA_LBL_PER_PAGE',
+        ARTICLE_PER_PAGE.map(n => [String(n), String(n)]), String(q.limit), false,
+        (v) => setDraftQuery({ limit: Number(v) })));
+
+    // Clear filters.
+    const clearBtn = iconBtn('rotate-left', t('GRAFIDA_BTN_CLEAR_FILTERS'), 'btn', 'btn-secondary', 'btn-sm');
+    clearBtn.addEventListener('click', () => {
+        State.draftQuery = defaultDraftQuery();
+        const panel = document.getElementById('articles-tab-drafts');
+        const oldBar = panel.querySelector('.articles-filter-bar');
+        panel.replaceChild(buildDraftFilterBar(), oldBar);
+        renderDraftsTab();
+    });
+    bar.appendChild(el('div', 'articles-filter-clear', clearBtn));
+
+    return bar;
+}
+
+/** Applies the current draft query's filters + sort to State.drafts. */
+function filteredSortedDrafts() {
+    const q = State.draftQuery;
+    let list = State.drafts.slice();
+
+    const search = q.search.trim().toLowerCase();
+    if (search) {
+        list = list.filter(d =>
+            (d.title || '').toLowerCase().includes(search)
+            || (d.alias || '').toLowerCase().includes(search));
+    }
+    if (q.category !== '') list = list.filter(d => String(d.catid) === String(q.category));
+    if (q.tag !== '') list = list.filter(d => Array.isArray(d.tags) && d.tags.includes(q.tag));
+    if (q.language !== '') list = list.filter(d => String(d.language) === String(q.language));
+    if (q.state !== '') list = list.filter(d => Number(d.state) === Number(q.state));
+
+    const dir = q.direction === 'asc' ? 1 : -1;
+    list.sort((a, b) => dir * compareDrafts(a, b, q.ordering));
+    return list;
+}
+
+/** Comparator for the local-drafts sort (ascending; caller flips for desc). */
+function compareDrafts(a, b, ordering) {
+    switch (ordering) {
+        case 'title':    return (a.title || '').localeCompare(b.title || '');
+        case 'category': return (a.categoryTitle || '').localeCompare(b.categoryTitle || '');
+        case 'language': return (a.language || '').localeCompare(b.language || '');
+        case 'state':    return (Number(a.state) || 0) - (Number(b.state) || 0);
+        case 'id':
+        default:         return (Number(a.id) || 0) - (Number(b.id) || 0);
+    }
+}
+
+/** Renders the local-drafts list page + pagination (used on load, filter, delete). */
+function renderDraftsTab() {
+    const list = document.getElementById('articles-drafts-list');
+    const pager = document.getElementById('articles-drafts-pagination');
+    if (!list || !pager) return;
+    clearNode(list);
+    clearNode(pager);
+
+    const all = filteredSortedDrafts();
+    const limit = State.draftQuery.limit;
+    const totalPages = Math.max(1, Math.ceil(all.length / limit));
+    const page = Math.min(State.draftQuery.page, totalPages);
+    State.draftQuery.page = page;
+    State.draftPaging = { page, totalPages };
+
+    if (!all.length) {
+        list.appendChild(el('div', 'empty-state', el('p', null, t('GRAFIDA_MSG_NO_DRAFTS'))));
+        return;
+    }
+
+    const start = (page - 1) * limit;
+    all.slice(start, start + limit).forEach(draft => list.appendChild(buildArticleItem(draft, 'draft')));
+
+    if (totalPages <= 1) return;
+
+    const prev = iconBtn('chevron-left', t('GRAFIDA_BTN_PREV_PAGE'), 'btn', 'btn-secondary', 'btn-sm');
+    prev.disabled = page <= 1;
+    prev.addEventListener('click', () => gotoDraftPage(page - 1));
+
+    const next = iconBtn('chevron-right', t('GRAFIDA_BTN_NEXT_PAGE'), 'btn', 'btn-secondary', 'btn-sm');
+    next.disabled = page >= totalPages;
+    next.addEventListener('click', () => gotoDraftPage(page + 1));
+
+    const info = el('span', 'articles-pagination-info',
+        ...formatNodes(t('GRAFIDA_PAGINATION_INFO'), String(page), String(totalPages)));
+
+    pager.appendChild(prev);
+    pager.appendChild(info);
+    pager.appendChild(next);
+}
+
+/** Applies a patch to the draft query (resetting to page 1) and re-renders. */
+function setDraftQuery(patch) {
+    State.draftQuery = { ...State.draftQuery, ...patch, page: 1 };
+    renderDraftsTab();
+}
+
+/** Moves to a specific local-drafts page (keeping all filters) and re-renders. */
+function gotoDraftPage(page) {
+    const total = State.draftPaging.totalPages || 1;
+    State.draftQuery = { ...State.draftQuery, page: Math.max(1, Math.min(total, page)) };
+    renderDraftsTab();
 }
 
 /** Builds the persistent search / sort / filter toolbar for remote articles. */
@@ -1071,7 +1293,7 @@ function setArticleQuery(patch) {
 /** Fetches the current remote-article page and re-renders the list + pagination. */
 async function reloadRemoteArticles() {
     const list = document.getElementById('articles-remote-list');
-    const pager = document.getElementById('articles-pagination');
+    const pager = document.getElementById('articles-remote-pagination');
     if (!list) return;
     clearNode(list);
     clearNode(pager);
@@ -1094,7 +1316,7 @@ async function reloadRemoteArticles() {
 /** Renders the current remote-article items and pagination controls. */
 function renderRemoteArticles() {
     const list = document.getElementById('articles-remote-list');
-    const pager = document.getElementById('articles-pagination');
+    const pager = document.getElementById('articles-remote-pagination');
     if (!list || !pager) return;
     clearNode(list);
     clearNode(pager);
@@ -1197,7 +1419,7 @@ async function confirmDeleteDraft(draft) {
     try {
         await api.deleteDraft(draft.id);
         State.drafts = State.drafts.filter(d => d.id !== draft.id);
-        renderDraftsSection();
+        renderDraftsTab();
         renderRemoteArticles();
         showToast(t('GRAFIDA_MSG_DRAFT_DELETED'), 'success');
     } catch (err) {

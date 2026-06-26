@@ -785,6 +785,38 @@ input[type="color"].form-control {
     gap: 8px;
 }
 
+/* Local Drafts / Remote Articles tab strip */
+.articles-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.articles-tab {
+    appearance: none;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    padding: 8px 16px;
+    font-family: var(--font-title);
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: color var(--transition), border-color var(--transition);
+}
+
+.articles-tab:hover {
+    color: var(--color-text);
+}
+
+.articles-tab.active {
+    color: var(--color-accent);
+    border-bottom-color: var(--color-accent);
+}
+
 /* Remote-article filter / sort toolbar */
 .articles-filter-bar {
     display: flex;

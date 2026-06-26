@@ -68,10 +68,17 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
   sort column against a whitelist (`ARTICLE_ORDERING`, drawn from the model's `filter_fields`),
   and forwards them to the REST API as `list[ordering|direction]` + `filter[…]` + `page[limit|
   offset]`. `ApiClient::listArticlesPage()` returns the page's items **and** the pagination total
-  (Joomla's `meta['total-pages']`). Default sort is `a.id` desc. The SPA renders a filter/sort
-  toolbar (search, sort column + direction, category/tag/language/state/featured/checked-out
-  dropdowns, per-page limit, clear-filters) above the remote list with prev/next pagination;
-  local drafts are listed separately above it and are never paginated. A remote article that
+  (Joomla's `meta['total-pages']`). Default sort is `a.id` desc. The Articles page is split into
+  two tabs — **Local Drafts** and **Remote Articles** (`State.articlesTab`, default `drafts`) —
+  each with its own filter/sort toolbar, list and prev/next pagination. The Remote Articles tab
+  renders the server-paginated toolbar (search, sort column + direction, category/tag/language/
+  state/featured/checked-out dropdowns, per-page limit, clear-filters). The Local Drafts tab
+  offers the same shape, but drafts are loaded in full per visit and **searched/sorted/filtered/
+  paginated entirely client-side** (`filteredSortedDrafts()` / `renderDraftsTab()`); its toolbar
+  is the subset of fields a draft actually carries (search over title+alias; sort by id/title/
+  category/language/state; category/tag/language/state filters; per-page limit) — no
+  featured/checked-out/hits/author/date controls. Because drafts store tag *titles* (not ids),
+  the drafts tab's tag filter matches on title. A remote article that
   is already mirrored by a local draft (same site + `remote_id`) **stays** in the remote list
   (it is not hidden), tagged with an extra `GRAFIDA_LBL_HAS_LOCAL_DRAFT` "Local draft" badge and
   a left accent; clicking it opens the existing draft rather than re-importing the article
