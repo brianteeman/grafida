@@ -5,6 +5,18 @@ and editing **Joomla! articles** through the Joomla Web Services (REST) API. It 
 **PHP 8.4** with [**Boson**](https://bosonphp.com), uses **SQLite** for all local storage,
 and **TinyMCE 7** as the HTML editor. Licensed **GNU GPL v3 or later**. Dev happens on macOS.
 
+## Scope (what we deliberately do NOT support)
+
+Grafida is an **offline article editor**: it composes article HTML locally and publishes it
+through the REST API. It is **not** the Joomla back-end and does **not** reuse the Joomla
+WYSIWYG editor environment. Consequently we do **not** support — and will not try to emulate —
+**page builders** (SP Page Builder, JSN, Quix, etc.), **editor-button/editor-xtd plugins**
+(e.g. the article/image/page-break/module-insert buttons, sliders, tabs, third-party
+shortcode buttons), or **custom/alternative media managers**. Article bodies are plain HTML
+authored in TinyMCE; images go through Grafida's own offline media picker (see `src/Media/`),
+not a site-side media-manager plugin. Don't add features that depend on server-side editor
+plugins or builder shortcodes.
+
 ## How Boson works here (important)
 
 Boson runs a native webview and bundles a PHP runtime. There is **no `webview->bind` RPC**.
