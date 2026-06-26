@@ -60,6 +60,18 @@ final class ApiRoutingTest extends TestCase
         self::assertSame([], $json['data']['sites']);
     }
 
+    public function testBootstrapReturnsAppMetadata(): void
+    {
+        [$status, $json] = $this->call($this->kernel(), 'GET', '/api/bootstrap');
+
+        self::assertSame(200, $status);
+        self::assertSame('Grafida', $json['data']['app']['name']);
+        self::assertSame(\Grafida\Support\App::VERSION, $json['data']['app']['version']);
+        self::assertStringContainsString('GNU General Public License', $json['data']['app']['license']);
+        self::assertStringStartsWith('https://www.gnu.org/', $json['data']['app']['licenseUrl']);
+        self::assertStringContainsString('Open Source Matters', $json['data']['app']['disclaimer']);
+    }
+
     public function testMarkdownConversion(): void
     {
         [$status, $json] = $this->call($this->kernel(), 'POST', '/api/markdown', json_encode(['markdown' => '# Hello']));

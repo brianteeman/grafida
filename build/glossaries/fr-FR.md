@@ -37,3 +37,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | folder | dossier | Répertoire du système de fichiers ; « dossier contenant » = le dossier qui contient le fichier de la base de données. |
 | reset | Réinitialiser | Remettre le stockage local à l'état d'une nouvelle installation (supprime toutes les données). Préféré à « Remettre à zéro ». |
 | location | emplacement | Chemin/emplacement d'un fichier, ex. « Emplacement de la base de données ». |
+| about | À propos | About dialog / menu label. |
+| close | Fermer | Button label; closes a dialog. |
+| license | Licence | Software licence (GPL). The full licence text and the Joomla! disclaimer are non-translatable legal content. |
+| version | Version | Application version label. |

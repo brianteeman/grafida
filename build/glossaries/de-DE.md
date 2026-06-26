@@ -43,3 +43,7 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | folder | Ordner | Verzeichnis im Dateisystem; „enthaltender Ordner" = der Ordner, der die Datenbankdatei enthält. |
 | reset | Zurücksetzen | Lokalen Speicher auf den frisch installierten Zustand zurücksetzen (alle Daten löschen). |
 | location | Speicherort | Pfad/Ort einer Datei, z. B. „Speicherort der Datenbank". |
+| about | Über | About dialog / menu label. |
+| close | Schließen | Button label; closes a dialog. |
+| license | Lizenz | Software licence (GPL). The full licence text and the Joomla! disclaimer are non-translatable legal content. |
+| version | Version | Application version label. |

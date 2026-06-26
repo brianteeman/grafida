@@ -37,3 +37,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | folder | φάκελος | A file-system directory; "containing folder" = the folder holding the database file. |
 | reset | επαναφορά | Reset local storage to a clean, just-installed state (deletes all data). Noun form «Επαναφορά». |
 | location | τοποθεσία | Path/location of a file, e.g. «Τοποθεσία βάσης δεδομένων». |
+| about | Σχετικά | About dialog / menu label. |
+| close | Κλείσιμο | Button label; closes a dialog. |
+| license | Άδεια χρήσης | Software licence (GPL). The full licence text and the Joomla! disclaimer are non-translatable legal content. |
+| version | Έκδοση | Application version label. |

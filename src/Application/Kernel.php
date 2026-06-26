@@ -33,6 +33,7 @@ use Grafida\Storage\Database;
 use Grafida\Storage\SettingsRepository;
 use Grafida\Storage\StorageService;
 use Grafida\Support\Resources;
+use Grafida\Support\UrlOpener;
 use PDO;
 
 /**
@@ -80,6 +81,7 @@ final class Kernel
             fields: new FieldSupport(),
             apiClient: $apiClient,
             storage: $storage,
+            urlOpener: new UrlOpener(),
         );
     }
 

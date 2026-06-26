@@ -37,3 +37,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | folder | pasta | Diretório do sistema de ficheiros; «pasta que o contém» = a pasta que contém o ficheiro da base de dados. |
 | reset | Repor | Repor o armazenamento local no estado acabado de instalar (elimina todos os dados). Preferido em pt-PT sobre «Redefinir» ou «Reiniciar». |
 | location | localização | Caminho/localização de um ficheiro, ex.: «Localização da base de dados». |
+| about | Acerca de | About dialog / menu label. |
+| close | Fechar | Button label; closes a dialog. |
+| license | Licença | Software licence (GPL). The full licence text and the Joomla! disclaimer are non-translatable legal content. |
+| version | Versão | Application version label. |

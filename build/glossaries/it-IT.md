@@ -37,3 +37,7 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | folder | cartella | Directory del file system; «cartella contenitore» = la cartella che contiene il file del database. |
 | reset | Reimposta | Riportare l'archivio locale allo stato di installazione iniziale (elimina tutti i dati). Etichetta pulsante; imperativo. |
 | location | posizione | Percorso/posizione di un file, es. «Posizione del database». |
+| about | Informazioni | About dialog / menu label. |
+| close | Chiudi | Button label; closes a dialog. |
+| license | Licenza | Software licence (GPL). The full licence text and the Joomla! disclaimer are non-translatable legal content. |
+| version | Versione | Application version label. |

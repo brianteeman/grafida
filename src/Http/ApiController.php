@@ -29,6 +29,8 @@ use Grafida\Site\SecureStoreUnavailableException;
 use Grafida\Site\Site;
 use Grafida\Site\SiteService;
 use Grafida\Storage\StorageService;
+use Grafida\Support\App;
+use Grafida\Support\UrlOpener;
 
 /**
  * Routes and handles the application's internal JSON API (the front-end calls
@@ -59,6 +61,8 @@ final class ApiController
         'GRAFIDA_MSG_UNSAVED_TITLE', 'GRAFIDA_MSG_UNSAVED_CHANGES',
         'GRAFIDA_MSG_DELETE_DRAFT_TITLE', 'GRAFIDA_MSG_DELETE_DRAFT_CONFIRM',
         'GRAFIDA_MSG_DRAFT_DELETED', 'GRAFIDA_MSG_DELETE_SITE_CONFIRM',
+        'GRAFIDA_LBL_ABOUT', 'GRAFIDA_BTN_ABOUT', 'GRAFIDA_LBL_VERSION', 'GRAFIDA_LBL_LICENSE',
+        'GRAFIDA_ABOUT_VIEW_LICENSE', 'GRAFIDA_BTN_CLOSE',
     ];
 
     public function __construct(
@@ -73,6 +77,7 @@ final class ApiController
         private readonly FieldSupport $fields,
         private readonly ApiClient $apiClient,
         private readonly StorageService $storage,
+        private readonly UrlOpener $urlOpener,
     ) {}
 
     public function dispatch(RequestInterface $request): ResponseInterface
@@ -110,6 +115,7 @@ final class ApiController
             $method === 'GET'  && $path === '/api/settings/storage'  => $this->storageInfo(),
             $method === 'POST' && $path === '/api/settings/storage/open'  => $this->openStorageFolder(),
             $method === 'POST' && $path === '/api/settings/storage/reset' => $this->resetStorage(),
+            $method === 'POST' && $path === '/api/open-url'          => $this->openUrl($body),
 
             default => $this->parameterised($method, $path, $body),
         };
@@ -182,7 +188,16 @@ final class ApiController
             'secureStore'         => $this->sites->hasSecureStore(),
             'supportedFieldTypes' => FieldSupport::SUPPORTED,
             'sites'               => array_map(static fn (Site $s): array => $s->toArray(), $this->sites->list()),
+            'app'                 => App::info(),
         ]);
+    }
+
+    /** @param array<string, mixed> $body */
+    private function openUrl(array $body): ResponseInterface
+    {
+        $this->urlOpener->open($this->str($body, 'url'));
+
+        return Json::ok();
     }
 
     /** @param array<string, mixed> $body */

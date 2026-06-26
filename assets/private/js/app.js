@@ -26,6 +26,7 @@ const State = {
     availableLanguages: {},
     secureStore: true,
     supportedFieldTypes: [],
+    app: {},
     sites: [],
     currentSiteId: null,
     currentDraftId: null,
@@ -209,6 +210,7 @@ const api = {
     getStorageInfo: () => apiFetch('GET', '/api/settings/storage'),
     openStorageFolder: () => apiFetch('POST', '/api/settings/storage/open'),
     resetStorage: () => apiFetch('POST', '/api/settings/storage/reset'),
+    openUrl: (url) => apiFetch('POST', '/api/open-url', { url }),
 };
 
 // ============================================================
@@ -1707,6 +1709,59 @@ function applyStrings() {
 }
 
 // ============================================================
+//  About dialog
+// ============================================================
+
+/** Set the version label shown at the bottom of the sidebar. */
+function renderSidebarFooter() {
+    const label = document.getElementById('sidebar-version');
+    if (!label) return;
+    const version = State.app.version || '';
+    label.textContent = version ? t('GRAFIDA_LBL_VERSION') + ' ' + version : t('GRAFIDA_BTN_ABOUT');
+}
+
+/** Open the licence text in the user's default web browser. */
+async function openLicenseUrl() {
+    const url = State.app.licenseUrl;
+    if (!url) return;
+    try {
+        await api.openUrl(url);
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+/** Show the About dialog with app identity, version, licence and disclaimers. */
+function showAboutDialog() {
+    const app = State.app;
+
+    const nameEl = el('p', 'about-name', app.name || 'Grafida');
+
+    const versionEl = el('p', 'about-version',
+        ...formatNodes(t('GRAFIDA_LBL_VERSION') + ' %s', app.version || ''));
+
+    const copyrightEl = app.copyright ? el('p', 'about-copyright', app.copyright) : null;
+
+    const licenseLine = el('p', 'about-license',
+        ...formatNodes(t('GRAFIDA_LBL_LICENSE') + ': %s', app.license || ''));
+
+    const licenseLink = iconBtn('up-right-from-square', t('GRAFIDA_ABOUT_VIEW_LICENSE'), 'btn', 'btn-link');
+    licenseLink.addEventListener('click', openLicenseUrl);
+
+    // Joomla! trademark disclaimer — displayed verbatim, never translated.
+    const disclaimerEl = app.disclaimer ? el('p', 'about-disclaimer', app.disclaimer) : null;
+
+    const closeBtn = iconBtn('xmark', t('GRAFIDA_BTN_CLOSE'), 'btn', 'btn-secondary');
+    closeBtn.addEventListener('click', closeModal);
+
+    showModal(
+        t('GRAFIDA_LBL_ABOUT'),
+        [nameEl, versionEl, copyrightEl, licenseLine, licenseLink, disclaimerEl],
+        [closeBtn]
+    );
+}
+
+// ============================================================
 //  App bootstrap
 // ============================================================
 
@@ -1721,6 +1776,7 @@ async function bootstrap() {
         State.availableLanguages = data.availableLanguages || {};
         State.secureStore = data.secureStore !== false;
         State.supportedFieldTypes = data.supportedFieldTypes || [];
+        State.app = data.app || {};
         State.sites = data.sites || [];
     } catch (err) {
         console.error('Bootstrap failed:', err);
@@ -1728,6 +1784,7 @@ async function bootstrap() {
 
     document.getElementById('app').style.opacity = '1';
     applyStrings();
+    renderSidebarFooter();
     renderSiteSelector();
     renderSitesScreen();
     renderSettingsScreen();
@@ -1763,6 +1820,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (State.activeScreen === 'articles') loadArticlesScreen();
         });
     }
+
+    const sidebarFooter = document.getElementById('sidebar-footer');
+    if (sidebarFooter) sidebarFooter.addEventListener('click', showAboutDialog);
 
     const btnAddSite = document.getElementById('btn-add-site');
     if (btnAddSite) btnAddSite.addEventListener('click', openAddSiteModal);

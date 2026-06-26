@@ -37,3 +37,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | folder | carpeta | Directorio del sistema de archivos; «carpeta contenedora» = la carpeta que contiene el archivo de la base de datos. |
 | reset | Restablecer | Devolver el almacenamiento local al estado recién instalado (elimina todos los datos). Preferido sobre «Reiniciar» o «Resetear». |
 | location | ubicación | Ruta/ubicación de un archivo, p. ej. «Ubicación de la base de datos». |
+| about | Acerca de | About dialog / menu label. |
+| close | Cerrar | Button label; closes a dialog. |
+| license | Licencia | Software licence (GPL). The full licence text and the Joomla! disclaimer are non-translatable legal content. |
+| version | Versión | Application version label. |

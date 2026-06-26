@@ -37,6 +37,11 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
   `StorageService` reports the DB file path, opens its folder in the OS file browser
   (`open`/`explorer`/`xdg-open`), and resets local storage (deletes tokens + wipes all
   tables, keeping `schema_migrations`). Exposed under `/api/settings/storage[/open|/reset]`.
+- `src/Support/` — `Resources`/`Paths` (filesystem locations), `App` (app identity/legal
+  metadata: name, `VERSION`, copyright, licence + FSF URL, the verbatim Joomla! trademark
+  disclaimer — sent to the SPA in the `bootstrap` payload's `app` key), and `UrlOpener`
+  (opens an external http(s) URL in the OS default browser; backs `POST /api/open-url`).
+  The sidebar footer shows the version and opens an About dialog using this metadata.
 - `assets/private/` — SPA (`view/index.html`, `css/`, `js/`, vendored `js/tinymce/`).
   UI icons use the vendored **FontAwesome 7 Free** solid font (`css/fontawesome.min.css`
   + `css/solid.min.css` + `webfonts/fa-solid-900.woff2`) — never images/emoji. Action
