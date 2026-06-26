@@ -4,3 +4,6 @@
 !glossaries/**
 !icon/
 !icon/**
+# Packaging sources used by scripts/build-all.sh (committed; not build output)
+!linux-install.sh
+!windows-installer.nsi

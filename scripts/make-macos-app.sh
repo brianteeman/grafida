@@ -16,10 +16,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ARCH="${1:-$([ "$(uname -m)" = "arm64" ] && echo arm64 || echo amd64)}"
 
-# Boson names the macOS arm64 output directory "aarch64".
+# Boson names the macOS arm64 output directory "aarch64"; amd64 stays "amd64".
 case "$ARCH" in
-  arm64|aarch64) SRC_DIR="$ROOT/build/macos/aarch64" ;;
-  amd64|x86_64)  SRC_DIR="$ROOT/build/macos/x86_64" ;;
+  arm64|aarch64) ARCH=arm64; SRC_DIR="$ROOT/build/macos/aarch64" ;;
+  amd64|x86_64)  ARCH=amd64; SRC_DIR="$ROOT/build/macos/amd64" ;;
   *) echo "Unknown arch: $ARCH" >&2; exit 1 ;;
 esac
 
@@ -29,8 +29,10 @@ if [ ! -x "$BIN" ]; then
   exit 1
 fi
 
-VERSION="${GRAFIDA_VERSION:-0.1.0}"
-APP="$ROOT/build/macos/Grafida.app"
+VERSION="${GRAFIDA_VERSION:-$(sed -nE "s/.*VERSION = '([^']+)'.*/\1/p" "$ROOT/src/Support/App.php" | head -1)}"
+# The bundle is written beside its source binary (per-arch) so building both the
+# arm64 and amd64 .app/.dmg in one run does not clobber a single shared path.
+APP="$SRC_DIR/Grafida.app"
 MACOS="$APP/Contents/MacOS"
 
 echo "Assembling $APP (arch: $ARCH, version: $VERSION)"
