@@ -23,7 +23,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | tag             | etiqueta                   | Joomla! tag. Plural: etiquetas.                                                          |
 | title           | título                     | Article or site title.                                                                   |
 | token           | token                      | API authentication token. Kept untranslated; widely understood in technical contexts.    |
-| status | Estado | Joomla! publishing state: Publicado, Despublicado, Archivado, En la papelera. |
+| status | Estado | Official Joomla! publishing state: Publicado, Despublicado, Archivado, Movido a la papelera. |
 | discard | Descartar | Descartar cambios sin guardar; botón «Descartar todos los cambios». |
 | unsaved changes | Cambios sin guardar | Modificaciones de un borrador aún no guardadas. |
 | keep editing | Seguir editando | Botón para permanecer en el editor en lugar de guardar o descartar. |
@@ -44,7 +44,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | intro image | Imagen de introducción | Joomla article images.image_intro. |
 | full article image | Imagen del artículo completo | Joomla article images.image_fulltext. |
 | alt text | Texto alternativo | Image alt attribute. |
-| caption | Pie de foto | Image caption. |
+| caption | Subtítulo | Image caption. Official Joomla! term (COM_CONTENT_FIELD_IMAGE_CAPTION_LABEL = «Subtítulo»), even though «Pie de foto» is more literal. |
 | image class | Clase de la imagen | Joomla float_intro/float_fulltext: a free-text CSS class. |
 | media library | Multimedia | The site's Media Manager, browsed when picking an image. |
 | decorative image | imagen decorativa | image_*_alt_empty: alt text intentionally empty. |

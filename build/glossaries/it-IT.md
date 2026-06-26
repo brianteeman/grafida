@@ -16,14 +16,14 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | interface         | interfaccia            | Come in «lingua dell'interfaccia» (lingua dell'UI).                                                     |
 | language          | lingua                 | Sia la lingua dell'interfaccia sia la lingua del contenuto. Non «linguaggio» (riservato alla programmazione). |
 | publish           | Pubblica               | Etichetta pulsante; imperativo. In prosa: «pubblicare».                                                 |
-| read more         | continua a leggere     | Segnaposto «Leggi tutto» di Joomla!. Minuscolo come concetto.                                           |
+| read more         | Leggi tutto            | Termine ufficiale di Joomla! (PLG_READMORE_BUTTON_READMORE = «Leggi tutto»). Segnaposto «Leggi tutto».  |
 | save              | Salva                  | Etichetta pulsante; imperativo. Preferito a «Registra» nei contesti software standard.                  |
 | settings          | impostazioni           | Impostazioni dell'applicazione o dell'elemento. Plurale. Nei titoli di sezione: «Impostazioni».         |
 | site              | sito                   | Un'installazione Joomla!. Plurale: siti.                                                                |
-| tag               | etichetta              | Tag di Joomla!. Plurale: etichette. Il termine «tag» è ampiamente compreso ma meno formale.             |
+| tag               | Tag                    | Termine ufficiale di Joomla! (JTAG = «Tag»), non «etichetta».                                            |
 | title             | titolo                 | Titolo di un articolo o di un sito.                                                                     |
 | token             | token                  | Token di autenticazione API. Mantenuto in inglese: è il termine standard nella documentazione tecnica.  |
-| status | Stato | Stato di pubblicazione Joomla!: Pubblicato, Non pubblicato, Archiviato, Nel cestino. |
+| status | Stato | Stato di pubblicazione ufficiale di Joomla!: Pubblicato, Sospeso, Archiviato, Cestinato. |
 | discard | Ignora | Ignora le modifiche non salvate; pulsante «Ignora tutte le modifiche». |
 | unsaved changes | Modifiche non salvate | Modifiche a una bozza non ancora salvate. |
 | keep editing | Continua a modificare | Pulsante per restare nell'editor invece di salvare o ignorare. |
@@ -42,7 +42,7 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | license | Licenza | Software licence (GPL). The full licence text and the Joomla! disclaimer are non-translatable legal content. |
 | version | Versione | Application version label. |
 | intro image | Immagine introduttiva | Joomla article images.image_intro. |
-| full article image | Immagine dell’articolo completo | Joomla article images.image_fulltext. |
+| full article image | Immagine articolo esteso | Joomla article images.image_fulltext (COM_CONTENT_FIELD_FULL_LABEL = «Immagine articolo esteso»). |
 | alt text | Testo alternativo | Image alt attribute. |
 | caption | Didascalia | Image caption. |
 | image class | Classe immagine | Joomla float_intro/float_fulltext: a free-text CSS class. |

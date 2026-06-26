@@ -23,7 +23,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | tag             | etiqueta                      | Joomla! tag. Plural: etiquetas. The word «tag» is understood but «etiqueta» is more formal in pt-PT.  |
 | title           | título                        | Article or site title. Plural: títulos.                                                                |
 | token           | token                         | API authentication token. Kept untranslated in technical contexts; «credencial» acceptable in prose.  |
-| status | Estado | Estado de publicação Joomla!: Publicado, Não publicado, Arquivado, No caixote do lixo. |
+| status | Situação | Situação de publicação oficial de Joomla! (JSTATUS = «Situação»): Publicado, Não publicado, Arquivado, Na reciclagem. |
 | discard | Descartar | Descartar alterações não guardadas; botão «Descartar todas as alterações». |
 | unsaved changes | Alterações não guardadas | Edições a um rascunho ainda não guardadas. |
 | keep editing | Continuar a editar | Botão para permanecer no editor em vez de guardar ou descartar. |

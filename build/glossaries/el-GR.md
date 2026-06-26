@@ -16,14 +16,14 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | interface       | διεπαφή                 | As in user interface / UI language selector.                                            |
 | language        | γλώσσα                  | Both UI language and content language.                                                  |
 | publish         | Δημοσίευση              | Button label; noun form. «Δημοσιεύστε» for prose imperative.                           |
-| read more       | διαβάστε περισσότερα    | The Joomla! "Read more" break. Keep lowercase when used as a concept.                  |
+| read more       | Περισσότερα             | Official Joomla! term (PLG_READMORE_BUTTON_READMORE = «Περισσότερα»). The "Read more" break. |
 | save            | Αποθήκευση              | Button label; noun form.                                                                 |
 | settings        | Ρυθμίσεις               | Application or item settings. Plural.                                                   |
 | site            | ιστότοπος               | A Joomla! site/installation. Plural: ιστότοποι. Short form in UI: «ιστότοπος».         |
-| tag             | ετικέτα                 | Joomla! tag. Plural: ετικέτες.                                                          |
+| tag             | ετικέτα                 | Joomla! tag (JTAG = «Ετικέτες»). Plural: ετικέτες.                                       |
 | title           | τίτλος                  | Article or site title.                                                                  |
 | token           | διακριτικό              | API authentication token. «API token» may be kept untranslated in technical contexts.  |
-| status | Κατάσταση | Joomla! publishing state: Δημοσιευμένο, Μη δημοσιευμένο, Αρχειοθετημένο, Στον κάδο. |
+| status | Κατάσταση | Official Joomla! publishing state: Δημοσιευμένο, Αδημοσίευτο, Αρχειοθετημένο, Απορρίφθηκε. |
 | discard | Απόρριψη | Discard unsaved changes; button «Απόρριψη όλων των αλλαγών». |
 | unsaved changes | Μη αποθηκευμένες αλλαγές | Edits to a draft not yet saved. |
 | keep editing | Συνέχιση επεξεργασίας | Button to stay in the editor instead of saving or discarding. |
@@ -41,7 +41,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | close | Κλείσιμο | Button label; closes a dialog. |
 | license | Άδεια χρήσης | Software licence (GPL). The full licence text and the Joomla! disclaimer are non-translatable legal content. |
 | version | Έκδοση | Application version label. |
-| intro image | Εικόνα εισαγωγής | Joomla article images.image_intro. |
+| intro image | Εισαγωγική εικόνα | Joomla article images.image_intro (COM_CONTENT_FIELD_INTRO_LABEL = «Εισαγωγική Εικόνα»). |
 | full article image | Εικόνα πλήρους άρθρου | Joomla article images.image_fulltext. |
 | alt text | Εναλλακτικό κείμενο | Image alt attribute. |
 | caption | Λεζάντα | Image caption. |
