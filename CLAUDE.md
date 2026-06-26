@@ -30,6 +30,18 @@ Request flow: `index.php` → `Grafida\FrontController` → `Grafida\Application
 static asset / the SPA shell. **The kernel is a pure `Request → Response` function**, so the
 whole back-end is testable without opening a window (see `tests/Feature/ApiRoutingTest.php`).
 
+**File pickers must go through the native dialog, not `<input type="file">`.** Boson's
+webview does not wire up the HTML file-input open-panel callback (WKWebView on macOS,
+WebKitGTK on Linux), so an in-page `<input type="file">` `.click()` silently does nothing.
+`index.php` therefore passes `$app->dialog` (Boson's `DialogApiInterface`) into the
+`FrontController` → `Kernel` → `ApiController`, and the SPA opens files via `POST
+/api/dialog/open-file` (`api.openFile(filter)`, filter `image`/`markdown`/`any`):
+`ApiController::openFile()` calls `selectFile()`, reads the chosen file and returns
+`{name, mime, dataBase64}` (or `{cancelled:true}`). `uploadLocalImage()` (intro/full-text
+images, the in-editor/media-browser "Choose file…" button) and `importMarkdown()` consume
+it. The dialog dependency is **nullable** so the kernel stays window-free in tests (a null
+dialog makes the endpoint return 503).
+
 ## Layout
 
 - `src/Http/` — `HttpClient` (curl/stream transport to Joomla), internal `ApiController`, `Json`.
@@ -104,7 +116,12 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
   `resolveImages()` uploads (via the shared offline-blob upload) and swaps for a public URL on publish.
   The SPA's editor "Images" section lets you pick a local file, browse the site's media, or paste a URL,
   and includes Joomla's `image_*_alt_empty` "decorative image" toggle. The same picker backs TinyMCE's
-  Insert/Edit Image dialog (its file-picker opens the media browser, with a "Choose file…" upload button):
+  Insert/Edit Image dialog: its Source-field browse button (`file_picker_callback`, gated by
+  `file_picker_types: 'image'`) opens the media browser, with a "Choose file…" button for a local file.
+  TinyMCE's own **"Upload" tab is disabled** (`image_uploadtab: false`) because its "Browse for an image"
+  dropzone creates a plain `<input type="file">` that Boson's webview never opens (see the native
+  file-dialog note above) — so local uploads go exclusively through the Source-field "Choose file…",
+  which calls the native picker.
   a local pick is inserted as `<img src="data:…" data-grafida-media-id="N">` (`GRAFIDA_MEDIA_ATTR`,
   mirroring `InlineMedia::ATTRIBUTE`) so `PublishService` uploads it on publish; a site-media pick is
   inserted as its public URL.

@@ -209,4 +209,76 @@ final class ApiRoutingTest extends TestCase
         [, $drafts] = $this->call($kernel, 'GET', '/api/sites/' . $siteId . '/drafts');
         self::assertSame([], $drafts['data']);
     }
+
+    public function testOpenFileIsUnavailableWithoutDialog(): void
+    {
+        // The default kernel has no native Dialog API wired in.
+        [$status, $json] = $this->call($this->kernel(), 'POST', '/api/dialog/open-file', json_encode(['filter' => 'image']));
+
+        self::assertSame(503, $status);
+        self::assertFalse($json['ok']);
+    }
+
+    public function testOpenFileReturnsSelectedFileContents(): void
+    {
+        $tmp = tempnam(sys_get_temp_dir(), 'grafida') . '.png';
+        file_put_contents($tmp, 'PNGDATA');
+
+        $kernel = new Kernel($this->kernelStatic(), Database::connect(':memory:'), \dirname(__DIR__, 2), $this->stubDialog($tmp));
+        [$status, $json] = $this->call($kernel, 'POST', '/api/dialog/open-file', json_encode(['filter' => 'image']));
+
+        unlink($tmp);
+
+        self::assertSame(200, $status);
+        self::assertTrue($json['ok']);
+        self::assertSame('image/png', $json['data']['mime']);
+        self::assertSame('PNGDATA', base64_decode($json['data']['dataBase64']));
+        self::assertStringEndsWith('.png', $json['data']['name']);
+    }
+
+    public function testOpenFileReturnsCancelledWhenDismissed(): void
+    {
+        $kernel = new Kernel($this->kernelStatic(), Database::connect(':memory:'), \dirname(__DIR__, 2), $this->stubDialog(null));
+        [$status, $json] = $this->call($kernel, 'POST', '/api/dialog/open-file', json_encode(['filter' => 'image']));
+
+        self::assertSame(200, $status);
+        self::assertTrue($json['ok']);
+        self::assertTrue($json['data']['cancelled']);
+    }
+
+    /** A no-op static provider, shared by the dialog tests. */
+    private function kernelStatic(): StaticProviderInterface
+    {
+        return new class implements StaticProviderInterface {
+            public function findFileByRequest(RequestInterface $request): ?ResponseInterface
+            {
+                return null;
+            }
+        };
+    }
+
+    /** A native Dialog API stub whose file-open returns the given path (or null). */
+    private function stubDialog(?string $path): \Boson\Api\Dialog\DialogApiInterface
+    {
+        return new class($path) implements \Boson\Api\Dialog\DialogApiInterface {
+            public function __construct(private readonly ?string $path) {}
+            public function selectFile(?string $directory = null, iterable $filter = []): ?string
+            {
+                return $this->path;
+            }
+            public function selectFiles(?string $directory = null, iterable $filter = []): iterable
+            {
+                return [];
+            }
+            public function selectDirectory(?string $directory = null, iterable $filter = []): ?string
+            {
+                return null;
+            }
+            public function selectDirectories(?string $directory = null, iterable $filter = []): iterable
+            {
+                return [];
+            }
+            public function open(string|\Stringable $uri): void {}
+        };
+    }
 }

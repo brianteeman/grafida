@@ -39,7 +39,7 @@ $static = new FilesystemStaticProvider([
     __DIR__ . '/assets/public',
 ]);
 
-$controller = new FrontController($static);
+$controller = new FrontController($static, $app->dialog);
 
 $app->on(static function (SchemeRequestReceived $e) use ($controller): void {
     $e->response = $controller($e->request);

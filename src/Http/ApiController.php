@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Grafida\Http;
 
+use Boson\Api\Dialog\DialogApiInterface;
 use Boson\Contracts\Http\RequestInterface;
 use Boson\Contracts\Http\ResponseInterface;
 use Grafida\Article\Draft;
@@ -108,6 +109,7 @@ final class ApiController
         private readonly ApiClient $apiClient,
         private readonly StorageService $storage,
         private readonly UrlOpener $urlOpener,
+        private readonly ?DialogApiInterface $dialog = null,
     ) {}
 
     public function dispatch(RequestInterface $request): ResponseInterface
@@ -148,6 +150,7 @@ final class ApiController
             $method === 'POST' && $path === '/api/settings/storage/open'  => $this->openStorageFolder(),
             $method === 'POST' && $path === '/api/settings/storage/reset' => $this->resetStorage(),
             $method === 'POST' && $path === '/api/open-url'          => $this->openUrl($body),
+            $method === 'POST' && $path === '/api/dialog/open-file'  => $this->openFile($body),
 
             default => $this->parameterised($method, $path, $body, $request),
         };
@@ -241,6 +244,65 @@ final class ApiController
         $this->urlOpener->open($this->str($body, 'url'));
 
         return Json::ok();
+    }
+
+    /**
+     * Open a native OS file-picker and return the chosen file's bytes.
+     *
+     * Boson's webview (WKWebView on macOS, WebKitGTK on Linux) does not wire up
+     * the HTML `<input type="file">` open-panel callback, so an in-page file
+     * input never opens a dialog. We instead drive the OS picker through Boson's
+     * native Dialog API and hand the file back to the SPA as base64, which then
+     * feeds it into the normal media-upload / Markdown-import flow.
+     *
+     * @param array<string, mixed> $body
+     */
+    private function openFile(array $body): ResponseInterface
+    {
+        if ($this->dialog === null) {
+            return Json::error('Native file dialog is unavailable', 503);
+        }
+
+        $filter = match ($this->str($body, 'filter', 'any')) {
+            'image'    => ['*.png', '*.jpg', '*.jpeg', '*.gif', '*.webp', '*.svg', '*.bmp', '*.avif'],
+            'markdown' => ['*.md', '*.markdown', '*.txt'],
+            default    => [],
+        };
+
+        $path = $this->dialog->selectFile(filter: $filter);
+
+        if ($path === null || $path === '') {
+            return Json::ok(['cancelled' => true]);
+        }
+
+        $raw = @file_get_contents($path);
+
+        if ($raw === false) {
+            return Json::error('Could not read the selected file', 400);
+        }
+
+        return Json::ok([
+            'name'       => basename($path),
+            'mime'       => self::mimeForPath($path),
+            'dataBase64' => base64_encode($raw),
+        ]);
+    }
+
+    /** Best-effort MIME type from a file extension (fileinfo is not bundled). */
+    private static function mimeForPath(string $path): string
+    {
+        return match (strtolower(pathinfo($path, \PATHINFO_EXTENSION))) {
+            'png'           => 'image/png',
+            'jpg', 'jpeg'   => 'image/jpeg',
+            'gif'           => 'image/gif',
+            'webp'          => 'image/webp',
+            'svg'           => 'image/svg+xml',
+            'bmp'           => 'image/bmp',
+            'avif'          => 'image/avif',
+            'md', 'markdown' => 'text/markdown',
+            'txt'           => 'text/plain',
+            default         => 'application/octet-stream',
+        };
     }
 
     /** @param array<string, mixed> $body */

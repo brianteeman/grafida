@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Grafida\Application;
 
+use Boson\Api\Dialog\DialogApiInterface;
 use Boson\Component\Http\Response;
 use Boson\Component\Http\Static\StaticProviderInterface;
 use Boson\Contracts\Http\RequestInterface;
@@ -54,6 +55,7 @@ final class Kernel
         private readonly StaticProviderInterface $static,
         ?PDO $pdo = null,
         ?string $basePath = null,
+        ?DialogApiInterface $dialog = null,
     ) {
         $pdo      = $pdo ?? Database::get();
         $basePath = $basePath ?? Resources::base();
@@ -89,6 +91,7 @@ final class Kernel
             apiClient: $apiClient,
             storage: $storage,
             urlOpener: new UrlOpener(),
+            dialog: $dialog,
         );
     }
 

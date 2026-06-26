@@ -292,6 +292,7 @@ const api = {
     deleteDraft: (id) => apiFetch('DELETE', `/api/drafts/${id}`),
     publishDraft: (id) => apiFetch('POST', `/api/drafts/${id}/publish`),
     uploadMedia: (siteId, body) => apiFetch('POST', `/api/sites/${siteId}/media`, body),
+    openFile: (filter) => apiFetch('POST', '/api/dialog/open-file', { filter }),
     browseMedia: (siteId, path = '') => apiFetch('GET', `/api/sites/${siteId}/media?path=${encodeURIComponent(path)}`),
     getMediaBlob: (id) => apiFetch('GET', `/api/media/${id}`),
     convertMarkdown: (markdown) => apiFetch('POST', '/api/markdown', { markdown }),
@@ -2150,6 +2151,13 @@ async function initTinyMCE(draft) {
         },
         // The Insert/Edit Image dialog's "browse" button opens the unified picker:
         // browse the site's Media Manager, or "Choose file…" to upload a local one.
+        // TinyMCE's own "Upload" tab dropzone ("Browse for an image") creates a
+        // plain <input type="file"> and clicks it — which Boson's webview never
+        // opens (no native file-input open-panel callback). Disable that dead tab;
+        // local files are uploaded through the Source field's browse button below,
+        // which routes to our native picker via the media browser's "Choose file…".
+        image_uploadtab: false,
+        file_picker_types: 'image',
         file_picker_callback: (callback, _value, meta) => {
             if (meta.filetype !== 'image') return;
             openMediaBrowser(editorSiteId, { allowUpload: true }).then(entry => {
@@ -2382,30 +2390,26 @@ function boundImageInput(key) {
  * `{url: <dataUri>, name, mediaId}` (or null on cancel/failure). Shared by the
  * intro/full-text picker and the in-editor image picker.
  */
-function uploadLocalImage(siteId, cb) {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = () => {
-        const file = input.files[0];
-        if (!file) { cb(null); return; }
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            const dataBase64 = String(e.target.result).split(',')[1];
-            try {
-                const result = await api.uploadMedia(siteId, {
-                    filename: file.name, mime: file.type || 'image/png',
-                    dataBase64, draftId: State.currentDraftId,
-                });
-                cb({ url: result.dataUri, name: file.name, mediaId: result.id });
-            } catch (err) {
-                showToast(err.message, 'error');
-                cb(null);
-            }
-        };
-        reader.readAsDataURL(file);
-    };
-    input.click();
+async function uploadLocalImage(siteId, cb) {
+    let picked;
+    try {
+        picked = await api.openFile('image');
+    } catch (err) {
+        showToast(err.message, 'error');
+        cb(null);
+        return;
+    }
+    if (!picked || picked.cancelled) { cb(null); return; }
+    try {
+        const result = await api.uploadMedia(siteId, {
+            filename: picked.name, mime: picked.mime || 'image/png',
+            dataBase64: picked.dataBase64, draftId: State.currentDraftId,
+        });
+        cb({ url: result.dataUri, name: picked.name, mediaId: result.id });
+    } catch (err) {
+        showToast(err.message, 'error');
+        cb(null);
+    }
 }
 
 /** Pick a local image file, store it offline, and set it as the kind's image. */
@@ -2815,25 +2819,27 @@ function showPostPublishDialog() {
 //  Import Markdown
 // --------------------------------------------------------
 
-function importMarkdown() {
-    const fileInput = document.createElement('input');
-    fileInput.type = 'file';
-    fileInput.accept = '.md,.markdown,text/markdown,text/plain';
-    fileInput.onchange = async () => {
-        const file = fileInput.files[0];
-        if (!file) return;
-        const text = await file.text();
-        try {
-            const result = await api.convertMarkdown(text);
-            if (State.tinyMCEEditor) {
-                State.tinyMCEEditor.setContent(result.html);
-                showToast('Markdown imported.', 'success');
-            }
-        } catch (err) {
-            showToast(err.message, 'error');
+async function importMarkdown() {
+    let picked;
+    try {
+        picked = await api.openFile('markdown');
+    } catch (err) {
+        showToast(err.message, 'error');
+        return;
+    }
+    if (!picked || picked.cancelled) return;
+    // The native picker hands the file back as base64; decode it as UTF-8 text.
+    const bytes = Uint8Array.from(atob(picked.dataBase64), c => c.charCodeAt(0));
+    const text = new TextDecoder().decode(bytes);
+    try {
+        const result = await api.convertMarkdown(text);
+        if (State.tinyMCEEditor) {
+            State.tinyMCEEditor.setContent(result.html);
+            showToast('Markdown imported.', 'success');
         }
-    };
-    fileInput.click();
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
 }
 
 // ============================================================
