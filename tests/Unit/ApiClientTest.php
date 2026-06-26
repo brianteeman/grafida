@@ -95,4 +95,36 @@ final class ApiClientTest extends TestCase
         self::assertSame('Hello', $sent['data']['attributes']['title']);
         self::assertSame(2, $sent['data']['attributes']['catid']);
     }
+
+    public function testGetArticleExposesTextAttributeAndRelationships(): void
+    {
+        // Mirrors Joomla's real article API response: the body is the combined
+        // `text` attribute and the category/tags are JSON:API relationships,
+        // not attributes. flatten() must preserve the relationships block.
+        $body = json_encode([
+            'data' => [
+                'type'          => 'articles',
+                'id'            => '7',
+                'attributes'    => ['title' => 'Hello', 'text' => '<p>Body</p>'],
+                'relationships' => [
+                    'category' => ['data' => ['type' => 'categories', 'id' => '9']],
+                    'tags'     => ['data' => [
+                        ['type' => 'tags', 'id' => '3'],
+                        ['type' => 'tags', 'id' => '5'],
+                    ]],
+                ],
+            ],
+        ]);
+
+        $transport = new FakeTransport();
+        $transport->on('https://example.com/index.php/api/v1/content/articles/7', new HttpResponse(200, (string) $body));
+
+        $client  = new ApiClient($transport);
+        $article = $client->getArticle('https://example.com/index.php/api', 'tok', 7);
+
+        self::assertSame('<p>Body</p>', $article['text']);
+        self::assertSame('9', $article['relationships']['category']['data']['id']);
+        self::assertSame('3', $article['relationships']['tags']['data'][0]['id']);
+        self::assertSame('5', $article['relationships']['tags']['data'][1]['id']);
+    }
 }

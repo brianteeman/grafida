@@ -368,10 +368,11 @@ final class ApiController
     }
 
     /**
-     * Maps a Joomla article resource into an unsaved draft payload. The intro and
-     * full text are rejoined around a read-more marker so the introtext/fulltext
-     * split round-trips on publish; tag IDs are resolved to titles (best effort)
-     * via the reference cache so editing then publishing does not drop them.
+     * Maps a Joomla article resource into an unsaved draft payload. The body is
+     * Joomla's combined `text` attribute (the API does not expose the read-more
+     * marker, so the intro/full split is not preserved); the category and tags
+     * come from JSON:API relationships, tag IDs being resolved to titles (best
+     * effort) via the reference cache so editing then publishing does not drop them.
      *
      * @param array<string, mixed> $article
      *
@@ -379,11 +380,14 @@ final class ApiController
      */
     private function remoteArticleToDraft(int $siteId, int $articleId, array $article, Site $site): array
     {
-        $intro = $this->str($article, 'introtext');
-        $full  = $this->str($article, 'fulltext');
-        $html  = $full === '' ? $intro : $intro . "\n<hr class=\"readmore\">\n" . $full;
+        // Joomla's article API returns the body as a single `text` attribute
+        // (introtext and fulltext joined with a space; the read-more marker is
+        // not preserved by the API, so the intro/full split cannot be restored).
+        $html = $this->str($article, 'text');
 
         $language = $this->str($article, 'language', '*');
+
+        $catId = $this->firstRelationshipId($article, 'category');
 
         return [
             'id'       => null,
@@ -391,7 +395,7 @@ final class ApiController
             'remoteId' => $articleId,
             'title'    => $this->str($article, 'title'),
             'alias'    => $this->str($article, 'alias'),
-            'catid'    => isset($article['catid']) && is_numeric($article['catid']) ? (int) $article['catid'] : null,
+            'catid'    => $catId,
             'access'   => isset($article['access']) && is_numeric($article['access']) ? (int) $article['access'] : 1,
             'language' => $language !== '' ? $language : '*',
             'state'    => isset($article['state']) && is_numeric($article['state']) ? (int) $article['state'] : 1,
@@ -415,9 +419,11 @@ final class ApiController
      */
     private function remoteTagTitles(array $article, Site $site): array
     {
-        $tags = $article['tags'] ?? null;
+        // Joomla exposes an article's tags as a to-many relationship, not an
+        // attribute, so the IDs come from `relationships.tags.data[].id`.
+        $tagIds = $this->relationshipIds($article, 'tags');
 
-        if (!is_array($tags) || $tags === []) {
+        if ($tagIds === []) {
             return [];
         }
 
@@ -431,14 +437,62 @@ final class ApiController
         }
 
         $out = [];
-        foreach ($tags as $tag) {
-            $id = is_array($tag) ? ($tag['id'] ?? null) : $tag;
-            if (is_numeric($id) && isset($titleById[(int) $id])) {
-                $out[] = $titleById[(int) $id];
+        foreach ($tagIds as $id) {
+            if (isset($titleById[$id])) {
+                $out[] = $titleById[$id];
             }
         }
 
         return array_values(array_unique($out));
+    }
+
+    /**
+     * Returns the resource IDs of a JSON:API to-many relationship (or the
+     * single ID of a to-one relationship as a one-element list), as preserved
+     * by ApiClient's flatten() under the `relationships` key.
+     *
+     * @param array<string, mixed> $resource
+     *
+     * @return list<int>
+     */
+    private function relationshipIds(array $resource, string $name): array
+    {
+        $relationships = $resource['relationships'] ?? null;
+
+        if (!is_array($relationships) || !isset($relationships[$name]) || !is_array($relationships[$name])) {
+            return [];
+        }
+
+        $data = $relationships[$name]['data'] ?? null;
+
+        if (!is_array($data)) {
+            return [];
+        }
+
+        // A to-one relationship's `data` is a single resource-identifier object;
+        // a to-many's is a list of them. Normalise both to a list of IDs.
+        $entries = isset($data['id']) ? [$data] : $data;
+        $ids     = [];
+
+        foreach ($entries as $entry) {
+            $id = is_array($entry) ? ($entry['id'] ?? null) : null;
+            if (is_numeric($id)) {
+                $ids[] = (int) $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Returns the ID of a to-one JSON:API relationship (e.g. an article's
+     * category), or null when it is absent.
+     *
+     * @param array<string, mixed> $resource
+     */
+    private function firstRelationshipId(array $resource, string $name): ?int
+    {
+        return $this->relationshipIds($resource, $name)[0] ?? null;
     }
 
     /**

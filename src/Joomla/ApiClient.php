@@ -331,7 +331,10 @@ final class ApiClient
 
     /**
      * Flattens a JSON:API resource object into a plain associative array,
-     * exposing `id` alongside the attribute values.
+     * exposing `id` alongside the attribute values. The raw `relationships`
+     * object is preserved untouched: Joomla exposes an article's category and
+     * tags only as relationships (never as attributes), so consumers that need
+     * those linkages read them from here.
      *
      * @param array<int|string, mixed> $resource
      *
@@ -351,6 +354,10 @@ final class ApiClient
         if (isset($resource['id'])) {
             $id         = $resource['id'];
             $flat['id'] = is_numeric($id) ? (int) $id : (is_string($id) ? $id : null);
+        }
+
+        if (isset($resource['relationships']) && is_array($resource['relationships'])) {
+            $flat['relationships'] = $resource['relationships'];
         }
 
         return $flat;

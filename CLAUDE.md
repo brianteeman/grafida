@@ -52,7 +52,9 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
   `site_id` + `remote_id` it mirrors; `findByRemote()` locates an existing draft for a
   remote article and `update()` can re-point a draft at another site (which unlinks it).
   Editing a remote article fetches its full content via `GET /api/sites/{id}/articles/{articleId}`
-  (intro+full text rejoined around the read-more marker, tag IDs resolved to titles) and
+  (body taken from Joomla's combined `text` attribute — the API does not expose the read-more
+  marker, so the intro/full split is not preserved; category and tags come from the JSON:API
+  `relationships` block, which `ApiClient::flatten()` preserves, tag IDs resolved to titles) and
   opens it as an **unsaved** draft — drafts (new or imported) are only written to the DB on
   the first Save, so an unchanged remote article leaves no local draft.
 - `src/Media/` — offline image blobs (`media_blobs`). `ApiClient::listMedia()` browses the
@@ -105,9 +107,31 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
   drawing a capital “J”); `scripts/make-icons.sh` rasterises it into `Grafida.icns` (macOS),
   `Grafida.ico` (Windows), a `png/` set + `grafida.png` (Linux), all committed. Wiring:
   `make-macos-app.sh` copies the `.icns` into the bundle + `Info.plist` (`CFBundleIconFile`);
-  Windows embeds the `.ico` into `grafida.exe` (rcedit); Linux ships `grafida.desktop` +
-  hicolor PNGs. `build/` is otherwise gitignored — `build/icon/` and `build/glossaries/` are
-  the whitelisted exceptions (see `build/.gitignore`). Re-run the script after editing the SVG.
+  the Windows installer bundles the `.ico` beside `grafida.exe`; Linux ships `grafida.desktop`
+  + a hicolor PNG. `build/` is otherwise gitignored — the whitelisted exceptions are
+  `build/icon/`, `build/glossaries/`, and the two packaging sources `build/linux-install.sh`
+  + `build/windows-installer.nsi` (see `build/.gitignore`). Re-run make-icons after editing the SVG.
+
+## Build & packaging (one step)
+
+`composer build` → `scripts/build-all.sh` is the **one-shot** compile-and-package pipeline; it
+runs `boson compile` (every target in `boson.json`) then packages each platform into
+**`build/dist/`** (gitignored). The version comes from `App::VERSION` (override via
+`GRAFIDA_VERSION`). Per-platform packaging is tolerant (missing binary → warn+skip), but a
+failing compile or a genuine packaging-tool error is fatal. Pieces:
+- macOS (arm64+amd64, macOS host only): `scripts/make-macos-app.sh <arch>` assembles
+  `build/macos/<bosondir>/Grafida.app` (the bare binary + dylib + `assets/`, Info.plist,
+  ad-hoc dylib signature) — Boson names the arm64 dir `aarch64`, amd64 stays `amd64` — then
+  `scripts/make-dmg.sh <arch>` wraps it (via `hdiutil`) into `Grafida-<v>-macos-<arch>.dmg`
+  with an `/Applications` symlink.
+- Linux (amd64+arm64): a `.tar.gz` of the per-arch output dir (binary + `libboson-linux-*.so`
+  + `assets/`) plus the icon, `grafida.desktop`, and `build/linux-install.sh` (renamed
+  `install.sh`) — a per-user XDG desktop-integration installer.
+- Windows (amd64): `build/windows-installer.nsi` compiled by **NSIS** `makensis`, which runs
+  natively on macOS/Linux (no Wine/Docker/Windows) → `Grafida-<v>-windows-amd64-Setup.exe`
+  (per-user install in `%LOCALAPPDATA%\Programs\Grafida`). Falls back to a portable `.zip` if
+  `makensis` is absent.
+- PHAR: the compiler's `build/phar/grafida.phar`, copied to `Grafida-<v>.phar`.
 
 ## Key Joomla API facts (verified against Joomla 5.4 source)
 
