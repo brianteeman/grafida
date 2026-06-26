@@ -26,6 +26,7 @@ use Grafida\Publish\PublishBlockedException;
 use Grafida\Publish\PublishService;
 use Grafida\Reference\EditorCssService;
 use Grafida\Reference\ReferenceService;
+use Grafida\Site\FaviconService;
 use Grafida\Site\SecureStoreUnavailableException;
 use Grafida\Site\Site;
 use Grafida\Site\SiteService;
@@ -78,6 +79,7 @@ final class ApiController
 
     public function __construct(
         private readonly SiteService $sites,
+        private readonly FaviconService $favicons,
         private readonly ReferenceService $references,
         private readonly EditorCssService $editorCss,
         private readonly DraftRepository $drafts,
@@ -210,7 +212,7 @@ final class ApiController
             'displayMode'         => $this->displayMode->current(),
             'secureStore'         => $this->sites->hasSecureStore(),
             'supportedFieldTypes' => FieldSupport::SUPPORTED,
-            'sites'               => array_map(static fn (Site $s): array => $s->toArray(), $this->sites->list()),
+            'sites'               => array_map($this->siteArray(...), $this->sites->list()),
             'app'                 => App::info(),
         ]);
     }
@@ -233,7 +235,20 @@ final class ApiController
 
     private function listSites(): ResponseInterface
     {
-        return Json::ok(array_map(static fn (Site $s): array => $s->toArray(), $this->sites->list()));
+        return Json::ok(array_map($this->siteArray(...), $this->sites->list()));
+    }
+
+    /**
+     * The public representation of a site sent to the SPA, augmented with its
+     * cached favicon (a data: URI) when one has been downloaded.
+     *
+     * @return array<string, mixed>
+     */
+    private function siteArray(Site $site): array
+    {
+        return $site->toArray() + [
+            'favicon' => $site->id !== null ? $this->favicons->dataUri($site->id) : null,
+        ];
     }
 
     /** @param array<string, mixed> $body */
@@ -250,8 +265,9 @@ final class ApiController
         // Warm the categories/tags/languages cache the moment a site is connected,
         // so the first article (new or existing) has its selectors populated.
         $this->references->sync($site);
+        $this->favicons->sync($site);
 
-        return Json::ok($site->toArray(), 201);
+        return Json::ok($this->siteArray($site), 201);
     }
 
     /** @param array<string, mixed> $body */
@@ -271,8 +287,9 @@ final class ApiController
 
         // Re-warm reference data in case the URL or token changed.
         $this->references->sync($site);
+        $this->favicons->sync($site);
 
-        return Json::ok($site->toArray());
+        return Json::ok($this->siteArray($site));
     }
 
     private function deleteSite(int $id): ResponseInterface
@@ -294,12 +311,19 @@ final class ApiController
 
         $fieldDefs = $this->references->fields($site, $refresh, $bestEffort);
 
+        // The explicit refresh also re-downloads the favicon, so the SPA can
+        // update the icon shown for the site without a full reload.
+        if ($refresh && $site->id !== null) {
+            $this->favicons->sync($site);
+        }
+
         return Json::ok([
             'categories' => $this->references->categories($site, $refresh, $bestEffort),
             'tags'       => $this->references->tags($site, $refresh, $bestEffort),
             'levels'     => $this->references->accessLevels($site, $refresh, $bestEffort),
             'languages'  => $this->references->contentLanguages($site, $refresh, $bestEffort),
             'fields'     => $this->fields->partition($fieldDefs),
+            'favicon'    => $refresh && $site->id !== null ? $this->favicons->dataUri($site->id) : null,
         ]);
     }
 

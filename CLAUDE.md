@@ -24,6 +24,13 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
 - `src/Joomla/ApiClient.php` — Joomla REST client: base-URL normalisation + probing, JSON:API.
 - `src/Secret/` — OS secret stores (macOS `security`, Linux `secret-tool`, Windows DPAPI) + factory.
 - `src/Site/` — site entity, repository, `SiteService` (token storage + connection test).
+  `FaviconService` (5s fetch) parses the site home page for `<link rel="icon">` / Apple
+  touch icons, downloads the largest one (falling back to `/apple-touch-icon.png` then
+  `/favicon.ico`), and caches the raw bytes in `site_favicons` (`FaviconRepository`).
+  `sync()` is best-effort, run when a site is connected/updated (and on the manual metadata
+  refresh); the cached icon is sent to the SPA as each site's `favicon` data: URI (in the
+  `bootstrap`/sites payloads) and shown as a 64×64 rounded square on the Sites page and below
+  the sidebar site dropdown.
 - `src/Reference/` — cached categories/tags/levels/fields + `EditorCssService` (5s fetch, rebase, cache).
   `ReferenceService` uses a short-timeout (8s) API client; `sync()` warms the cache best-effort
   when a site is connected/updated, and opening the editor falls back to cache per-list (only the

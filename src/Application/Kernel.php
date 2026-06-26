@@ -28,6 +28,8 @@ use Grafida\Reference\EditorCssService;
 use Grafida\Reference\ReferenceRepository;
 use Grafida\Reference\ReferenceService;
 use Grafida\Secret\SecretStoreFactory;
+use Grafida\Site\FaviconRepository;
+use Grafida\Site\FaviconService;
 use Grafida\Site\SiteRepository;
 use Grafida\Site\SiteService;
 use Grafida\Storage\Database;
@@ -61,6 +63,7 @@ final class Kernel
         $apiClient   = new ApiClient();
 
         $siteService = new SiteService(new SiteRepository($pdo), $apiClient, $secureStore);
+        $favicons    = new FaviconService(new FaviconRepository($pdo));
         $referenceRepo = new ReferenceRepository($pdo);
         $references  = new ReferenceService($referenceRepo, $siteService);
         $editorCss   = new EditorCssService($referenceRepo);
@@ -73,6 +76,7 @@ final class Kernel
 
         $this->api = new ApiController(
             sites: $siteService,
+            favicons: $favicons,
             references: $references,
             editorCss: $editorCss,
             drafts: $drafts,

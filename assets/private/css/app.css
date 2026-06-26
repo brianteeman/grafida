@@ -153,6 +153,41 @@ html, body {
     border-color: var(--color-input-focus);
 }
 
+#sidebar-site-favicon {
+    display: flex;
+    justify-content: center;
+    margin-top: 10px;
+}
+
+#sidebar-site-favicon:empty {
+    display: none;
+}
+
+/* 64x64 rounded square favicon, shown on the Sites list and in the sidebar. */
+.site-favicon {
+    width: 64px;
+    height: 64px;
+    flex-shrink: 0;
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.site-favicon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.site-favicon-empty {
+    color: var(--color-text-muted);
+    font-size: 26px;
+}
+
 nav#main-nav {
     flex: 1;
     overflow-y: auto;

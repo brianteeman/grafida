@@ -157,6 +157,24 @@ function iconBtn(iconName, label, ...classes) {
     return b;
 }
 
+/**
+ * Build a 64x64 rounded-square favicon element for a site. Falls back to a
+ * globe glyph when the site has no cached favicon.
+ */
+function siteFaviconEl(site) {
+    const box = el('div', 'site-favicon');
+    if (site && site.favicon) {
+        const img = document.createElement('img');
+        img.src = site.favicon;
+        img.alt = '';
+        box.appendChild(img);
+    } else {
+        box.classList.add('site-favicon-empty');
+        box.appendChild(icon('globe'));
+    }
+    return box;
+}
+
 /** Create a labelled form-control group using DOM methods. */
 function formGroup(labelText, inputEl) {
     const group = document.createElement('div');
@@ -391,6 +409,19 @@ function recallLastSite() {
     }
 }
 
+/** Refresh the favicon shown below the sidebar site dropdown. */
+function renderSidebarFavicon() {
+    const box = document.getElementById('sidebar-site-favicon');
+    if (!box) return;
+    clearNode(box);
+
+    const site = State.currentSiteId
+        ? State.sites.find(s => s.id === State.currentSiteId)
+        : null;
+
+    if (site) box.appendChild(siteFaviconEl(site));
+}
+
 function renderSiteSelector() {
     const sel = document.getElementById('site-select');
     clearNode(sel);
@@ -403,6 +434,7 @@ function renderSiteSelector() {
         sel.appendChild(defaultOpt);
         sel.disabled = true;
         State.currentSiteId = null;
+        renderSidebarFavicon();
         updateNewArticleButton();
         updateNavState();
         return;
@@ -435,6 +467,7 @@ function renderSiteSelector() {
     // A single-option drop-down offers no choice, so disable it.
     sel.disabled = State.sites.length === 1;
 
+    renderSidebarFavicon();
     updateNewArticleButton();
     updateNavState();
 }
@@ -451,6 +484,7 @@ function selectSite(siteId) {
     State.editorCss = null;
     const sel = document.getElementById('site-select');
     if (sel) sel.value = String(siteId);
+    renderSidebarFavicon();
     updateNewArticleButton();
 }
 
@@ -507,6 +541,18 @@ async function reloadSiteMetadata(siteId, button) {
         const refs = await api.refreshReferences(siteId);
         const editorSiteId = State.currentDraft ? State.currentDraft.siteId : null;
         if (siteId === State.currentSiteId || siteId === editorSiteId) State.references = refs;
+
+        // The refresh re-downloads the favicon; reflect it on the Sites list and
+        // in the sidebar without a full reload.
+        if (refs && 'favicon' in refs) {
+            const site = State.sites.find(s => s.id === siteId);
+            if (site) {
+                site.favicon = refs.favicon;
+                renderSitesScreen();
+                if (siteId === State.currentSiteId) renderSidebarFavicon();
+            }
+        }
+
         showToast(t('GRAFIDA_MSG_REFS_REFRESHED'), 'success');
         return true;
     } catch (err) {
@@ -533,7 +579,7 @@ function buildSiteItem(site) {
     btnReload.addEventListener('click', () => reloadSiteMetadata(site.id, btnReload));
 
     const actions = el('div', 'site-item-actions', btnReload, btnEdit, btnDel);
-    return el('div', 'site-item', info, actions);
+    return el('div', 'site-item', siteFaviconEl(site), info, actions);
 }
 
 function buildSiteFormBody(site = null) {
@@ -2460,6 +2506,7 @@ document.addEventListener('DOMContentLoaded', () => {
             rememberLastSite(State.currentSiteId);
             State.references = null;
             State.editorCss = null;
+            renderSidebarFavicon();
             updateNewArticleButton();
             if (State.activeScreen === 'articles') loadArticlesScreen();
         });
