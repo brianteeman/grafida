@@ -11,7 +11,7 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | category | Kategorie | Standardbegriff in Joomla!-Übersetzungen. |
 | access | Zugriffsebene | Bezeichnet die Joomla!-Zugriffssteuerung (ACL); nicht einfach „Zugriff". |
 | publish | Veröffentlichen | Imperativ als Schaltflächenbeschriftung: „Veröffentlichen". |
-| draft | Entwurf | Noch nicht veröffentlichter Beitrag. |
+| Local Article (draft) | lokaler Artikel | Lokal gespeicherter Beitrag, der (noch) nicht veröffentlicht ist; maskulin, dekliniert (Akk. „lokalen Artikel", Dat. „dem lokalen Artikel", Plural „lokale Artikel"). Früher „Entwurf". |
 | connection | Verbindung | Im Kontext der API-Verbindung zu einer Website. |
 | token | Token | API-Schlüsselwort; wird als Anglizismus beibehalten (gängig in Entwicklerdoku). |
 | read more | Weiterlesen | Offizieller Joomla!-Begriff (PLG_READMORE_BUTTON_READMORE); Schaltfläche: „Weiterlesen einfügen". |
@@ -31,14 +31,14 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | auto-detect | Automatisch erkennen | Sprach- oder Einstellungserkennung; kurze Form: „(Automatisch)". |
 | status | Status | Offizieller Joomla!-Veröffentlichungsstatus: Veröffentlicht, Versteckt, Archiviert, Papierkorb. |
 | discard | Verwerfen | Ungespeicherte Änderungen verwerfen; Schaltfläche „Alle Änderungen verwerfen". |
-| unsaved changes | Nicht gespeicherte Änderungen | Noch nicht gespeicherte Bearbeitungen eines Entwurfs. |
+| unsaved changes | Nicht gespeicherte Änderungen | Noch nicht gespeicherte Bearbeitungen eines lokalen Artikels. |
 | keep editing | Weiter bearbeiten | Schaltfläche, um im Editor zu bleiben, statt zu speichern oder zu verwerfen. |
 | yes | Ja | Bestätigungsschaltfläche in Ja/Nein-Abfragen (z. B. Löschbestätigung). |
 | no | Nein | Abbrechen-/Ablehnen-Schaltfläche in Ja/Nein-Abfragen. |
-| delete draft | Entwurf löschen | Aktion zum endgültigen Entfernen eines lokalen Entwurfs. |
+| delete local article | Lokalen Artikel löschen | Aktion zum endgültigen Entfernen eines lokalen Artikels. |
 | back | Zurück | Schaltfläche, um den Editor zu verlassen und zur Beitragsliste zurückzukehren. |
 | refresh | Aktualisieren | Schaltfläche zum erneuten Laden der Referenzdaten (Kategorien, Schlagwörter usw.). |
-| local storage | Lokaler Speicher | Die lokalen SQLite-Daten der App auf dem Computer (Websites, Entwürfe, Token, Cache). |
+| local storage | Lokaler Speicher | Die lokalen SQLite-Daten der App auf dem Computer (Websites, lokale Artikel, Token, Cache). |
 | database | Datenbank | Die lokale SQLite-Datenbank. |
 | folder | Ordner | Verzeichnis im Dateisystem; „enthaltender Ordner" = der Ordner, der die Datenbankdatei enthält. |
 | reset | Zurücksetzen | Lokalen Speicher auf den frisch installierten Zustand zurücksetzen (alle Daten löschen). |

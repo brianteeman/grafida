@@ -11,7 +11,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | category        | categoria                     | Joomla! category. Plural: categorias.                                                                  |
 | connection      | ligação                       | Network/API connection. Preferred over «conexão» in pt-PT.                                             |
 | delete          | Eliminar                      | Button label; infinitive form. Use «eliminar» in lowercase for inline prose. Not «apagar» or «deletar».|
-| draft           | rascunho                      | Unpublished / draft state.                                                                             |
+| Local Article   | artigo local                  | Local copy of an article (masc.; pl. «artigos locais»). Formerly «rascunho».                            |
 | edit            | Editar                        | Button label; infinitive form. Use «editar» in lowercase for inline prose.                             |
 | interface       | interface                     | As in user interface / UI language selector. Feminine: «a interface».                                  |
 | language        | idioma                        | Both UI language and content language. Preferred over «língua» in software contexts.                   |
@@ -25,14 +25,14 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | token           | token                         | API authentication token. Kept untranslated in technical contexts; «credencial» acceptable in prose.  |
 | status | Situação | Situação de publicação oficial de Joomla! (JSTATUS = «Situação»): Publicado, Não publicado, Arquivado, Na reciclagem. |
 | discard | Descartar | Descartar alterações não guardadas; botão «Descartar todas as alterações». |
-| unsaved changes | Alterações não guardadas | Edições a um rascunho ainda não guardadas. |
+| unsaved changes | Alterações não guardadas | Edições a um artigo local ainda não guardadas. |
 | keep editing | Continuar a editar | Botão para permanecer no editor em vez de guardar ou descartar. |
 | yes | Sim | Botão de confirmação em avisos Sim/Não (ex.: eliminação). |
 | no | Não | Botão de cancelar/recusar em avisos Sim/Não. |
-| delete draft | Eliminar rascunho | Ação para remover definitivamente um rascunho local. |
+| delete local article | Eliminar artigo local | Ação para remover definitivamente um artigo local. |
 | back | Voltar | Botão para sair do editor e voltar à lista de artigos. |
 | refresh | Atualizar | Botão para recarregar os dados de referência (categorias, etiquetas, etc.). |
-| local storage | armazenamento local | Os dados SQLite locais da aplicação no computador (sites, rascunhos, tokens, cache). |
+| local storage | armazenamento local | Os dados SQLite locais da aplicação no computador (sites, artigos locais, tokens, cache). |
 | database | base de dados | A base de dados SQLite local. Não «banco de dados» (português do Brasil). |
 | folder | pasta | Diretório do sistema de ficheiros; «pasta que o contém» = a pasta que contém o ficheiro da base de dados. |
 | reset | Repor | Repor o armazenamento local no estado acabado de instalar (elimina todos os dados). Preferido em pt-PT sobre «Redefinir» ou «Reiniciar». |

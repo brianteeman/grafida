@@ -69,7 +69,8 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
   and forwards them to the REST API as `list[ordering|direction]` + `filter[…]` + `page[limit|
   offset]`. `ApiClient::listArticlesPage()` returns the page's items **and** the pagination total
   (Joomla's `meta['total-pages']`). Default sort is `a.id` desc. The Articles page is split into
-  two tabs — **Local Drafts** and **Remote Articles** (`State.articlesTab`, default `drafts`) —
+  two tabs — **Local Articles** and **Remote Articles** (`State.articlesTab`, default `drafts`;
+  the user-facing label is “Local Articles” but the internal entity/state/routes remain *draft*) —
   each with its own filter/sort toolbar, list and prev/next pagination. The tab strip carries a
   right-aligned **network-activity indicator** (`#articles-net-indicator`): `apiFetch()` keeps a
   global in-flight-request counter (`netActivityCount`) and `updateNetActivityIndicator()` shows a
@@ -84,7 +85,7 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
   featured/checked-out/hits/author/date controls. Because drafts store tag *titles* (not ids),
   the drafts tab's tag filter matches on title. A remote article that
   is already mirrored by a local draft (same site + `remote_id`) **stays** in the remote list
-  (it is not hidden), tagged with an extra `GRAFIDA_LBL_HAS_LOCAL_DRAFT` "Local draft" badge and
+  (it is not hidden), tagged with an extra `GRAFIDA_LBL_HAS_LOCAL_DRAFT` "Local article" badge and
   a left accent; clicking it opens the existing draft rather than re-importing the article
   (`openEditorFor()` reuses the matching draft). The API only accepts a
   **single** category/tag and an INT `state`, so there is no multi-select or "all states"; an
@@ -96,8 +97,8 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
 - `src/Html/` — `ContentSplitter` (read-more split), `CssRebaser`, `InlineMedia`, `HtmlDocument`.
 - `src/Publish/PublishService.php` — the publish pipeline (media upload, tags, fields, split, POST/PATCH).
   After a successful publish the SPA (`showPostPublishDialog()`) asks what to do with the local
-  draft: **Delete Draft** (the default/focused action — removes the draft and returns to the list,
-  the published article remaining in the remote list) or **Keep Draft** (leaves the editor open to
+  draft: **Delete Local Article** (the default/focused action — removes the draft and returns to the list,
+  the published article remaining in the remote list) or **Keep Local Article** (leaves the editor open to
   edit and re-publish). A draft's `images` object holds Joomla's eight `image_intro*` / `image_fulltext*` subfields; the
   intro/full-text image picked from a local file is stored as a `grafida-media://N` sentinel that
   `resolveImages()` uploads (via the shared offline-blob upload) and swaps for a public URL on publish.

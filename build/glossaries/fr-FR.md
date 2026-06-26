@@ -11,7 +11,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | category        | catégorie               | Joomla! category. Plural: catégories.                                                        |
 | connection      | connexion               | Network/API connection.                                                                      |
 | delete          | Supprimer               | Button label; infinitive form. Use « supprimer » in lowercase for inline prose.              |
-| draft           | brouillon               | Unpublished / draft state.                                                                   |
+| Local Article   | article local           | Locally-stored article (masc.; plural « articles locaux »). Formerly « brouillon » (draft).  |
 | edit            | Modifier                | Button label; infinitive form. Use « modifier » in lowercase for inline prose.               |
 | interface       | interface               | As in user interface / UI language selector.                                                 |
 | language        | langue                  | Both UI language and content language. Not « langage » (which is used for programming).      |
@@ -25,14 +25,14 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | token           | jeton                   | API authentication token. « API token » may be kept untranslated in technical contexts.     |
 | status | Statut | État de publication Joomla! : Publié, Dépublié, Archivé, Dans la corbeille. |
 | discard | Abandonner | Abandonner les modifications non enregistrées ; bouton « Abandonner les modifications ». |
-| unsaved changes | Modifications non enregistrées | Modifications d'un brouillon pas encore enregistrées. |
+| unsaved changes | Modifications non enregistrées | Modifications d'un article local pas encore enregistrées. |
 | keep editing | Continuer l'édition | Bouton pour rester dans l'éditeur au lieu d'enregistrer ou d'abandonner. |
 | yes | Oui | Bouton de confirmation dans les invites Oui/Non (ex. suppression). |
 | no | Non | Bouton d'annulation/refus dans les invites Oui/Non. |
-| delete draft | Supprimer le brouillon | Action de supprimer définitivement un brouillon local. |
+| delete local article | Supprimer l'article local | Action de supprimer définitivement un article local. |
 | back | Retour | Bouton pour quitter l'éditeur et revenir à la liste des articles. |
 | refresh | Actualiser | Bouton pour recharger les données de référence (catégories, tags, etc.). |
-| local storage | stockage local | Les données SQLite locales de l'application sur l'ordinateur (sites, brouillons, jetons, cache). |
+| local storage | stockage local | Les données SQLite locales de l'application sur l'ordinateur (sites, articles locaux, jetons, cache). |
 | database | base de données | La base de données SQLite locale. |
 | folder | dossier | Répertoire du système de fichiers ; « dossier contenant » = le dossier qui contient le fichier de la base de données. |
 | reset | Réinitialiser | Remettre le stockage local à l'état d'une nouvelle installation (supprime toutes les données). Préféré à « Remettre à zéro ». |

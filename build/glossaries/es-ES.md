@@ -11,7 +11,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | category        | categoría                  | Joomla! category. Plural: categorías.                                                    |
 | connection      | conexión                   | Network/API connection.                                                                  |
 | delete          | Eliminar                   | Button label. Preferred over «Borrar» for destructive actions in software UIs.           |
-| draft           | borrador                   | Unpublished / draft state.                                                               |
+| Local Article   | artículo local             | Locally stored article (offline copy). Plural: artículos locales. Formerly «borrador».   |
 | edit            | Editar                     | Button label; infinitive. Use «editar» (lowercase) in prose.                            |
 | interface       | interfaz                   | As in user interface / UI language selector. Feminine noun: «la interfaz».              |
 | language        | idioma                     | Both UI language and content language. Preferred over «lengua» in software contexts.    |
@@ -25,14 +25,14 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | token           | token                      | API authentication token. Kept untranslated; widely understood in technical contexts.    |
 | status | Estado | Official Joomla! publishing state: Publicado, Despublicado, Archivado, Movido a la papelera. |
 | discard | Descartar | Descartar cambios sin guardar; botón «Descartar todos los cambios». |
-| unsaved changes | Cambios sin guardar | Modificaciones de un borrador aún no guardadas. |
+| unsaved changes | Cambios sin guardar | Modificaciones de un artículo local aún no guardadas. |
 | keep editing | Seguir editando | Botón para permanecer en el editor en lugar de guardar o descartar. |
 | yes | Sí | Botón de confirmación en avisos Sí/No (p. ej. eliminación). |
 | no | No | Botón de cancelar/rechazar en avisos Sí/No. |
-| delete draft | Eliminar borrador | Acción para eliminar definitivamente un borrador local. |
+| delete local article | Eliminar artículo local | Acción para eliminar definitivamente un artículo local. |
 | back | Atrás | Botón para salir del editor y volver a la lista de artículos. |
 | refresh | Actualizar | Botón para recargar los datos de referencia (categorías, etiquetas, etc.). |
-| local storage | almacenamiento local | Los datos SQLite locales de la app en el equipo (sitios, borradores, tokens, caché). |
+| local storage | almacenamiento local | Los datos SQLite locales de la app en el equipo (sitios, artículos locales, tokens, caché). |
 | database | base de datos | La base de datos SQLite local. |
 | folder | carpeta | Directorio del sistema de archivos; «carpeta contenedora» = la carpeta que contiene el archivo de la base de datos. |
 | reset | Restablecer | Devolver el almacenamiento local al estado recién instalado (elimina todos los datos). Preferido sobre «Reiniciar» o «Resetear». |

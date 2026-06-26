@@ -11,7 +11,7 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | category          | categoria              | Categoria Joomla!. Plurale: categorie.                                                                  |
 | connection        | connessione            | Connessione di rete / API.                                                                              |
 | delete            | Elimina                | Etichetta pulsante; imperativo. In prosa: «eliminare». Non usare «cancella» (ambiguo).                  |
-| draft             | bozza                  | Stato non pubblicato. Plurale: bozze.                                                                   |
+| draft (Local Article) | articolo locale     | Articolo composto e salvato localmente (in precedenza «bozza»). Maschile. Plurale: articoli locali.     |
 | edit              | Modifica               | Etichetta pulsante; imperativo. In prosa: «modificare».                                                 |
 | interface         | interfaccia            | Come in «lingua dell'interfaccia» (lingua dell'UI).                                                     |
 | language          | lingua                 | Sia la lingua dell'interfaccia sia la lingua del contenuto. Non «linguaggio» (riservato alla programmazione). |
@@ -25,14 +25,14 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | token             | token                  | Token di autenticazione API. Mantenuto in inglese: è il termine standard nella documentazione tecnica.  |
 | status | Stato | Stato di pubblicazione ufficiale di Joomla!: Pubblicato, Sospeso, Archiviato, Cestinato. |
 | discard | Ignora | Ignora le modifiche non salvate; pulsante «Ignora tutte le modifiche». |
-| unsaved changes | Modifiche non salvate | Modifiche a una bozza non ancora salvate. |
+| unsaved changes | Modifiche non salvate | Modifiche a un articolo locale non ancora salvate. |
 | keep editing | Continua a modificare | Pulsante per restare nell'editor invece di salvare o ignorare. |
 | yes | Sì | Pulsante di conferma nei messaggi Sì/No (es. eliminazione). |
 | no | No | Pulsante di annullamento/rifiuto nei messaggi Sì/No. |
-| delete draft | Elimina bozza | Azione per rimuovere definitivamente una bozza locale. |
+| delete draft | Elimina articolo locale | Azione per rimuovere definitivamente un articolo locale. |
 | back | Indietro | Pulsante per uscire dall'editor e tornare all'elenco degli articoli. |
 | refresh | Aggiorna | Pulsante per ricaricare i dati di riferimento (categorie, tag, ecc.). |
-| local storage | archivio locale | I dati SQLite locali dell'app sul computer (siti, bozze, token, cache). |
+| local storage | archivio locale | I dati SQLite locali dell'app sul computer (siti, articoli locali, token, cache). |
 | database | database | Il database SQLite locale. Mantenuto in inglese: termine standard. |
 | folder | cartella | Directory del file system; «cartella contenitore» = la cartella che contiene il file del database. |
 | reset | Reimposta | Riportare l'archivio locale allo stato di installazione iniziale (elimina tutti i dati). Etichetta pulsante; imperativo. |
