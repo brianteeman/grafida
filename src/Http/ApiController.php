@@ -348,7 +348,7 @@ final class ApiController
         $articles = $this->apiClient
             ->listArticles($site->apiBase, $token, ['page[limit]' => 50, 'list[ordering]' => 'modified', 'list[direction]' => 'desc']);
 
-        return Json::ok($articles);
+        return Json::ok($this->withCategoryTitles($articles, $site));
     }
 
     /**
@@ -531,6 +531,40 @@ final class ApiController
     }
 
     /**
+     * Annotates each article in a list with a normalised `catid` (int|null) and a
+     * human-readable `categoryTitle`, resolved from the site's cached category
+     * list. Saved drafts already carry a `catid` attribute; the remote list
+     * webservice exposes the category only as a JSON:API relationship — both are
+     * accepted. An id the cache does not know leaves `categoryTitle` null.
+     *
+     * @param list<array<string, mixed>> $articles
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function withCategoryTitles(array $articles, Site $site): array
+    {
+        $titles = [];
+        foreach ($this->references->categories($site) as $cat) {
+            $id = $cat['id'] ?? null;
+            if (is_numeric($id)) {
+                $titles[(int) $id] = $this->str($cat, 'title');
+            }
+        }
+
+        foreach ($articles as &$article) {
+            $catId = isset($article['catid']) && is_numeric($article['catid'])
+                ? (int) $article['catid']
+                : $this->firstRelationshipId($article, 'category');
+
+            $article['catid']         = $catId;
+            $article['categoryTitle'] = $catId !== null ? ($titles[$catId] ?? null) : null;
+        }
+        unset($article);
+
+        return $articles;
+    }
+
+    /**
      * Normalises a remote article's `images` attribute (a JSON string or object)
      * to a plain array the draft can store and republish verbatim.
      *
@@ -562,10 +596,12 @@ final class ApiController
 
     private function listDrafts(int $siteId): ResponseInterface
     {
-        return Json::ok(array_map(
+        $drafts = array_map(
             static fn (Draft $d): array => $d->toArray(),
             $this->drafts->forSite($siteId)
-        ));
+        );
+
+        return Json::ok($this->withCategoryTitles($drafts, $this->requireSite($siteId)));
     }
 
     private function getDraft(int $id): ResponseInterface

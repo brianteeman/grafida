@@ -822,10 +822,23 @@ input[type="color"].form-control {
     text-overflow: ellipsis;
 }
 
+.article-item-category {
+    font-size: 11px;
+    color: var(--color-text-muted);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 .article-item-meta {
     font-size: 11px;
     color: var(--color-text-muted);
     margin-top: 2px;
+}
+
+.article-item-alias {
+    font-family: var(--font-mono);
 }
 
 .article-badge {

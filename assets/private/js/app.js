@@ -868,8 +868,14 @@ function buildArticleItem(article, type) {
 
     const titleDiv = el('div', 'article-item-title', article.title || '(Untitled)');
     const infoDiv = el('div', 'article-item-info', titleDiv);
+    if (article.catid != null) {
+        const label = article.categoryTitle
+            ? `[#${article.catid}] ${article.categoryTitle}`
+            : `[#${article.catid}]`;
+        infoDiv.appendChild(el('div', 'article-item-category', label));
+    }
     if (article.alias) {
-        infoDiv.appendChild(el('div', 'article-item-meta', article.alias));
+        infoDiv.appendChild(el('div', 'article-item-meta article-item-alias', article.alias));
     }
 
     const badgeClass = type === 'draft' ? 'badge-draft' : 'badge-remote';
