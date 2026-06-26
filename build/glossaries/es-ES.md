@@ -52,3 +52,15 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | follow system | seguir el sistema | Display mode that follows the OS light/dark setting. |
 | light (theme) | claro | Light display theme. |
 | dark (theme) | oscuro | Dark display theme. |
+| sort by | Ordenar por | Article-list sort selector. |
+| ascending | Ascendente | Sort direction. |
+| descending | Descendente | Sort direction. |
+| featured | Destacado | Joomla! featured article flag. |
+| hits | Visitas | Joomla! article hit/view count. |
+| ordering | Orden | Joomla! manual ordering column. |
+| filter | filtro | Article-list filters; «Limpiar filtros» = clear filters. |
+| pagination | paginación | Page navigation of the article list. |
+| previous | Anterior | Pagination: previous page. |
+| next | Siguiente | Pagination: next page. |
+| per page | Por página | Article-list page size selector. |
+| checked out | bloqueado | Joomla! article locked/checked-out by an editor. |

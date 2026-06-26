@@ -52,3 +52,16 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | follow system | segui il sistema | Display mode that follows the OS light/dark setting. |
 | light (theme) | chiaro | Light display theme. |
 | dark (theme) | scuro | Dark display theme. |
+| sort by | Ordina per | Elenco articoli: campo di ordinamento. |
+| ascending | Crescente | Direzione di ordinamento. |
+| descending | Decrescente | Direzione di ordinamento. |
+| featured | In evidenza | Termine ufficiale di Joomla! (JFEATURED = «In evidenza»). |
+| hits | Visite | Contatore visualizzazioni articolo (Joomla JGLOBAL_HITS = «Visite»). |
+| ordering | Ordinamento | Ordine manuale degli articoli. |
+| filter | filtro | Filtri dell'elenco articoli; «Azzera filtri». |
+| per page | Per pagina | Numero di elementi per pagina nella paginazione. |
+| pagination | paginazione | Navigazione tra le pagine dei risultati. |
+| previous | Precedente | Pulsante: pagina precedente. |
+| next | Successivo | Pulsante: pagina successiva. |
+| checked out | Bloccato | Articolo bloccato in modifica da un utente. |
+| author | Autore | Autore dell'articolo. |

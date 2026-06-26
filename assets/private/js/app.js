@@ -55,6 +55,15 @@ const State = {
     editorSavedSiteId: null,
     drafts: [],
     remoteArticles: [],
+    // The remote-article browse state: current filters, sort and page, plus the
+    // last page's pagination total. Reset whenever the active site changes (see
+    // defaultArticleQuery / loadArticlesScreen). `articleListSiteId` records the
+    // site the current query belongs to; `articleListRefs` caches that site's
+    // categories/tags/languages for the filter dropdowns.
+    articleQuery: null,
+    articlePaging: { page: 1, totalPages: 1 },
+    articleListSiteId: null,
+    articleListRefs: null,
     references: null,
     editorCss: null,
     tinyMCEEditor: null,
@@ -242,7 +251,14 @@ const api = {
     getReferences: (siteId) => apiFetch('GET', `/api/sites/${siteId}/references`),
     refreshReferences: (siteId) => apiFetch('POST', `/api/sites/${siteId}/references/refresh`),
     getEditorCss: (siteId) => apiFetch('GET', `/api/sites/${siteId}/editor-css`),
-    getRemoteArticles: (siteId) => apiFetch('GET', `/api/sites/${siteId}/articles`),
+    getRemoteArticles: (siteId, params = {}) => {
+        const qs = new URLSearchParams();
+        Object.entries(params).forEach(([k, v]) => {
+            if (v !== '' && v != null) qs.set(k, String(v));
+        });
+        const tail = qs.toString();
+        return apiFetch('GET', `/api/sites/${siteId}/articles${tail ? `?${tail}` : ''}`);
+    },
     getRemoteArticle: (siteId, articleId) => apiFetch('GET', `/api/sites/${siteId}/articles/${articleId}`),
     getDrafts: (siteId) => apiFetch('GET', `/api/sites/${siteId}/drafts`),
     createDraft: (siteId, body) => apiFetch('POST', `/api/sites/${siteId}/drafts`, body),
@@ -802,65 +818,323 @@ async function confirmDeleteSite(id) {
 //  ARTICLES SCREEN
 // ============================================================
 
+// The columns the remote-article list may be sorted by, mirroring Joomla's
+// back-end "Sort by" dropdown (only the columns the REST API actually accepts as
+// `list[ordering]`). Direction is a separate control. Default is `a.id`.
+const ARTICLE_SORT_COLUMNS = [
+    ['a.id', 'GRAFIDA_SORT_ID'],
+    ['a.title', 'GRAFIDA_SORT_TITLE'],
+    ['category_title', 'GRAFIDA_SORT_CATEGORY'],
+    ['a.access', 'GRAFIDA_SORT_ACCESS'],
+    ['a.created_by', 'GRAFIDA_SORT_AUTHOR'],
+    ['language', 'GRAFIDA_SORT_LANGUAGE'],
+    ['a.created', 'GRAFIDA_SORT_CREATED'],
+    ['a.modified', 'GRAFIDA_SORT_MODIFIED'],
+    ['a.publish_up', 'GRAFIDA_SORT_PUBLISH_UP'],
+    ['a.publish_down', 'GRAFIDA_SORT_PUBLISH_DOWN'],
+    ['a.hits', 'GRAFIDA_SORT_HITS'],
+    ['a.featured', 'GRAFIDA_SORT_FEATURED'],
+    ['a.state', 'GRAFIDA_SORT_STATUS'],
+    ['a.ordering', 'GRAFIDA_SORT_ORDERING'],
+];
+
+const ARTICLE_PER_PAGE = [5, 10, 15, 20, 25, 30, 50, 100];
+
+/** The default filter/sort/page state for the remote-article list. */
+function defaultArticleQuery() {
+    return {
+        search: '', ordering: 'a.id', direction: 'desc',
+        category: '', tag: '', language: '', state: '',
+        featured: '', checked_out: '',
+        limit: 20, page: 1,
+    };
+}
+
+let _articleSearchTimer = null;
+
 async function loadArticlesScreen() {
     const container = document.getElementById('articles-container');
 
     if (!State.currentSiteId) {
         clearNode(container);
-        container.appendChild(el('div', 'empty-state', el('p', null, 'Please select a site.')));
+        container.appendChild(el('div', 'empty-state', el('p', null, t('GRAFIDA_MSG_SELECT_SITE'))));
         return;
     }
 
+    // A new active site starts from a clean query and drops the cached filter
+    // reference data (categories/tags/languages are per-site).
+    if (State.articleListSiteId !== State.currentSiteId || !State.articleQuery) {
+        State.articleListSiteId = State.currentSiteId;
+        State.articleQuery = defaultArticleQuery();
+        State.articleListRefs = null;
+    }
+
     clearNode(container);
-    const spinnerDiv = el('div', 'loading-row',
-        el('div', 'spinner'),
-        txt(' Loading…')
-    );
-    container.appendChild(spinnerDiv);
+    container.appendChild(el('div', 'loading-row', el('div', 'spinner'), txt(' ' + t('GRAFIDA_MSG_LOADING'))));
 
     try {
-        const [drafts, remoteArticles] = await Promise.all([
+        // Drafts and the filter reference data are loaded once per visit; the
+        // remote article page is then fetched (and refetched on every filter,
+        // sort or page change) by reloadRemoteArticles().
+        const [drafts] = await Promise.all([
             api.getDrafts(State.currentSiteId),
-            api.getRemoteArticles(State.currentSiteId).catch(() => []),
+            loadArticleFilterRefs(),
         ]);
         State.drafts = drafts || [];
-        State.remoteArticles = Array.isArray(remoteArticles) ? remoteArticles : [];
-        renderArticlesList();
+
+        clearNode(container);
+        const draftsSection = el('div', 'article-list-section');
+        draftsSection.id = 'articles-drafts';
+        container.appendChild(draftsSection);
+
+        const remoteSection = el('div', 'article-list-section');
+        remoteSection.appendChild(el('h3', null, t('GRAFIDA_LBL_REMOTE_ARTICLES')));
+        remoteSection.appendChild(buildArticleFilterBar());
+        const list = el('div', null);
+        list.id = 'articles-remote-list';
+        remoteSection.appendChild(list);
+        const pager = el('div', 'articles-pagination');
+        pager.id = 'articles-pagination';
+        remoteSection.appendChild(pager);
+        container.appendChild(remoteSection);
+
+        renderDraftsSection();
+        await reloadRemoteArticles();
     } catch (err) {
         clearNode(container);
-        const errDiv = el('div', 'alert alert-error', String(err.message));
-        container.appendChild(errDiv);
+        container.appendChild(el('div', 'alert alert-error', String(err.message)));
     }
 }
 
-function renderArticlesList() {
-    const container = document.getElementById('articles-container');
-    clearNode(container);
-
-    if (State.drafts.length > 0) {
-        const section = el('div', 'article-list-section');
-        const heading = el('h3', null, 'Local Drafts');
-        section.appendChild(heading);
-        State.drafts.forEach(draft => section.appendChild(buildArticleItem(draft, 'draft')));
-        container.appendChild(section);
+/** Loads (and caches per-site) the categories/tags/languages for the filter bar. */
+async function loadArticleFilterRefs() {
+    if (State.articleListRefs && State.articleListRefs.siteId === State.currentSiteId) return;
+    try {
+        const refs = await api.getReferences(State.currentSiteId);
+        State.articleListRefs = {
+            siteId: State.currentSiteId,
+            categories: refs.categories || [],
+            tags: refs.tags || [],
+            languages: refs.languages || [],
+        };
+    } catch {
+        State.articleListRefs = { siteId: State.currentSiteId, categories: [], tags: [], languages: [] };
     }
+}
 
-    // A remote article that already has a local draft is shown only as that draft
-    // (clicking it would reuse the draft anyway), so it is filtered out here.
+/** Renders just the local-drafts section (used on load and after a draft delete). */
+function renderDraftsSection() {
+    const section = document.getElementById('articles-drafts');
+    if (!section) return;
+    clearNode(section);
+    if (!State.drafts.length) return;
+    section.appendChild(el('h3', null, t('GRAFIDA_LBL_LOCAL_DRAFTS')));
+    State.drafts.forEach(draft => section.appendChild(buildArticleItem(draft, 'draft')));
+}
+
+/** Builds the persistent search / sort / filter toolbar for remote articles. */
+function buildArticleFilterBar() {
+    const q = State.articleQuery;
+    const bar = el('div', 'articles-filter-bar');
+
+    // Search box (debounced) + explicit search button.
+    const search = document.createElement('input');
+    search.type = 'search';
+    search.className = 'form-control';
+    search.placeholder = t('GRAFIDA_PLACEHOLDER_SEARCH');
+    search.value = q.search;
+    search.setAttribute('aria-label', t('GRAFIDA_PLACEHOLDER_SEARCH'));
+    search.addEventListener('input', () => {
+        clearTimeout(_articleSearchTimer);
+        _articleSearchTimer = setTimeout(() => setArticleQuery({ search: search.value }), 400);
+    });
+    search.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') { clearTimeout(_articleSearchTimer); setArticleQuery({ search: search.value }); }
+    });
+    bar.appendChild(el('div', 'articles-filter-search', search));
+
+    // Sort column + direction.
+    bar.appendChild(filterSelect('GRAFIDA_LBL_SORT_BY',
+        ARTICLE_SORT_COLUMNS.map(([v, k]) => [v, t(k)]), q.ordering, false,
+        (v) => setArticleQuery({ ordering: v })));
+    bar.appendChild(filterSelect('GRAFIDA_LBL_DIRECTION', [
+        ['desc', t('GRAFIDA_SORT_DIR_DESC')],
+        ['asc', t('GRAFIDA_SORT_DIR_ASC')],
+    ], q.direction, false, (v) => setArticleQuery({ direction: v })));
+
+    // Category / Tag / Language filters from the cached reference data.
+    const refs = State.articleListRefs || { categories: [], tags: [], languages: [] };
+    bar.appendChild(filterSelect('GRAFIDA_FILTER_CATEGORY_ANY',
+        categoryFilterOptions(refs.categories), q.category, true,
+        (v) => setArticleQuery({ category: v })));
+    bar.appendChild(filterSelect('GRAFIDA_FILTER_TAG_ANY',
+        (refs.tags || []).map(tg => [String(tg.id), tg.title]), q.tag, true,
+        (v) => setArticleQuery({ tag: v })));
+    bar.appendChild(filterSelect('GRAFIDA_FILTER_LANGUAGE_ANY',
+        languageFilterOptions(refs.languages), q.language, true,
+        (v) => setArticleQuery({ language: v })));
+
+    // Published state / featured / checked-out filters.
+    bar.appendChild(filterSelect('GRAFIDA_FILTER_STATE_ANY', [
+        ['1', t('GRAFIDA_OPT_PUBLISHED')],
+        ['0', t('GRAFIDA_OPT_UNPUBLISHED')],
+        ['2', t('GRAFIDA_OPT_ARCHIVED')],
+        ['-2', t('GRAFIDA_OPT_TRASHED')],
+    ], q.state, true, (v) => setArticleQuery({ state: v })));
+    bar.appendChild(filterSelect('GRAFIDA_FILTER_FEATURED_ANY', [
+        ['1', t('GRAFIDA_FILTER_FEATURED_YES')],
+        ['0', t('GRAFIDA_FILTER_FEATURED_NO')],
+    ], q.featured, true, (v) => setArticleQuery({ featured: v })));
+    bar.appendChild(filterSelect('GRAFIDA_FILTER_CHECKEDOUT_ANY', [
+        ['-1', t('GRAFIDA_FILTER_CHECKEDOUT_YES')],
+        ['0', t('GRAFIDA_FILTER_CHECKEDOUT_NO')],
+    ], q.checked_out, true, (v) => setArticleQuery({ checked_out: v })));
+
+    // Per-page limit.
+    bar.appendChild(filterSelect('GRAFIDA_LBL_PER_PAGE',
+        ARTICLE_PER_PAGE.map(n => [String(n), String(n)]), String(q.limit), false,
+        (v) => setArticleQuery({ limit: Number(v) })));
+
+    // Clear filters.
+    const clearBtn = iconBtn('rotate-left', t('GRAFIDA_BTN_CLEAR_FILTERS'), 'btn', 'btn-secondary', 'btn-sm');
+    clearBtn.addEventListener('click', () => {
+        State.articleQuery = defaultArticleQuery();
+        const remoteSection = document.getElementById('articles-remote-list').parentNode;
+        const oldBar = remoteSection.querySelector('.articles-filter-bar');
+        remoteSection.replaceChild(buildArticleFilterBar(), oldBar);
+        reloadRemoteArticles();
+    });
+    bar.appendChild(el('div', 'articles-filter-clear', clearBtn));
+
+    return bar;
+}
+
+/**
+ * A labelled <select> for the filter bar. When `withAny` is true, `anyKey` is
+ * the leading "no filter" option (value ''); otherwise it is the field's label.
+ */
+function filterSelect(anyKey, options, selected, withAny, onChange) {
+    const wrap = el('div', 'articles-filter-field');
+    const sel = document.createElement('select');
+    sel.className = 'form-control';
+    sel.setAttribute('aria-label', t(anyKey));
+    if (withAny) {
+        const any = document.createElement('option');
+        any.value = '';
+        any.textContent = t(anyKey);
+        sel.appendChild(any);
+    } else {
+        const lbl = el('label', 'articles-filter-label', t(anyKey));
+        wrap.appendChild(lbl);
+    }
+    options.forEach(([value, label]) => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = label;
+        if (String(selected) === String(value)) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    sel.addEventListener('change', () => onChange(sel.value));
+    wrap.appendChild(sel);
+    return wrap;
+}
+
+/** Flattened, indented [id, label] category options (mirrors buildCategorySelect). */
+function categoryFilterOptions(categories) {
+    if (!categories.length) return [];
+    if (categories[0].level === undefined) {
+        return categories.map(c => [String(c.id), c.title]);
+    }
+    const ordered = categories.slice().sort((a, b) => (Number(a.lft) || 0) - (Number(b.lft) || 0));
+    const minLevel = Math.min(...ordered.map(c => Number(c.level) || 0));
+    return ordered.map(c => {
+        const depth = (Number(c.level) || 0) - minLevel;
+        return [String(c.id), ' '.repeat(depth * 4) + c.title];
+    });
+}
+
+/** [code, label] content-language options for the language filter. */
+function languageFilterOptions(languages) {
+    const opts = [['*', t('GRAFIDA_OPT_LANG_ALL')]];
+    (languages || [])
+        .filter(l => l.published === undefined || Number(l.published) === 1)
+        .forEach(l => { if (l.lang_code) opts.push([l.lang_code, `${l.title || l.lang_code} (${l.lang_code})`]); });
+    return opts;
+}
+
+/** Applies a patch to the article query (resetting to page 1) and refetches. */
+function setArticleQuery(patch) {
+    State.articleQuery = { ...State.articleQuery, ...patch, page: 1 };
+    reloadRemoteArticles();
+}
+
+/** Fetches the current remote-article page and re-renders the list + pagination. */
+async function reloadRemoteArticles() {
+    const list = document.getElementById('articles-remote-list');
+    const pager = document.getElementById('articles-pagination');
+    if (!list) return;
+    clearNode(list);
+    clearNode(pager);
+    list.appendChild(el('div', 'loading-row', el('div', 'spinner'), txt(' ' + t('GRAFIDA_MSG_LOADING'))));
+
+    const siteId = State.currentSiteId;
+    try {
+        const result = await api.getRemoteArticles(siteId, State.articleQuery);
+        // Ignore a response that arrived after the user moved on.
+        if (siteId !== State.currentSiteId) return;
+        State.remoteArticles = Array.isArray(result.items) ? result.items : [];
+        State.articlePaging = { page: result.page || 1, totalPages: result.totalPages || 1 };
+        renderRemoteArticles();
+    } catch (err) {
+        clearNode(list);
+        list.appendChild(el('div', 'alert alert-error', String(err.message)));
+    }
+}
+
+/** Renders the current remote-article items and pagination controls. */
+function renderRemoteArticles() {
+    const list = document.getElementById('articles-remote-list');
+    const pager = document.getElementById('articles-pagination');
+    if (!list || !pager) return;
+    clearNode(list);
+    clearNode(pager);
+
+    // A remote article that already has a local draft is shown only as that draft.
     const linkedRemoteIds = new Set(State.drafts.map(d => d.remoteId).filter(id => id != null));
     const remoteArticles = State.remoteArticles.filter(a => !linkedRemoteIds.has(a.id));
 
-    if (remoteArticles.length > 0) {
-        const section = el('div', 'article-list-section');
-        const heading = el('h3', null, 'Remote Articles');
-        section.appendChild(heading);
-        remoteArticles.forEach(article => section.appendChild(buildArticleItem(article, 'remote')));
-        container.appendChild(section);
+    if (!remoteArticles.length) {
+        list.appendChild(el('div', 'empty-state', el('p', null, t('GRAFIDA_MSG_NO_REMOTE_ARTICLES'))));
+        return;
     }
 
-    if (!State.drafts.length && !remoteArticles.length) {
-        container.appendChild(el('div', 'empty-state', el('p', null, 'No articles found.')));
-    }
+    remoteArticles.forEach(article => list.appendChild(buildArticleItem(article, 'remote')));
+
+    const { page, totalPages } = State.articlePaging;
+    if (totalPages <= 1) return;
+
+    const prev = iconBtn('chevron-left', t('GRAFIDA_BTN_PREV_PAGE'), 'btn', 'btn-secondary', 'btn-sm');
+    prev.disabled = page <= 1;
+    prev.addEventListener('click', () => gotoArticlePage(page - 1));
+
+    const next = iconBtn('chevron-right', t('GRAFIDA_BTN_NEXT_PAGE'), 'btn', 'btn-secondary', 'btn-sm');
+    next.disabled = page >= totalPages;
+    next.addEventListener('click', () => gotoArticlePage(page + 1));
+
+    const info = el('span', 'articles-pagination-info',
+        ...formatNodes(t('GRAFIDA_PAGINATION_INFO'), String(page), String(totalPages)));
+
+    pager.appendChild(prev);
+    pager.appendChild(info);
+    pager.appendChild(next);
+}
+
+/** Moves to a specific remote-article page (keeping all filters) and refetches. */
+function gotoArticlePage(page) {
+    const total = State.articlePaging.totalPages || 1;
+    const clamped = Math.max(1, Math.min(total, page));
+    State.articleQuery = { ...State.articleQuery, page: clamped };
+    reloadRemoteArticles();
 }
 
 function buildArticleItem(article, type) {
@@ -915,7 +1189,8 @@ async function confirmDeleteDraft(draft) {
     try {
         await api.deleteDraft(draft.id);
         State.drafts = State.drafts.filter(d => d.id !== draft.id);
-        renderArticlesList();
+        renderDraftsSection();
+        renderRemoteArticles();
         showToast(t('GRAFIDA_MSG_DRAFT_DELETED'), 'success');
     } catch (err) {
         showToast(err.message, 'error');

@@ -52,3 +52,20 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | follow system | ακολούθηση συστήματος | Display mode that follows the OS light/dark setting. |
 | light (theme) | φωτεινή | Light display theme. |
 | dark (theme) | σκοτεινή | Dark display theme. |
+| sort by | Ταξινόμηση κατά | Article-list sort field selector. |
+| ascending | Αύξουσα | Sort direction; Joomla JGLOBAL_ORDER_ASCENDING. |
+| descending | Φθίνουσα | Sort direction; Joomla JGLOBAL_ORDER_DESCENDING. |
+| direction | Κατεύθυνση | Sort direction selector. |
+| per page | Ανά σελίδα | Pagination page-size selector (Joomla JGLOBAL_DISPLAY_NUM). |
+| featured | Προβεβλημένο | Joomla JFEATURED; article promoted to the front page. «Μη προβεβλημένο» = not featured. |
+| hits | Επισκέψεις | Joomla JGLOBAL_HITS; article view count. |
+| ordering | Σειρά ταξινόμησης | Joomla JGRID_HEADING_ORDERING; manual sort order. |
+| author | Συντάκτης | Article author/created-by. |
+| search | Αναζήτηση | Filter search box (Joomla JSEARCH_FILTER). |
+| filter | φίλτρο | Article-list filters; «Καθαρισμός φίλτρων» = clear filters. |
+| checked out | Κλειδωμένο | Joomla check-out lock state. «Μη κλειδωμένο» = not checked out. |
+| previous (page) | Προηγούμενη | Pagination; previous page (Joomla JPREV). |
+| next (page) | Επόμενη | Pagination; next page (Joomla JNEXT). |
+| page (pagination) | Σελίδα | Pagination info «Σελίδα %s από %s». |
+| start publishing | Έναρξη δημοσίευσης | Joomla publish_up date. |
+| finish publishing | Λήξη δημοσίευσης | Joomla publish_down date. |

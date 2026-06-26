@@ -58,3 +58,18 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | follow system | Systemeinstellung folgen | Display mode that follows the OS light/dark setting. |
 | light (theme) | Hell | Light display theme. |
 | dark (theme) | Dunkel | Dark display theme. |
+| sort by | Sortieren nach | Article-list sort selector. |
+| direction | Richtung | Sort direction selector. |
+| ascending | Aufsteigend | Sort direction. |
+| descending | Absteigend | Sort direction. |
+| per page | Pro Seite | Pagination page-size selector. |
+| featured | Hervorgehoben | Joomla JFEATURED; an article promoted to the front page. |
+| hits | Treffer | Joomla JGLOBAL_HITS; view count. |
+| ordering | Reihenfolge | Joomla JFIELD_ORDERING_LABEL; manual sort order. |
+| start publishing | Veröffentlichungsbeginn | Joomla COM_CONTENT_FIELD_PUBLISH_UP_LABEL. |
+| finish publishing | Veröffentlichungsende | Joomla COM_CONTENT_FIELD_PUBLISH_DOWN_LABEL. |
+| checked out | Ausgecheckt | Joomla record lock state; „Eingecheckt" = checked in. |
+| filter | Filter | Article-list filter dropdowns; „Filter zurücksetzen" = clear filters. |
+| pagination | Seitennummerierung | Page navigation of the article list („Seite %s von %s"). |
+| previous (page) | Vorherige | Pagination back button (distinct from „Zurück" = back to list). |
+| next (page) | Nächste | Pagination forward button. |

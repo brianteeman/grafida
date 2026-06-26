@@ -140,6 +140,44 @@ final class ApiClient
         return $this->collection($base, $token, 'content/articles', $query);
     }
 
+    /**
+     * Lists articles as a single page, returning both the flattened items and the
+     * pagination metadata Joomla emits (`meta['total-pages']`). Use this — rather
+     * than {@see listArticles()} — when paginating a browsable list, so the whole
+     * collection is never fetched at once.
+     *
+     * @param array<string, scalar> $query
+     *
+     * @return array{items: list<array<string, mixed>>, totalPages: int}
+     */
+    public function listArticlesPage(string $base, string $token, array $query = []): array
+    {
+        $url = $base . '/v1/content/articles';
+        if ($query !== []) {
+            $url .= '?' . http_build_query($query);
+        }
+
+        $response = $this->raw('GET', $url, $token);
+        $this->assertSuccess($response);
+
+        $json = $response->json();
+        $data = $json['data'] ?? [];
+        $out  = [];
+
+        foreach (is_array($data) ? $data : [] as $item) {
+            if (is_array($item)) {
+                $out[] = $this->flatten($item);
+            }
+        }
+
+        $meta       = is_array($json['meta'] ?? null) ? $json['meta'] : [];
+        $totalPages = isset($meta['total-pages']) && is_numeric($meta['total-pages'])
+            ? (int) $meta['total-pages']
+            : 1;
+
+        return ['items' => $out, 'totalPages' => max(1, $totalPages)];
+    }
+
     /** @return array<string, mixed> */
     public function getArticle(string $base, string $token, int $id): array
     {

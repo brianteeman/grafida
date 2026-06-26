@@ -52,3 +52,16 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | follow system | suivre le système | Display mode that follows the OS light/dark setting. |
 | light (theme) | clair | Light display theme. |
 | dark (theme) | sombre | Dark display theme. |
+| sort by | Trier par | Article-list sort selector. Mirrors Joomla's backend article list. |
+| ascending | Croissant | Sort direction. |
+| descending | Décroissant | Sort direction. |
+| direction | Sens | Sort direction selector label. |
+| featured | En vedette | Joomla "featured" article flag. |
+| hits | Visites | Joomla article hit/view count. |
+| ordering | Ordre | Manual article ordering column. |
+| filter | filtre | Article-list filter dropdowns; « Effacer les filtres » = clear filters. |
+| per page | Par page | Pagination page-size selector. |
+| previous | Précédent | Pagination button. |
+| next | Suivant | Pagination button. |
+| pagination | pagination | « Page %s sur %s » page indicator. |
+| checked out | Verrouillé | Joomla article checked-out (locked-for-editing) state. |

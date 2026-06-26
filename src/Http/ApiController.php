@@ -75,6 +75,19 @@ final class ApiController
         'GRAFIDA_BTN_CHOOSE_FILE', 'GRAFIDA_BTN_BROWSE_MEDIA', 'GRAFIDA_BTN_CLEAR_IMAGE',
         'GRAFIDA_BTN_MEDIA_UP', 'GRAFIDA_LBL_SOURCE_CODE',
         'GRAFIDA_MSG_NO_IMAGE', 'GRAFIDA_MSG_MEDIA_EMPTY',
+        'GRAFIDA_LBL_LOCAL_DRAFTS', 'GRAFIDA_LBL_REMOTE_ARTICLES',
+        'GRAFIDA_MSG_SELECT_SITE', 'GRAFIDA_MSG_LOADING', 'GRAFIDA_MSG_NO_REMOTE_ARTICLES',
+        'GRAFIDA_PLACEHOLDER_SEARCH', 'GRAFIDA_LBL_SORT_BY', 'GRAFIDA_LBL_DIRECTION',
+        'GRAFIDA_LBL_PER_PAGE', 'GRAFIDA_SORT_DIR_ASC', 'GRAFIDA_SORT_DIR_DESC',
+        'GRAFIDA_SORT_ID', 'GRAFIDA_SORT_TITLE', 'GRAFIDA_SORT_CATEGORY', 'GRAFIDA_SORT_ACCESS',
+        'GRAFIDA_SORT_AUTHOR', 'GRAFIDA_SORT_LANGUAGE', 'GRAFIDA_SORT_CREATED', 'GRAFIDA_SORT_MODIFIED',
+        'GRAFIDA_SORT_PUBLISH_UP', 'GRAFIDA_SORT_PUBLISH_DOWN', 'GRAFIDA_SORT_HITS',
+        'GRAFIDA_SORT_FEATURED', 'GRAFIDA_SORT_STATUS', 'GRAFIDA_SORT_ORDERING',
+        'GRAFIDA_FILTER_CATEGORY_ANY', 'GRAFIDA_FILTER_TAG_ANY', 'GRAFIDA_FILTER_LANGUAGE_ANY',
+        'GRAFIDA_FILTER_STATE_ANY', 'GRAFIDA_FILTER_FEATURED_ANY', 'GRAFIDA_FILTER_FEATURED_YES',
+        'GRAFIDA_FILTER_FEATURED_NO', 'GRAFIDA_FILTER_CHECKEDOUT_ANY', 'GRAFIDA_FILTER_CHECKEDOUT_YES',
+        'GRAFIDA_FILTER_CHECKEDOUT_NO', 'GRAFIDA_OPT_LANG_ALL', 'GRAFIDA_BTN_CLEAR_FILTERS',
+        'GRAFIDA_BTN_PREV_PAGE', 'GRAFIDA_BTN_NEXT_PAGE', 'GRAFIDA_PAGINATION_INFO',
     ];
 
     public function __construct(
@@ -162,7 +175,7 @@ final class ApiController
             return $this->editorCss((int) $m[1]);
         }
         if ($method === 'GET' && preg_match('#^/api/sites/(\d+)/articles$#', $path, $m) === 1) {
-            return $this->remoteArticles((int) $m[1]);
+            return $this->remoteArticles((int) $m[1], $request);
         }
         if ($method === 'GET' && preg_match('#^/api/sites/(\d+)/articles/(\d+)$#', $path, $m) === 1) {
             return $this->remoteArticle((int) $m[1], (int) $m[2]);
@@ -336,7 +349,30 @@ final class ApiController
         return Json::ok(['css' => $this->editorCss->load($site)]);
     }
 
-    private function remoteArticles(int $siteId): ResponseInterface
+    /**
+     * The article columns the SPA may sort by. Each maps to a Joomla
+     * `list[ordering]` value drawn from the article list's `filter_fields`
+     * (administrator/components/com_content/ArticlesModel), so the API accepts
+     * it. Anything outside this set falls back to `a.id`.
+     */
+    private const ARTICLE_ORDERING = [
+        'a.id', 'a.title', 'category_title', 'a.created', 'a.modified',
+        'a.publish_up', 'a.publish_down', 'a.access', 'a.state', 'a.featured',
+        'a.ordering', 'a.hits', 'a.created_by', 'language',
+    ];
+
+    /** Published-state values Joomla's `filter[state]` accepts for articles. */
+    private const ARTICLE_STATES = [1, 0, 2, -2];
+
+    /**
+     * Returns one page of the site's remote articles, sorted and filtered exactly
+     * as Joomla's back-end article list would be. The SPA passes the page, page
+     * size, ordering and the supported filters as query parameters; they are
+     * forwarded to the Joomla REST API (which exposes `filter[search|category|
+     * tag|language|state|featured|checked_out]` and `list[ordering|direction]`)
+     * and the page's items are returned alongside the pagination total.
+     */
+    private function remoteArticles(int $siteId, RequestInterface $request): ResponseInterface
     {
         $site  = $this->requireSite($siteId);
         $token = $this->sites->tokenFor($site);
@@ -345,10 +381,68 @@ final class ApiController
             return Json::error('The site is not connected.', 409);
         }
 
-        $articles = $this->apiClient
-            ->listArticles($site->apiBase, $token, ['page[limit]' => 50, 'list[ordering]' => 'modified', 'list[direction]' => 'desc']);
+        $q = $request->url->query;
 
-        return Json::ok($this->withCategoryTitles($articles, $site));
+        $limit = (int) ($q->get('limit') ?? 20);
+        $limit = max(1, min(100, $limit));
+        $page  = max(1, (int) ($q->get('page') ?? 1));
+
+        $ordering = $q->get('ordering') ?? 'a.id';
+        if (!in_array($ordering, self::ARTICLE_ORDERING, true)) {
+            $ordering = 'a.id';
+        }
+        $direction = strtolower($q->get('direction') ?? 'desc') === 'asc' ? 'asc' : 'desc';
+
+        $query = [
+            'page[limit]'     => $limit,
+            'page[offset]'    => ($page - 1) * $limit,
+            'list[ordering]'  => $ordering,
+            'list[direction]' => $direction,
+        ];
+
+        $search = trim($q->get('search') ?? '');
+        if ($search !== '') {
+            $query['filter[search]'] = $search;
+        }
+
+        $category = (int) ($q->get('category') ?? 0);
+        if ($category > 0) {
+            $query['filter[category]'] = $category;
+        }
+
+        $tag = (int) ($q->get('tag') ?? 0);
+        if ($tag > 0) {
+            $query['filter[tag]'] = $tag;
+        }
+
+        $language = trim($q->get('language') ?? '');
+        if ($language !== '') {
+            $query['filter[language]'] = $language;
+        }
+
+        $stateRaw = $q->get('state');
+        if ($stateRaw !== null && $stateRaw !== '' && in_array((int) $stateRaw, self::ARTICLE_STATES, true)) {
+            $query['filter[state]'] = (int) $stateRaw;
+        }
+
+        $featuredRaw = $q->get('featured');
+        if ($featuredRaw === '0' || $featuredRaw === '1') {
+            $query['filter[featured]'] = (int) $featuredRaw;
+        }
+
+        $checkedOutRaw = $q->get('checked_out');
+        if ($checkedOutRaw === '0' || $checkedOutRaw === '-1') {
+            $query['filter[checked_out]'] = (int) $checkedOutRaw;
+        }
+
+        $result = $this->apiClient->listArticlesPage($site->apiBase, $token, $query);
+
+        return Json::ok([
+            'items'      => $this->withCategoryTitles($result['items'], $site),
+            'page'       => $page,
+            'limit'      => $limit,
+            'totalPages' => $result['totalPages'],
+        ]);
     }
 
     /**

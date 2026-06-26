@@ -61,6 +61,19 @@ whole back-end is testable without opening a window (see `tests/Feature/ApiRouti
   tag IDs resolved to titles) and
   opens it as an **unsaved** draft — drafts (new or imported) are only written to the DB on
   the first Save, so an unchanged remote article leaves no local draft.
+  The remote-article list (`GET /api/sites/{id}/articles`) is a **paginated, sorted and
+  filtered** browse, mirroring Joomla's back-end article list: `ApiController::remoteArticles()`
+  reads `page`/`limit`/`ordering`/`direction` plus the supported filters (`search`, `category`,
+  `tag`, `language`, `state`, `featured`, `checked_out`) from the query string, validates the
+  sort column against a whitelist (`ARTICLE_ORDERING`, drawn from the model's `filter_fields`),
+  and forwards them to the REST API as `list[ordering|direction]` + `filter[…]` + `page[limit|
+  offset]`. `ApiClient::listArticlesPage()` returns the page's items **and** the pagination total
+  (Joomla's `meta['total-pages']`). Default sort is `a.id` desc. The SPA renders a filter/sort
+  toolbar (search, sort column + direction, category/tag/language/state/featured/checked-out
+  dropdowns, per-page limit, clear-filters) above the remote list with prev/next pagination;
+  local drafts are listed separately above it and are never paginated. The API only accepts a
+  **single** category/tag and an INT `state`, so there is no multi-select or "all states"; an
+  author filter is omitted (no local user list).
 - `src/Media/` — offline image blobs (`media_blobs`). `ApiClient::listMedia()` browses the
   site's Media Manager (`GET /v1/media/files`); `ApiController` exposes it as
   `GET /api/sites/{id}/media?path=…` and serves an offline blob's data: URI back to the SPA

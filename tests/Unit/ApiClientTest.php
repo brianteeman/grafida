@@ -76,6 +76,47 @@ final class ApiClientTest extends TestCase
         $client->probeApiBase('https://example.com', 'bad-token');
     }
 
+    public function testListArticlesPageReturnsItemsAndPaginationTotal(): void
+    {
+        // The browsable list pages through articles, so it must forward the
+        // page/limit/sort/filter query and surface Joomla's `meta.total-pages`.
+        $body = json_encode([
+            'data' => [
+                ['type' => 'articles', 'id' => '9', 'attributes' => ['title' => 'Nine']],
+                ['type' => 'articles', 'id' => '8', 'attributes' => ['title' => 'Eight']],
+            ],
+            'meta' => ['total-pages' => 4],
+        ]);
+
+        $url       = 'https://example.com/index.php/api/v1/content/articles'
+            . '?page%5Blimit%5D=20&page%5Boffset%5D=20&list%5Bordering%5D=a.title&filter%5Bsearch%5D=hi';
+        $transport = new FakeTransport();
+        $transport->on($url, new HttpResponse(200, (string) $body));
+
+        $client = new ApiClient($transport);
+        $result = $client->listArticlesPage('https://example.com/index.php/api', 'tok', [
+            'page[limit]'    => 20,
+            'page[offset]'   => 20,
+            'list[ordering]' => 'a.title',
+            'filter[search]' => 'hi',
+        ]);
+
+        self::assertSame(4, $result['totalPages']);
+        self::assertCount(2, $result['items']);
+        self::assertSame(9, $result['items'][0]['id']);
+        self::assertSame('Eight', $result['items'][1]['title']);
+    }
+
+    public function testListArticlesPageDefaultsToASinglePageWithoutMeta(): void
+    {
+        $transport = new FakeTransport(new HttpResponse(200, '{"data":[]}'));
+        $client    = new ApiClient($transport);
+        $result    = $client->listArticlesPage('https://example.com/index.php/api', 'tok');
+
+        self::assertSame([], $result['items']);
+        self::assertSame(1, $result['totalPages']);
+    }
+
     public function testCreateArticleSendsAFlatFieldBody(): void
     {
         // Joomla's Web Services API takes a flat JSON object of field values for
