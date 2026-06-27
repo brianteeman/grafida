@@ -147,6 +147,7 @@ final class ApiController
         // AI chat panel (Step 7)
         'GRAFIDA_LBL_AI_CHATS',
         'GRAFIDA_BTN_AI_ASSISTANT', 'GRAFIDA_BTN_AI_TOOLS',
+        'GRAFIDA_MENU_AI_CUSTOM_PROMPT',
         'GRAFIDA_BTN_NEW_CHAT',
         'GRAFIDA_BTN_SEND', 'GRAFIDA_BTN_STOP',
         'GRAFIDA_BTN_AI_INSERT', 'GRAFIDA_BTN_COPY',

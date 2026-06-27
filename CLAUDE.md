@@ -361,7 +361,10 @@ failing compile or a genuine packaging-tool error is fatal. Pieces:
 - **UI:** a docked right-hand `#ai-panel` in the editor (`assets/private/js/ai/panel.js`) hosts the
   streaming conversation; the **document (title + HTML) is embedded as context in the first message**
   and follow-ups resend the whole history. A TinyMCE **AI Assistant** toolbar button toggles the panel
-  and an **AI tools** menu button runs any configured writing tool against the document. The panel has
+  and an **AI tools** menu button runs any configured writing tool against the document; that menu also
+  always ends with a separated **"Custom…"** item (`GrafidaAIPanel.openCustom()`) — present even when no
+  tools are configured — that opens the panel with an empty chat for a free-form prompt, so the
+  ask-anything path is discoverable from the tools menu, not only via the AI Assistant toggle. The panel has
   a **header** (`#ai-panel-header`) with the title plus **New chat** (`#ai-btn-new`, offers to remember
   the current chat then resets) and **Close** (`#ai-btn-close`, runs the close/remember flow and hides)
   buttons — the TinyMCE toolbar toggle is no longer the only way to close it. Each reply

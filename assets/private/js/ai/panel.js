@@ -1070,6 +1070,23 @@
         openWithTool,
 
         /**
+         * Open the panel with a fresh, empty chat ready for a typed prompt.
+         * Always opens (never toggles closed) and focuses the input — wired to
+         * the "Custom…" item of the TinyMCE 'aitools' menu button so a new user
+         * can discover that they may ask anything, not only run a preset tool.
+         */
+        openCustom() {
+            const panel = document.getElementById('ai-panel');
+            if (!panel) return;
+            if (panel.classList.contains('hidden')) {
+                _openPanel(null);
+            } else {
+                const inputEl = document.getElementById('ai-input');
+                if (inputEl) inputEl.focus();
+            }
+        },
+
+        /**
          * Reset panel state when the editor opens/reinitialises.
          * Called by app.js from openEditorScreen() after initTinyMCE().
          */

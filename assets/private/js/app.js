@@ -2369,23 +2369,45 @@ async function initTinyMCE(draft) {
                 text: t('GRAFIDA_BTN_AI_TOOLS'),
                 tooltip: t('GRAFIDA_BTN_AI_TOOLS'),
                 fetch: (done) => {
-                    if (!State.aiTools.length) {
-                        done([{
-                            type: 'menuitem',
-                            text: t('GRAFIDA_MSG_NO_AI_TOOLS'),
-                            enabled: false,
-                        }]);
-                        return;
-                    }
-                    done(State.aiTools.map(tool => ({
+                    // The "Custom…" item is always offered (even with no tools
+                    // configured): it opens the panel for a free-form prompt, so
+                    // a new user discovers that they may ask anything, not just
+                    // run a preset tool.
+                    const customItem = {
                         type: 'menuitem',
-                        text: tool.title,
+                        text: t('GRAFIDA_MENU_AI_CUSTOM_PROMPT'),
+                        icon: 'aiassistant',
                         onAction: () => {
                             if (typeof GrafidaAIPanel !== 'undefined') {
-                                GrafidaAIPanel.openWithTool(tool);
+                                GrafidaAIPanel.openCustom();
                             }
                         },
-                    })));
+                    };
+                    if (!State.aiTools.length) {
+                        done([
+                            {
+                                type: 'menuitem',
+                                text: t('GRAFIDA_MSG_NO_AI_TOOLS'),
+                                enabled: false,
+                            },
+                            { type: 'separator' },
+                            customItem,
+                        ]);
+                        return;
+                    }
+                    done([
+                        ...State.aiTools.map(tool => ({
+                            type: 'menuitem',
+                            text: tool.title,
+                            onAction: () => {
+                                if (typeof GrafidaAIPanel !== 'undefined') {
+                                    GrafidaAIPanel.openWithTool(tool);
+                                }
+                            },
+                        })),
+                        { type: 'separator' },
+                        customItem,
+                    ]);
                 },
             });
 
