@@ -372,12 +372,10 @@ final class ApiController
 
     private function bootstrap(): ResponseInterface
     {
-        $aiServiceList  = $this->aiServices->list();
-        $aiDefault      = $this->aiServices->default();
-
-        // Only enabled tools, sorted, with each tool's resolved serviceId.
-        $allTools     = $this->aiDefaults->effectiveTools($this->aiTools);
-        $enabledTools = array_values(array_filter($allTools, static fn (array $t): bool => $t['enabled']));
+        // The AI subsystem is optional: a failure assembling it (e.g. a missing
+        // bundled resource in a build) must never blank the rest of the app, so
+        // it degrades to "no AI configured" rather than failing the whole payload.
+        $ai = $this->aiBootstrap();
 
         return Json::ok([
             'strings'             => $this->language->strings(self::UI_KEYS),
@@ -390,12 +388,42 @@ final class ApiController
             'supportedFieldTypes' => FieldSupport::SUPPORTED,
             'sites'               => array_map($this->siteArray(...), $this->sites->list()),
             'app'                 => App::info(),
-            'aiServices'          => array_map(static fn ($s) => $s->toArray(), $aiServiceList),
-            'aiDefaultServiceId'  => $aiDefault?->id,
-            'aiProviders'         => $this->aiDefaults->providers(),
-            'secureStoreAi'       => $this->aiServices->hasSecureStore(),
-            'aiTools'             => $enabledTools,
+            'aiServices'          => $ai['aiServices'],
+            'aiDefaultServiceId'  => $ai['aiDefaultServiceId'],
+            'aiProviders'         => $ai['aiProviders'],
+            'secureStoreAi'       => $ai['secureStoreAi'],
+            'aiTools'             => $ai['aiTools'],
         ]);
+    }
+
+    /**
+     * Assembles the AI portion of the bootstrap payload, degrading to empty data
+     * on any failure so a broken AI subsystem cannot take down the whole SPA.
+     *
+     * @return array{aiServices: list<array<string, mixed>>, aiDefaultServiceId: int|null, aiProviders: array<string, mixed>, secureStoreAi: bool, aiTools: list<array<string, mixed>>}
+     */
+    private function aiBootstrap(): array
+    {
+        try {
+            $allTools     = $this->aiDefaults->effectiveTools($this->aiTools);
+            $enabledTools = array_values(array_filter($allTools, static fn (array $t): bool => $t['enabled']));
+
+            return [
+                'aiServices'         => array_map(static fn ($s) => $s->toArray(), $this->aiServices->list()),
+                'aiDefaultServiceId' => $this->aiServices->default()?->id,
+                'aiProviders'        => $this->aiDefaults->providers(),
+                'secureStoreAi'      => $this->aiServices->hasSecureStore(),
+                'aiTools'            => $enabledTools,
+            ];
+        } catch (\Throwable) {
+            return [
+                'aiServices'         => [],
+                'aiDefaultServiceId' => null,
+                'aiProviders'        => [],
+                'secureStoreAi'      => false,
+                'aiTools'            => [],
+            ];
+        }
     }
 
     /** @param array<string, mixed> $body */

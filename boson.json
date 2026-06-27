@@ -56,6 +56,10 @@
                 "name": "*.php"
             },
             {
+                "directory": "src",
+                "name": "*.json"
+            },
+            {
                 "directory": "vendor",
                 "not-directory": "vendor/boson-php/compiler",
                 "name": "*.php",
