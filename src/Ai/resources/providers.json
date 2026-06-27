@@ -1,0 +1,98 @@
+{
+    "openai": {
+        "name": "OpenAI",
+        "endpoint": "https://api.openai.com/v1",
+        "auth": "bearer",
+        "chat_path": "/chat/completions",
+        "models_path": "/models",
+        "sse_dialect": "openai"
+    },
+    "anthropic": {
+        "name": "Anthropic",
+        "endpoint": "https://api.anthropic.com/v1",
+        "auth": "x-api-key",
+        "chat_path": "/messages",
+        "models_path": "/models",
+        "sse_dialect": "anthropic"
+    },
+    "cohere": {
+        "name": "Cohere",
+        "endpoint": "https://api.cohere.ai/compatibility/v1",
+        "auth": "bearer",
+        "chat_path": "/chat/completions",
+        "models_path": null,
+        "sse_dialect": "openai"
+    },
+    "deepseek": {
+        "name": "DeepSeek",
+        "endpoint": "https://api.deepseek.com/v1",
+        "auth": "bearer",
+        "chat_path": "/chat/completions",
+        "models_path": "/models",
+        "sse_dialect": "openai"
+    },
+    "google": {
+        "name": "Google",
+        "endpoint": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "auth": "bearer",
+        "chat_path": "/chat/completions",
+        "models_path": "/models",
+        "sse_dialect": "openai"
+    },
+    "groq": {
+        "name": "Groq",
+        "endpoint": "https://api.groq.com/openai/v1",
+        "auth": "bearer",
+        "chat_path": "/chat/completions",
+        "models_path": "/models",
+        "sse_dialect": "openai"
+    },
+    "mistral": {
+        "name": "Mistral",
+        "endpoint": "https://api.mistral.ai/v1",
+        "auth": "bearer",
+        "chat_path": "/chat/completions",
+        "models_path": "/models",
+        "sse_dialect": "openai"
+    },
+    "openrouter": {
+        "name": "OpenRouter",
+        "endpoint": "https://openrouter.ai/api/v1",
+        "auth": "bearer",
+        "chat_path": "/chat/completions",
+        "models_path": "/models",
+        "sse_dialect": "openai"
+    },
+    "perplexity": {
+        "name": "Perplexity",
+        "endpoint": "https://api.perplexity.ai",
+        "auth": "bearer",
+        "chat_path": "/chat/completions",
+        "models_path": null,
+        "sse_dialect": "openai"
+    },
+    "scaleway": {
+        "name": "Scaleway",
+        "endpoint": "https://api.scaleway.ai/v1",
+        "auth": "bearer",
+        "chat_path": "/chat/completions",
+        "models_path": "/models",
+        "sse_dialect": "openai"
+    },
+    "github": {
+        "name": "GitHub",
+        "endpoint": "https://models.github.ai",
+        "auth": "bearer",
+        "chat_path": "/inference/chat/completions",
+        "models_path": "/catalog/models",
+        "sse_dialect": "openai"
+    },
+    "custom": {
+        "name": "Custom",
+        "endpoint": "",
+        "auth": "bearer",
+        "chat_path": "/chat/completions",
+        "models_path": "/models",
+        "sse_dialect": "openai"
+    }
+}

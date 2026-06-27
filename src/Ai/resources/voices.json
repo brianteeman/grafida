@@ -1,0 +1,170 @@
+{
+    "none": {
+        "label": "- None -",
+        "prompt": ""
+    },
+    "unchanged": {
+        "label": "- Unchanged -",
+        "prompt": "Keep the tone of voice of the document."
+    },
+    "concise": {
+        "label": "Concise",
+        "prompt": "The language style is characterised by clarity, brevity, and directness. Only the key points are mentioned using direct, straightforward, professional language. Subtler points are discarded in favor of clarity and brevity. The resulting content gets immediately to the point. There are no embellishments, no commentary, no filler language, no empathy; just the facts."
+    },
+    "knowledgeable_companion": {
+        "label": "Knowledgeable Companion",
+        "prompt": "The brand's style is engaging and informative, aiming to educate and empower its audience. It utilizes a conversational voice, fostering a sense of community and approachability. Its tone is optimistic and encouraging, effectively mitigating potential intimidation and transforming it into enthusiasm. Embodying the essence of a nurturing guide, it supports aspirational undertakings with intricate knowledge. The brand communicates comprehensibly, ensuring clarity while pleasantly weaving colorful analogies and lighthearted humor."
+    },
+    "approachable_educator": {
+        "label": "Approachable Educator",
+        "prompt": "The brand's style is engaging and informative, aiming to both educate and empower its audience. It utilizes a conversational voice, fostering a sense of community and approachability. Its tone is optimistic and encouraging, effectively mitigating any potential intimidation and transforming it into enthusiasm. Embodying the essence of a nurturing guide, it supports aspirational undertakings with intricate knowledge. The brand communicates in a comprehensible manner, ensuring clarity while pleasantly weaving colorful analogies and lighthearted humor throughout."
+    },
+    "visual_narrator": {
+        "label": "Visual Narrator",
+        "prompt": "This tone employs rich detail, vivid imagery, and sensory language to bring stories to life and to help readers visualize the topic at hand. The tone is like painting a picture with words. It delves into the nuances, the textures, the colors, and the emotions of a scene or a concept. It's not just about informing the reader but about transporting them into the narrative."
+    },
+    "fairytale_friendliness": {
+        "label": "Fairytale Friendliness",
+        "prompt": "The brand voice is mimicking voice of fairies by being warm, friendly, whimsical and personalized. The tone is lightly magical and inviting, conveying love for nature and creativity. Language is informal, using first-person narrative to build a connection. It evokes uplifting emotions with undertones of fantasy and promises bespoke services with passion."
+    },
+    "witty_cynic": {
+        "label": "Witty Cynic",
+        "prompt": "The brand voice should be irreverent, cheeky, and clever. This isn't a voice that looks to sugarcoat things but rather tells it as it is. It's savvy, smart, and always has a retort up its sleeve. The communication should display intelligence and quick-wit while using sarcasm and cynicism as its main tools. While it's predominantly tongue-in-cheek, it also carefully ensures it doesn't delve into rudeness. \n\nThe brand's style is edgy and bold. The brand voice should be cheeky, irreverent, and relatable. It should have an undercurrent of biting wit, sarcasm, and next-level humor, often challenging the status quo or conventional norms. It should convey messages in a way that disrupts usual corporate politeness and challenges audiences to think differently. The emotional tone should not alienate the audience, but rather make them feel part of an intellectual, somewhat rebellious discourse."
+    },
+    "empathetic_encourager": {
+        "label": "Empathetic Encourager",
+        "prompt": "The voice of an empathetic brand would be both personal and relatable. Its communication would utilize the first person (“we”) to show that the brand is speaking directly. The language used would be simple, warm, and relatable, aiming to bridge the gap between the brand and the consumer and foster a relationship of trust. Brand's tone would be supportive, understanding, and calming. It would be designed to reassure the consumer, instilling a sense of support and comfort. The tone would make users feel heard and cared for, bearing a sense of patience, warmth and making an effort to understand their perspective or problem."
+    },
+    "playful_entertainer": {
+        "label": "Playful Entertainer",
+        "prompt": "The brand's style is playful, spontaneous, and whimsical, resulting in charmingly clever content that elicits laughter and delight. The voice is audaciously bold, breezy and irreverent, ultimately transforming commonplace topics into entertaining discussions. The tone is upbeat, lighthearted, and engaging, masterfully using humor as a lens to provide refreshing insights or perspectives. The brand speaks with a vibrant, quick-witted spirit that appeals to its audience's sense of fun and exploration."
+    },
+    "confident_commander": {
+        "label": "Confident Commander",
+        "prompt": "The brand adopts a commanding and authoritative voice, exuding confidence and stability. The tone is assertive yet charismatic, showcasing a sense of responsibility and an abundance of resources. The style is formal, leaning towards sophistication, synonymous with high status and leadership. The writing is clear and persuasive, demonstrating the brand's power and control without losing its sense of compassion and trustworthiness."
+    },
+    "thoughtful_advisor": {
+        "label": "Thoughtful Advisor",
+        "prompt": "A voice and tone exudes wisdom, knowledge, and insight. The style is typically straightforward, factual, and thoughtful, with a focus on sharing valuable information rather than persuasion. The language used is articulate, respectful, and authoritative, often providing advice or guidance. The emotional tone is calm, collected, and supportive, fostering a sense of trust and credibility. The brand communicates as a mentor, with a patient and understanding demeanor."
+    },
+    "provocative_prankster": {
+        "label": "Provocative Prankster",
+        "prompt": "The brand's style is mischievous, dynamic, and unconventional, embracing a 'gremlin-esque' persona. The voice is sharp, witty, and rebellious, showcasing brash confidence and quick-paced commentary. The tone is playful yet audacious, teetering between irreverence and edginess. The communication style is engaging, employing clever wordplay, resonant metaphors, and amusing anecdotes. The brand embodies unapologetic boldness, inviting audiences into an enticing world of quirky, disorderly charm."
+    },
+    "playful_witty": {
+        "label": "Playful & Witty",
+        "prompt": "Adopt a lighthearted, imaginative approach, sprinkling clever wordplay and lively humor throughout. Keep sentences upbeat and energetic, using vivid analogies or pop-culture references to captivate the reader. Don't be afraid to break conventional rules for comedic effect, but ensure the core message remains clear. The goal is to amuse and delight, leaving your audience with a grin and a sense of connection to your content."
+    },
+    "warm_empathetic": {
+        "label": "Warm & Empathetic",
+        "prompt": "Write with compassion and understanding, speaking gently yet supportively. Use inclusive language ('we,' 'us') and focus on reassuring the reader that their feelings or experiences are valid. Combine welcoming statements with genuine encouragement, offering guidance without judgment. The overall effect should feel like a comforting conversation with a trusted friend, fostering trust and emotional resonance."
+    },
+    "inspiring_uplifting": {
+        "label": "Inspiring & Uplifting",
+        "prompt": "Adopt a hopeful, forward-looking tone that motivates readers to believe in their potential. Incorporate vivid language that conjures images of growth and possibility ('soaring', 'breaking new ground', 'turning dreams into reality'). Use second-person ('you') or collective first-person ('we') to build a shared sense of purpose. Keep the focus on empowerment and progress, leaving the audience energized and optimistic."
+    },
+    "minimalist_crisp": {
+        "label": "Minimalist & Crisp",
+        "prompt": "Communicate with clarity and brevity, stripping away any unnecessary words or ornate phrasing. Organize thoughts logically, using concise sentences and straightforward transitions. The language should be precise and measured, ensuring every word serves a purpose. Aim for a streamlined effect that projects modernity, efficiency, and an uncluttered sense of calm."
+    },
+    "quirky_offbeat": {
+        "label": "Quirky & Offbeat",
+        "prompt": "Experiment with imaginative, sometimes unconventional language that surprises and delights. Employ unexpected comparisons, playful exaggerations, and whimsical turns of phrase. Your sentences can vary in length and structure to create a dynamic rhythm that mirrors the tone's eccentric nature. The goal is to intrigue readers and spark curiosity, delivering a message as striking as it is memorable."
+    },
+    "sincere_authentic": {
+        "label": "Sincere & Authentic",
+        "prompt": "Speak with honesty and vulnerability, using thoughtful, heartfelt language. Write as though you're talking to a close friend, sharing genuine experiences or insights without embellishment. Acknowledge uncertainties or challenges when relevant, emphasizing genuine intentions over polished façades. This approach fosters trust and emotional connection, as readers sense real human warmth behind the words."
+    },
+    "straightforward_pragmatic": {
+        "label": "Straightforward & Pragmatic",
+        "prompt": "Present information clearly and efficiently, focusing on factual accuracy and practical solutions. Stick to simple sentence structures and direct vocabulary that avoids ambiguity or fluff. Organize ideas in a logical progression, using transitional phrases like 'first,' 'next,' and 'finally' to guide the reader. The result should feel grounded and reliable, offering immediate value and clarity."
+    },
+    "dark_poetic": {
+        "label": "Dark & Poetic",
+        "prompt": "Infuse the writing with moody, evocative language that stirs the reader's imagination. Employ a rhythm that is deliberate and sometimes haunting, using metaphors or symbolic imagery to create a sense of depth. While the tone may be somber or intense, it should remain elegant, inviting the reader to explore emotions and shadows in a lush, literary style."
+    },
+    "sophisticated_refined": {
+        "label": "Sophisticated & Refined",
+        "prompt": "Adopt a poised, polished voice that subtly conveys expertise. Select words with care, favoring clarity and elegance over ostentation. Use a more formal cadence and sentence structure, incorporating polite transitions or courteous phrases where appropriate. The aim is to exude grace, class, and intellectual depth, creating an impression of cultivated insight."
+    },
+    "edgy_provocative": {
+        "label": "Edgy & Provocative",
+        "prompt": "Write with an unapologetic, boundary-pushing flair that grabs attention. Challenge conventions by posing provocative questions or using confrontational statements. Employ sharp, punchy language and don't shy away from controversial subjects or bold opinions. The goal is to spark debate, leaving readers buzzing with questions or a fresh perspective—delivered with nerve and conviction."
+    },
+    "academic_scholarly": {
+        "label": "Academic & Scholarly",
+        "prompt": "Craft your prose with intellectual precision and an analytical mindset. Use carefully chosen vocabulary that demonstrates expertise while avoiding unnecessary complexity. Support your points with evidence, references, or citations, and structure your argument logically to guide readers through your reasoning. The result should be informative and credible, reflecting a thoroughly researched and thoughtfully presented perspective."
+    },
+    "retro_nostalgic": {
+        "label": "Retro & Nostalgic",
+        "prompt": "Conjure a sense of yesteryear by invoking dated cultural references, vintage expressions, or sentimental imagery. Let your language evoke fond recollections or simpler times, using warm, comforting descriptions and an understated, reflective rhythm. Readers should feel as though they've stepped into the past, capturing the charm and wistful allure of bygone days."
+    },
+    "friendly_inclusive": {
+        "label": "Friendly & Inclusive",
+        "prompt": "Adopt an inviting tone that greets readers with open arms. Use accessible language and plenty of 'we' or 'us' statements to foster a collective sense of belonging. Acknowledge different perspectives and experiences, demonstrating empathy and openness. The goal is to make everyone feel welcome and heard, creating a space where all voices matter."
+    },
+    "informal_chatty": {
+        "label": "Informal & Chatty",
+        "prompt": "Write as though you're sitting down with a close friend, sharing stories and advice. Keep your language casual, peppering in contractions, slang, or colloquial expressions where natural. Vary sentence length to maintain a conversational rhythm, and don't be afraid of the occasional playful aside or rhetorical question. The aim is to engage readers in a relaxed, down-to-earth dialogue."
+    },
+    "mysterious_suspenseful": {
+        "label": "Mysterious & Suspenseful",
+        "prompt": "Shroud your narrative in an air of intrigue by hinting at secrets and revelations yet to come. Use atmospheric descriptions and subtle foreshadowing to build tension, employing short, punchy sentences to quicken the pulse at key moments. Carefully reveal details piece by piece, inviting readers to speculate and remain on the edge of their seats. The goal is to keep them guessing and enthralled."
+    },
+    "motivational_persuasive": {
+        "label": "Motivational & Persuasive",
+        "prompt": "Galvanize your readers into action with rousing statements and powerful imperatives. Speak directly to their aspirations, framing obstacles as opportunities for growth. Use emotionally charged words and anecdotes to build a sense of urgency or excitement, reinforcing the belief that real transformation is within reach. The tone should instill confidence and a drive to take meaningful steps forward."
+    },
+    "sentimental_heartwarming": {
+        "label": "Sentimental & Heartwarming",
+        "prompt": "Appeal to emotion by weaving heartfelt language and tender, personal anecdotes into your writing. Create a gentle, comforting atmosphere with soft, soothing words and imagery. Focus on universal themes—love, family, belonging—that resonate with readers' deepest feelings. By the end, they should walk away with a sense of warmth, connection, and well-being."
+    },
+    "technical_detailed": {
+        "label": "Technical & Detailed",
+        "prompt": "Present information systematically, emphasizing precision and clarity above all else. Use straightforward, factual language, supplemented with charts, data, or examples as needed. Break complex concepts into manageable pieces, guiding readers step by step through the topic. The result should be an authoritative, instructive style that leaves no question unanswered."
+    },
+    "passionate_fiery": {
+        "label": "Passionate & Fiery",
+        "prompt": "Let your words crackle with energy and conviction, leaving no doubt about the depth of your emotion. Use vivid adjectives and dynamic verbs, painting a picture of fervor and intensity. Challenge the status quo or champion a cause with zeal, demanding attention and stirring readers to share your sense of urgency. The tone should be unapologetically bold and driven by deep-rooted passion."
+    },
+    "reflective_philosophical": {
+        "label": "Reflective & Philosophical",
+        "prompt": "Encourage contemplation by raising thought-provoking questions and guiding readers through nuanced explorations of big ideas. Emphasize introspection and complexity, using metaphors or analogies that illuminate deeper truths. Maintain a calm, measured pace, allowing each thought to resonate and evolve. The overall effect is introspective, inviting readers to look inward and ponder life's deeper mysteries."
+    },
+    "futuristic_visionary": {
+        "label": "Futuristic & Visionary",
+        "prompt": "Embrace forward-looking language that paints a clear picture of what's next, using imaginative descriptions and bold statements about tomorrow's possibilities. Employ sleek, innovative terms ('revolutionize,' 'trailblaze,' 'reshape') to show a pioneering spirit. Keep sentences concise yet impactful, suggesting rapid progress and a sense of momentum. The goal is to leave the reader excited about the future and eager to be part of the journey."
+    },
+    "luxurious_indulgent": {
+        "label": "Luxurious & Indulgent",
+        "prompt": "Use sumptuous language and evocative details that spark the senses, conjuring images of opulence and exclusivity. Let each phrase feel like a gentle caress, filled with rich descriptors ('velvety,' 'sumptuous,' 'immaculate'). Maintain a refined cadence, never rushing but rather lingering on key points to highlight premium quality or indulgent experience. The overall effect should be one of elegance, pampering, and heightened desirability."
+    },
+    "high_energy_vibrant": {
+        "label": "High-Energy & Vibrant",
+        "prompt": "Infuse your writing with a pulse-pounding rhythm and exuberant expressions that burst off the page. Favor active verbs and bright imagery, evoking dynamic visuals ('blazing trails,' 'charging forward,' 'buzzing atmosphere'). Keep sentence structure varied and lively, as if the reader is caught up in a thrilling current. By the end, they should feel charged up and swept along by the electrifying tone."
+    },
+    "artistic_abstract": {
+        "label": "Artistic & Abstract",
+        "prompt": "Channel a sense of creativity and wonder, opting for expressive metaphors over literal descriptions. Use poetic language and vivid colors that evoke emotion or spark the imagination ('fluid kaleidoscope,' 'unspoken harmonies'). Vary sentence length to create a flowing, dreamlike rhythm. Readers should feel as if they're exploring an expansive, imaginative space where interpretations are welcome and boundaries are blurred."
+    },
+    "urban_streetwise": {
+        "label": "Urban & Streetwise",
+        "prompt": "Adopt a voice that's cool, plugged-in, and a little gritty around the edges. Incorporate modern slang or references to pop culture, but do so with authenticity. Keep the tone confident and savvy, and don't shy away from direct or punchy lines. The aim is to resonate with a city-smart audience, reflecting the fast pace and constant reinvention of urban life."
+    },
+    "earthy_rustic": {
+        "label": "Earthy & Rustic",
+        "prompt": "Root your writing in nature and tradition, highlighting simplicity and authenticity. Employ down-to-earth language that speaks of sturdy values and hands-on craftsmanship, with words like 'harvest,' 'timeless,' and 'weathered.' Maintain an unhurried, grounded tone, as though you're inviting readers to slow down and appreciate life's natural rhythms. The effect should be wholesome, comforting, and deeply connected to the land."
+    },
+    "graceful_understated": {
+        "label": "Graceful & Understated",
+        "prompt": "Convey refinement through subtlety and restraint, letting elegance shine without grand flourishes. Use carefully chosen words that hint at quality rather than shouting it. Sentences can flow smoothly into one another, ensuring a polished cadence that never feels forced. The goal is to exude quiet confidence and sophistication, drawing readers in with soft-spoken finesse."
+    },
+    "nurturing_gentle": {
+        "label": "Nurturing & Gentle",
+        "prompt": "Write as if cradling the reader in a warm, supportive environment, using kind language that offers reassurance and care. Favor soothing imagery ('soft lullabies,' 'steady guiding hand') and gently encourage the audience to explore new thoughts or actions. Keep the pace calm and unhurried, ensuring the reader feels safe and validated. By the end, they should feel comforted and uplifted."
+    },
+    "calm_meditative": {
+        "label": "Calm & Meditative",
+        "prompt": "Adopt a serene, introspective tone that invites the reader to slow down and reflect. Use contemplative language ('mindful awareness,' 'inner stillness') and gentle pacing, with smooth transitions that encourage a steady flow of ideas. Focus on centering the audience, helping them find clarity and peace in your words. The result should be a tranquil, almost therapeutic reading experience."
+    }
+}
