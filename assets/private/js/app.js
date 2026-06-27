@@ -2044,7 +2044,7 @@ async function initTinyMCE(draft) {
         document_base_url: baseUrl,
         // Keep the offline-image tag (data-grafida-media-id) in the editor output
         // so it survives save/getContent and reaches PublishService.
-        extended_valid_elements: 'img[src|alt|title|class|style|width|height|loading|data-grafida-media-id]',
+        extended_valid_elements: 'img[src|alt|title|class|style|width|height|loading|data-path|data-grafida-media-id]',
         menubar: 'file edit view insert format tools table',
         // The built-in "code" plugin opens raw HTML in a plain textarea; we
         // replace it with our own CodeMirror-backed "sourcecode" item (registered
@@ -2075,6 +2075,17 @@ async function initTinyMCE(draft) {
             '  border-top: 3px dashed #ff7a45;' +
             '  margin: 1.6em 0;' +
             '  cursor: pointer;' +
+            '}' +
+            // Constrain images to the editing surface. Joomla bakes a photo's full
+            // intrinsic size into the <img> (e.g. width="4032"), and a site editor.css
+            // that omits a max-width rule leaves it that big in the editor: it then
+            // overflows the editor's scroll box, and WebView (WKWebView) hit-testing
+            // on the overflowing image breaks — the picture can't be clicked, selected
+            // or double-clicked to edit. Scaling it to fit keeps it interactive. Only
+            // the editor view is affected; the published width/height are untouched.
+            'img {' +
+            '  max-width: 100%;' +
+            '  height: auto;' +
             '}',
         setup: (editor) => {
             State.tinyMCEEditor = editor;
@@ -2118,6 +2129,18 @@ async function initTinyMCE(draft) {
                 onAction: () => openSourceCodeEditor(editor),
             });
 
+            // Floating toolbar shown when an image is selected, so editing an
+            // image's properties (size, alt, alignment) is discoverable: the
+            // "image" item re-opens TinyMCE's Insert/Edit Image dialog — which is
+            // where the Dimensions (width/height), description and Advanced (CSS,
+            // border, spacing) fields live — for the already-inserted picture.
+            editor.ui.registry.addContextToolbar('grafidaImageTools', {
+                predicate: (node) => node.nodeName.toLowerCase() === 'img',
+                position: 'node',
+                scope: 'node',
+                items: 'image | alignleft aligncenter alignright',
+            });
+
             editor.on('init', () => {
                 editor.setContent(draft.html || '');
             });
@@ -2157,6 +2180,11 @@ async function initTinyMCE(draft) {
         // local files are uploaded through the Source field's browse button below,
         // which routes to our native picker via the media browser's "Choose file…".
         image_uploadtab: false,
+        // Show the dialog's Dimensions fields (width/height + constrain) and the
+        // Advanced tab (CSS class, inline style, border, vertical/horizontal space)
+        // so an image's properties can be edited after it is inserted.
+        image_dimensions: true,
+        image_advtab: true,
         file_picker_types: 'image',
         file_picker_callback: (callback, _value, meta) => {
             if (meta.filetype !== 'image') return;

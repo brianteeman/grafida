@@ -14,67 +14,84 @@ namespace Grafida\Html;
 /**
  * Handles images that were inserted while editing offline.
  *
- * Such images are embedded as `<img src="data:..." data-grafida-media-id="N">`.
- * Before publishing, the data: URIs must be uploaded and swapped for the real
- * public URLs returned by the Media Manager.
+ * An image picked through Grafida's own media flow is embedded as
+ * `<img src="data:..." data-grafida-media-id="N">`, but an image **pasted or
+ * dragged straight into the editor** (e.g. dropped from a web page or another
+ * app) lands as a bare `<img src="data:...">` with no tag, because it never went
+ * through the in-editor upload handler. Before publishing, *every* such data:
+ * URI must be uploaded and swapped for the real public URL returned by the Media
+ * Manager — otherwise an untagged data: image would leak into the published
+ * article as a huge, broken inline blob.
  */
 final class InlineMedia
 {
     public const ATTRIBUTE = 'data-grafida-media-id';
 
     /**
-     * Returns the media-blob IDs referenced by offline images still carrying a
-     * data: URI (i.e. not yet uploaded).
+     * Rewrites every inline `data:` image into the Media-Manager `<img>` that
+     * Joomla's own editor produces once the image is uploaded.
      *
-     * @return list<int>
-     */
-    public function pendingMediaIds(string $html): array
-    {
-        if (trim($html) === '') {
-            return [];
-        }
-
-        $dom = HtmlDocument::load($html);
-        $ids = [];
-
-        foreach ($dom->getElementsByTagName('img') as $img) {
-            $id  = $img->getAttribute(self::ATTRIBUTE);
-            $src = $img->getAttribute('src');
-
-            if ($id !== '' && str_starts_with($src, 'data:')) {
-                $ids[] = (int) $id;
-            }
-        }
-
-        return array_values(array_unique($ids));
-    }
-
-    /**
-     * Replaces the data: URI of each offline image with its uploaded public URL.
+     * The callback receives the offline-blob id tagged on the image (or null for
+     * an untagged data: image that was pasted/dropped directly) together with the
+     * raw data: URI, and returns the uploaded image's details:
+     *   - `src`      the public URL (relative to the site root, as Joomla emits);
+     *   - `dataPath` the Media Manager adapter path, e.g. "local-images:/grafida/x.jpg";
+     *   - `width` / `height` the intrinsic pixel dimensions (or null if unknown).
+     * The `data-grafida-media-id` attribute is dropped, `data-path` (the linkage
+     * to the Media Manager entry), `loading="lazy"` and the dimensions are added
+     * the way Joomla does. A callback may throw to abort the whole rewrite (e.g.
+     * on an upload failure), so a publish never leaves a broken inline image.
      *
-     * @param array<int, string> $urls Map of media-blob ID => public URL.
+     * @param callable(?int $mediaId, string $dataUri): array{src: string, dataPath?: ?string, width?: ?int, height?: ?int} $upload
      *
      * @return string The rewritten HTML.
      */
-    public function applyUploadedUrls(string $html, array $urls): string
+    public function rewriteDataImages(string $html, callable $upload): string
     {
-        if (trim($html) === '' || $urls === []) {
+        if (trim($html) === '') {
             return $html;
         }
 
-        $dom = HtmlDocument::load($html);
+        $dom     = HtmlDocument::load($html);
+        $changed = false;
 
         foreach ($dom->getElementsByTagName('img') as $img) {
-            $id = $img->getAttribute(self::ATTRIBUTE);
+            $src = $img->getAttribute('src');
 
-            if ($id === '' || !isset($urls[(int) $id])) {
+            if (!str_starts_with($src, 'data:')) {
                 continue;
             }
 
-            $img->setAttribute('src', $urls[(int) $id]);
+            $idAttr  = $img->getAttribute(self::ATTRIBUTE);
+            $mediaId = $idAttr !== '' && is_numeric($idAttr) ? (int) $idAttr : null;
+
+            $result = $upload($mediaId, $src);
+
+            $img->setAttribute('src', $result['src']);
             $img->removeAttribute(self::ATTRIBUTE);
+
+            $dataPath = $result['dataPath'] ?? null;
+            if (is_string($dataPath) && $dataPath !== '') {
+                $img->setAttribute('data-path', $dataPath);
+            }
+
+            if (!$img->hasAttribute('loading')) {
+                $img->setAttribute('loading', 'lazy');
+            }
+
+            $width = $result['width'] ?? null;
+            if (is_int($width) && $width > 0 && !$img->hasAttribute('width')) {
+                $img->setAttribute('width', (string) $width);
+            }
+
+            $height = $result['height'] ?? null;
+            if (is_int($height) && $height > 0 && !$img->hasAttribute('height')) {
+                $img->setAttribute('height', (string) $height);
+            }
+
+            $changed = true;
         }
 
-        return HtmlDocument::innerHtml($dom);
+        return $changed ? HtmlDocument::innerHtml($dom) : $html;
     }
 }

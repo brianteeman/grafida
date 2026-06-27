@@ -118,13 +118,37 @@ dialog makes the endpoint return 503).
   and includes Joomla's `image_*_alt_empty` "decorative image" toggle. The same picker backs TinyMCE's
   Insert/Edit Image dialog: its Source-field browse button (`file_picker_callback`, gated by
   `file_picker_types: 'image'`) opens the media browser, with a "Choose file…" button for a local file.
+  To **edit an already-inserted image** (dimensions, description, alignment, CSS), selecting it shows a
+  floating context toolbar (`addContextToolbar('grafidaImageTools')`, predicate = `img`) whose **Image**
+  item re-opens that same dialog; the dialog carries the Dimensions fields (`image_dimensions`) and an
+  Advanced tab (`image_advtab`: CSS class, inline style, border, spacing). Double-clicking the image or the
+  toolbar/Insert-menu **Image** button work too. The editor `content_style` also forces
+  `img { max-width: 100%; height: auto }`: Joomla bakes a photo's full intrinsic size into the tag (e.g.
+  `width="4032"`), and without a constraining rule the picture overflows the editor's scroll box and becomes
+  un-clickable in the WKWebView (broken hit-testing) — scaling it to fit keeps it selectable/editable, and
+  only the editor view is affected (the published `width`/`height` are untouched).
   TinyMCE's own **"Upload" tab is disabled** (`image_uploadtab: false`) because its "Browse for an image"
   dropzone creates a plain `<input type="file">` that Boson's webview never opens (see the native
   file-dialog note above) — so local uploads go exclusively through the Source-field "Choose file…",
   which calls the native picker.
   a local pick is inserted as `<img src="data:…" data-grafida-media-id="N">` (`GRAFIDA_MEDIA_ATTR`,
   mirroring `InlineMedia::ATTRIBUTE`) so `PublishService` uploads it on publish; a site-media pick is
-  inserted as its public URL.
+  inserted as its public URL. On publish, `InlineMedia::rewriteDataImages()` rewrites **every** inline
+  `data:` image — not just tagged ones: an image **pasted or dropped straight into the editor** (e.g. from
+  a web page or another app) never passes through the in-editor upload handler, so it carries no
+  `data-grafida-media-id`; `PublishService::uploadInlineImage()` decodes and stores such an untagged data:
+  URI on the fly so it is uploaded too, instead of leaking a giant broken inline blob into the published
+  HTML. A media upload that fails (or returns no usable result) aborts the publish with a clear error.
+  Each uploaded image is rebuilt as the **same `<img>` Joomla's own media field emits** —
+  `<img src="images/…" width=… height=… loading="lazy" data-path="local-images:/…">` (`mediaInfo()`): a
+  site-root-relative `src`, the intrinsic `width`/`height`, and the `data-path` adapter linkage to the
+  Media-Manager entry. **The upload path is relative to the default Media adapter's root** (`grafida/<file>`,
+  NOT `images/grafida/<file>`): the default `local-images` adapter is rooted at the site's `images/`
+  directory, so an `images/`-prefixed path writes the file to `images/images/grafida/…` while the article
+  still points at `images/grafida/…` — a broken image. After a successful media upload `PublishService`
+  also **writes the rewritten HTML back into the local draft** (so the stored draft mirrors what was
+  published and a re-publish does not upload the images again); `data-path` is added to the editor's
+  `extended_valid_elements` so it survives a TinyMCE round-trip.
 - `src/Display/DisplayModeService.php` — persists the interface display-mode preference
   (`auto`/`light`/`dark`) in `settings`; sent to the SPA as the `bootstrap` payload's
   `displayMode` key and written via `POST /api/settings/display-mode`. Because Boson's

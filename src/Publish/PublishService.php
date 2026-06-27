@@ -77,6 +77,15 @@ final class PublishService
 
         $html = $this->uploadOfflineMedia($draft, $site, $base, $token);
 
+        // Persist the uploaded-image HTML back into the local draft: the data:
+        // URIs have become real Media-Manager <img> tags, so the stored draft now
+        // mirrors what is published (and a re-publish won't upload the images a
+        // second time). Only a saved draft has a row to update.
+        if ($draft->id !== null && $html !== $draft->html) {
+            $draft->html = $html;
+            $this->drafts->update($draft);
+        }
+
         $tagIds = $this->resolveTags($draft->tags, $site, $base, $token);
 
         $split = $this->splitter->split($html);
@@ -214,30 +223,95 @@ final class PublishService
 
     private function uploadOfflineMedia(Draft $draft, Site $site, string $base, string $token): string
     {
-        $pending = $this->inlineMedia->pendingMediaIds($draft->html);
-
-        if ($pending === []) {
-            return $draft->html;
-        }
-
-        $map = [];
-
-        foreach ($pending as $mediaId) {
-            $url = $this->uploadBlob($mediaId, $site, $base, $token);
-
-            if ($url !== null) {
-                $map[$mediaId] = $url;
-            }
-        }
-
-        return $this->inlineMedia->applyUploadedUrls($draft->html, $map);
+        return $this->inlineMedia->rewriteDataImages(
+            $draft->html,
+            fn (?int $mediaId, string $dataUri): array =>
+                $this->uploadInlineImage($draft, $site, $base, $token, $mediaId, $dataUri),
+        );
     }
 
     /**
-     * Uploads a single offline media blob to the site (or returns the URL it was
-     * already uploaded to). Returns null when the blob no longer exists.
+     * Uploads a single inline editor image to the site's Media Manager and
+     * returns the details needed to rebuild it as a Joomla media-field <img>.
+     *
+     * A tagged image resolves to its stored offline blob. An *untagged* data:
+     * image — pasted or dropped straight into the editor, so it never passed
+     * through the in-editor upload handler — is decoded and stored on the fly so
+     * it is uploaded too, rather than leaking a raw data: URI into the published
+     * article. A failure to upload aborts the publish with a clear error instead
+     * of silently leaving a broken image.
+     *
+     * @return array{src: string, dataPath: ?string, width: ?int, height: ?int}
+     *
+     * @throws \Grafida\Joomla\ApiException When the image cannot be uploaded.
      */
-    private function uploadBlob(int $mediaId, Site $site, string $base, string $token): ?string
+    private function uploadInlineImage(Draft $draft, Site $site, string $base, string $token, ?int $mediaId, string $dataUri): array
+    {
+        if ($mediaId === null || $this->media->find($mediaId) === null) {
+            $mediaId = $this->storeInlineDataUri($draft, $site, $dataUri);
+        }
+
+        $info = $mediaId !== null ? $this->uploadBlob($mediaId, $site, $base, $token) : null;
+
+        if ($info === null || $info['src'] === '') {
+            throw new \Grafida\Joomla\ApiException(
+                'An image embedded in the article could not be uploaded to the site\'s Media Manager, '
+                . 'so the article was not published. Check that the connected user is allowed to upload media.'
+            );
+        }
+
+        return $info;
+    }
+
+    /**
+     * Decodes a `data:` URI image and stores it as a new offline blob, returning
+     * its id (or null when the URI cannot be parsed into image bytes).
+     */
+    private function storeInlineDataUri(Draft $draft, Site $site, string $dataUri): ?int
+    {
+        if (preg_match('#^data:([^;,]*)(;base64)?,(.*)$#s', $dataUri, $m) !== 1) {
+            return null;
+        }
+
+        $mime = $m[1] !== '' ? $m[1] : 'image/png';
+        $raw  = $m[2] !== '' ? base64_decode($m[3], true) : rawurldecode($m[3]);
+
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+
+        $filename = 'inline-image.' . $this->extensionForMime($mime);
+
+        return $this->media->store($site->id ?? 0, $draft->id, $filename, $mime, $raw);
+    }
+
+    private function extensionForMime(string $mime): string
+    {
+        return match (strtolower(trim($mime))) {
+            'image/jpeg', 'image/jpg' => 'jpg',
+            'image/gif'               => 'gif',
+            'image/webp'              => 'webp',
+            'image/svg+xml'           => 'svg',
+            'image/avif'              => 'avif',
+            'image/bmp'               => 'bmp',
+            default                   => 'png',
+        };
+    }
+
+    /**
+     * Uploads a single offline media blob to the site's Media Manager and returns
+     * its details (or the cached details if it was already uploaded). Returns null
+     * when the blob no longer exists.
+     *
+     * The upload path is **relative to the default Media adapter's root** — i.e.
+     * `grafida/<file>`, NOT `images/grafida/<file>`. Joomla's default `local-images`
+     * adapter is rooted at the site's `images/` directory, so prefixing the path
+     * with `images/` writes the file to `images/images/grafida/...` while the
+     * article still points at `images/grafida/...` — a guaranteed broken image.
+     *
+     * @return array{src: string, dataPath: ?string, width: ?int, height: ?int}|null
+     */
+    private function uploadBlob(int $mediaId, Site $site, string $base, string $token): ?array
     {
         $blob = $this->media->find($mediaId);
 
@@ -245,18 +319,107 @@ final class PublishService
             return null;
         }
 
-        if ($blob['remote_url'] !== null) {
-            return $blob['remote_url'];
+        [$width, $height] = $this->imageSize($blob['data']);
+
+        if ($blob['remote_url'] !== null && $blob['remote_url'] !== '') {
+            return [
+                'src'      => $blob['remote_url'],
+                'dataPath' => $blob['remote_path'],
+                'width'    => $width,
+                'height'   => $height,
+            ];
         }
 
-        $path        = 'images/grafida/' . $this->safeName($blob['filename'], $mediaId);
-        $resource    = $this->api->uploadMedia($base, $token, $path, $blob['data']);
-        $resourceUrl = $resource['url'] ?? null;
-        $url         = is_string($resourceUrl) ? $resourceUrl : ($site->baseUrl . '/' . $path);
+        $path     = 'grafida/' . $this->safeName($blob['filename'], $mediaId);
+        $resource = $this->api->uploadMedia($base, $token, $path, $blob['data']);
+        $info     = $this->mediaInfo($resource, $site, $path, $width, $height);
 
-        $this->media->markUploaded($mediaId, $path, $url);
+        $this->media->markUploaded($mediaId, $info['dataPath'] ?? $path, $info['src']);
 
-        return $url;
+        return $info;
+    }
+
+    /**
+     * Distils a Media Manager upload response into the values that rebuild the
+     * Joomla media-field <img>: a site-relative `src`, the adapter `dataPath`
+     * (e.g. "local-images:/grafida/x.jpg") and the image dimensions.
+     *
+     * @param array<string, mixed> $resource
+     *
+     * @return array{src: string, dataPath: ?string, width: ?int, height: ?int}
+     */
+    private function mediaInfo(array $resource, Site $site, string $fallbackRelPath, ?int $width, ?int $height): array
+    {
+        $adapterPath = is_string($resource['path'] ?? null) ? $resource['path'] : '';
+        $rawUrl      = is_string($resource['url'] ?? null) ? $resource['url'] : '';
+
+        // The API reports the intrinsic size for images; trust it over our guess.
+        $width  = $this->intOrNull($resource['width'] ?? null) ?? $width;
+        $height = $this->intOrNull($resource['height'] ?? null) ?? $height;
+
+        // Public src, relative to the site root — matching what Joomla's own media
+        // field inserts. Prefer the API-reported URL; otherwise derive it from the
+        // adapter path ("local-images:/grafida/x.jpg" → "images/grafida/x.jpg",
+        // the adapter name minus its "local-" prefix being the public sub-path).
+        if ($rawUrl !== '') {
+            $src = $this->relativeToSite($rawUrl, $site);
+        } elseif (str_contains($adapterPath, ':')) {
+            [$adapter, $rel] = explode(':', $adapterPath, 2);
+            $filePath        = preg_replace('#^local-#', '', $adapter) ?? $adapter;
+            $src             = trim($filePath, '/') . '/' . ltrim($rel, '/');
+        } else {
+            $src = ltrim($fallbackRelPath, '/');
+        }
+
+        return [
+            'src'      => $src,
+            'dataPath' => $adapterPath !== '' ? $adapterPath : null,
+            'width'    => $width,
+            'height'   => $height,
+        ];
+    }
+
+    /** Strips the site root (or scheme+host) from an absolute media URL. */
+    private function relativeToSite(string $url, Site $site): string
+    {
+        $base = rtrim($site->baseUrl, '/');
+
+        if ($base !== '' && str_starts_with($url, $base . '/')) {
+            return ltrim(substr($url, strlen($base)), '/');
+        }
+
+        if (preg_match('#^https?://#i', $url) === 1) {
+            $pathPart = parse_url($url, \PHP_URL_PATH);
+
+            return is_string($pathPart) ? ltrim($pathPart, '/') : $url;
+        }
+
+        return ltrim($url, '/');
+    }
+
+    /**
+     * Intrinsic pixel dimensions of raw image bytes, or [null, null] if undecodable.
+     *
+     * @return array{0: ?int, 1: ?int}
+     */
+    private function imageSize(string $data): array
+    {
+        $info = @getimagesizefromstring($data);
+
+        if ($info === false) {
+            return [null, null];
+        }
+
+        return [$info[0], $info[1]];
+    }
+
+    private function intOrNull(mixed $value): ?int
+    {
+        if (is_int($value)) {
+            return $value;
+        }
+
+        return is_numeric($value) ? (int) $value : null;
     }
 
     /**
@@ -290,10 +453,10 @@ final class PublishService
             }
 
             $mediaId = (int) substr($value, strlen(self::MEDIA_REF_PREFIX));
-            $url     = $mediaId > 0 ? $this->uploadBlob($mediaId, $site, $base, $token) : null;
+            $info    = $mediaId > 0 ? $this->uploadBlob($mediaId, $site, $base, $token) : null;
 
             // Drop the reference if its blob vanished, rather than publishing the sentinel.
-            $out[$key] = $url ?? '';
+            $out[$key] = $info['src'] ?? '';
         }
 
         return $out;

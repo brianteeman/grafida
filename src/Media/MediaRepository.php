@@ -43,14 +43,14 @@ final class MediaRepository
     }
 
     /**
-     * @return array{id: int, filename: string, mime: string, data: string, remote_url: ?string}|null
+     * @return array{id: int, filename: string, mime: string, data: string, remote_path: ?string, remote_url: ?string}|null
      */
     public function find(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, filename, mime, data, remote_url FROM media_blobs WHERE id = ?');
+        $stmt = $this->pdo->prepare('SELECT id, filename, mime, data, remote_path, remote_url FROM media_blobs WHERE id = ?');
         $stmt->execute([$id]);
 
-        /** @var array{id: int|string, filename: string, mime: string, data: string, remote_url: string|null}|false $row */
+        /** @var array{id: int|string, filename: string, mime: string, data: string, remote_path: string|null, remote_url: string|null}|false $row */
         $row = $stmt->fetch();
 
         if ($row === false) {
@@ -58,11 +58,12 @@ final class MediaRepository
         }
 
         return [
-            'id'         => (int) $row['id'],
-            'filename'   => $row['filename'],
-            'mime'       => $row['mime'],
-            'data'       => $row['data'],
-            'remote_url' => $row['remote_url'] !== null ? $row['remote_url'] : null,
+            'id'          => (int) $row['id'],
+            'filename'    => $row['filename'],
+            'mime'        => $row['mime'],
+            'data'        => $row['data'],
+            'remote_path' => $row['remote_path'] !== null ? $row['remote_path'] : null,
+            'remote_url'  => $row['remote_url'] !== null ? $row['remote_url'] : null,
         ];
     }
 
