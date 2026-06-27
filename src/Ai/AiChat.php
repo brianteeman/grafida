@@ -25,11 +25,13 @@ final class AiChat
         public ?int $serviceId,
         public string $title,
         public array $messages = [],
+        public ?string $createdAt = null,
+        public ?string $updatedAt = null,
     ) {}
 
     /**
      * @param array{id?: int|string|null, draft_id: int|string, service_id: int|string|null,
-     *             title: string} $row
+     *             title: string, created_at?: string|null, updated_at?: string|null} $row
      * @param list<AiMessage> $messages
      */
     public static function fromRow(array $row, array $messages = []): self
@@ -40,6 +42,8 @@ final class AiChat
             serviceId: $row['service_id'] !== null ? (int) $row['service_id'] : null,
             title: $row['title'],
             messages: $messages,
+            createdAt: isset($row['created_at']) && is_string($row['created_at']) ? $row['created_at'] : null,
+            updatedAt: isset($row['updated_at']) && is_string($row['updated_at']) ? $row['updated_at'] : null,
         );
     }
 
@@ -52,6 +56,8 @@ final class AiChat
             'serviceId' => $this->serviceId,
             'title'     => $this->title,
             'messages'  => array_map(static fn (AiMessage $m): array => $m->toArray(), $this->messages),
+            'createdAt' => $this->createdAt,
+            'updatedAt' => $this->updatedAt,
         ];
     }
 }

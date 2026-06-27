@@ -1548,6 +1548,35 @@ input[type="color"].form-control {
     gap: 4px;
 }
 
+/* One saved-chat row in the banner */
+.ai-chat-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 3px 4px;
+    border-radius: var(--radius);
+}
+
+.ai-chat-row:hover {
+    background: var(--color-surface-2);
+}
+
+.ai-chat-title {
+    font-size: 12px;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--color-text);
+}
+
+.ai-chat-row-actions {
+    display: flex;
+    gap: 3px;
+    flex-shrink: 0;
+}
+
 /* Scrollable conversation area */
 #ai-conversation {
     flex: 1;

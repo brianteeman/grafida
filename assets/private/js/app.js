@@ -351,6 +351,12 @@ const api = {
     createAiTool: (body) => apiFetch('POST', '/api/ai/tools', body),
     deleteAiTool: (key) => apiFetch('DELETE', `/api/ai/tools/${key}`),
     aiProxy: (body) => apiFetch('POST', '/api/ai/proxy', body),
+    // AI Chats (Step 8)
+    getDraftChats: (draftId) => apiFetch('GET', `/api/drafts/${draftId}/chats`),
+    createAiChat: (body) => apiFetch('POST', '/api/ai/chats', body),
+    getAiChat: (id) => apiFetch('GET', `/api/ai/chats/${id}`),
+    updateAiChat: (id, body) => apiFetch('PATCH', `/api/ai/chats/${id}`, body),
+    deleteAiChat: (id) => apiFetch('DELETE', `/api/ai/chats/${id}`),
 };
 
 // ============================================================

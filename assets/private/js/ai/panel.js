@@ -3,23 +3,21 @@
  * Copyright (c) 2026 Nicholas K. Dionysopoulos
  * GNU General Public License version 3, or later
  *
- * AI chat panel — Step 7.
+ * AI chat panel — Step 7 + Step 8 (saved chats).
  *
  * Exposes window.GrafidaAIPanel = { toggle, openWithTool, onEditorOpen, renderAiChatsBanner }.
  *
  * This module is a plain IIFE loaded AFTER app.js and relies on globals that
  * app.js places in the window scope (resolved at call time, not load time):
- *   State, t, el, txt, icon, iconBtn, clearNode, api, showToast, GrafidaAI
- *
- * Step 8 integration points (documented stubs — do NOT add logic here):
- *   renderAiChatsBanner()  — called when the panel opens; Step 8 populates #ai-chats-list
- *   _onPanelClose()        — called when the panel closes; Step 8 adds the "remember" prompt
+ *   State, t, el, txt, icon, iconBtn, clearNode, api, showToast, GrafidaAI,
+ *   showModal, closeModal, confirmYesNo, promptText, saveDraft
  */
 
 'use strict';
 
 (function (global) {
-    /* global State, t, el, txt, icon, iconBtn, clearNode, api, showToast, GrafidaAI */
+    /* global State, t, el, txt, icon, iconBtn, clearNode, api, showToast, GrafidaAI,
+              showModal, closeModal, confirmYesNo, promptText, saveDraft */
 
     // -------------------------------------------------------------------------
     //  Panel state
@@ -47,6 +45,18 @@
 
     /** The tool that opened the current panel session (if any), or null. */
     let _activeTool = null;
+
+    /**
+     * The id of a saved chat that was loaded into _history, or null for a fresh conversation.
+     * When set, _onPanelClose offers to PATCH the existing chat rather than POST a new one.
+     */
+    let _loadedChatId = null;
+
+    /**
+     * The number of messages in _history at the moment a saved chat was loaded.
+     * Used to detect whether the user added any new turns before closing.
+     */
+    let _loadedHistoryLength = 0;
 
     // -------------------------------------------------------------------------
     //  Public: toggle / open / close
@@ -78,6 +88,8 @@
         _activeTool = tool;
         _history = [];
         _docContextEmbedded = false;
+        _loadedChatId = null;
+        _loadedHistoryLength = 0;
         _streamingBubble = null;
         if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
         _setStreaming(false);
@@ -114,6 +126,8 @@
         _history = [];
         _docContextEmbedded = false;
         _activeTool = null;
+        _loadedChatId = null;
+        _loadedHistoryLength = 0;
         _renderConversation();
 
         // Keep the panel hidden when the editor first opens; user must toggle it.
@@ -140,6 +154,8 @@
         _activeTool = tool || null;
         _history = [];
         _docContextEmbedded = false;
+        _loadedChatId = null;
+        _loadedHistoryLength = 0;
         if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
         _setStreaming(false);
         _streamingBubble = null;
@@ -158,7 +174,7 @@
         }
     }
 
-    function _closePanel() {
+    async function _closePanel() {
         // Abort any in-flight request.
         if (_abortCtrl) {
             _abortCtrl.abort();
@@ -167,10 +183,13 @@
         _streaming = false;
         _streamingBubble = null;
 
+        // The "remember?" prompt (if applicable) is shown while the panel is still
+        // visible; we only hide it after the user has responded (or if there is
+        // nothing to prompt about, _onPanelClose resolves immediately).
+        await _onPanelClose();
+
         const panel = document.getElementById('ai-panel');
         if (panel) panel.classList.add('hidden');
-
-        _onPanelClose();
     }
 
     // -------------------------------------------------------------------------
@@ -544,39 +563,312 @@
     });
 
     // -------------------------------------------------------------------------
-    //  Step 8 stubs — documented integration points
+    //  Step 8: saved chats banner + remember prompt
     // -------------------------------------------------------------------------
 
     /**
-     * Populate the AI Chats banner with saved conversations.
-     * Called each time the panel opens. Step 8 will implement this body.
+     * Populate #ai-chats-list with saved conversations for the current draft and
+     * reveal #ai-chats-section.  Called each time the panel opens.
      *
-     * Step 8 integration:
-     *   - Fetch saved chats for the current draft from the server.
-     *   - Render entries inside #ai-chats-list.
-     *   - Remove the 'hidden' class from #ai-chats-section to reveal the banner.
-     *   - Each entry, when clicked, should load that chat's history into _history
-     *     and call _renderConversation() (Step 8 will need to expose helpers).
-     *
-     * DO NOT add logic here — this is a documented stub for Step 8.
+     * Hides the section when there is no current draft or no saved chats.
+     * Each row provides Open, Rename, and Delete actions.
      */
-    function renderAiChatsBanner() {
-        // Step 8 will populate #ai-chats-list and reveal #ai-chats-section here.
+    async function renderAiChatsBanner() {
+        const section = document.getElementById('ai-chats-section');
+        const list    = document.getElementById('ai-chats-list');
+        if (!section || !list) return;
+
+        if (!State.currentDraftId) {
+            section.classList.add('hidden');
+            return;
+        }
+
+        clearNode(list);
+
+        let chats;
+        try {
+            chats = await api.getDraftChats(State.currentDraftId);
+        } catch {
+            section.classList.add('hidden');
+            return;
+        }
+
+        if (!Array.isArray(chats) || chats.length === 0) {
+            section.classList.add('hidden');
+            return;
+        }
+
+        section.classList.remove('hidden');
+        chats.forEach(chat => list.appendChild(_renderChatRow(chat)));
     }
 
     /**
-     * Called when the AI panel closes.
-     * Step 8 will add the "remember this conversation?" prompt here.
+     * Build one row in the AI Chats banner.
      *
-     * Step 8 integration:
-     *   - If _history has messages, prompt the user to save the conversation.
-     *   - Use _history, _activeTool, and State.currentDraftId to persist.
-     *   - After saving (or declining), clear _history as needed.
-     *
-     * DO NOT add logic here — this is a documented stub for Step 8.
+     * @param {Object} chat  — {id, title, ...} from the server
+     * @returns {HTMLElement}
      */
-    function _onPanelClose() {
-        // Step 8: offer to save the current conversation to the server.
+    function _renderChatRow(chat) {
+        const row = el('div', 'ai-chat-row');
+
+        const titleEl = el('span', 'ai-chat-title', txt(chat.title || ''));
+
+        const openBtn = iconBtn('comment', t('GRAFIDA_BTN_OPEN'), 'btn', 'btn-sm', 'btn-secondary');
+        openBtn.title = t('GRAFIDA_BTN_OPEN');
+        openBtn.addEventListener('click', async () => { await _openSavedChat(chat.id); });
+
+        const renameBtn = iconBtn('pen', t('GRAFIDA_BTN_RENAME'), 'btn', 'btn-sm', 'btn-secondary');
+        renameBtn.title = t('GRAFIDA_BTN_RENAME');
+        renameBtn.addEventListener('click', async () => {
+            const newTitle = await promptText(
+                t('GRAFIDA_LBL_RENAME_CHAT'),
+                t('GRAFIDA_LBL_CHAT_TITLE'),
+                chat.title || '',
+            );
+            if (!newTitle) return;
+            try {
+                await api.updateAiChat(chat.id, { title: newTitle });
+                showToast(t('GRAFIDA_MSG_CHAT_RENAMED'), 'success');
+                await renderAiChatsBanner();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        });
+
+        const delBtn = iconBtn('trash', t('GRAFIDA_BTN_DELETE'), 'btn', 'btn-sm', 'btn-danger');
+        delBtn.title = t('GRAFIDA_BTN_DELETE');
+        delBtn.addEventListener('click', async () => {
+            const confirmed = await confirmYesNo(
+                t('GRAFIDA_BTN_DELETE'),
+                [el('p', null, txt(t('GRAFIDA_MSG_DELETE_CHAT_CONFIRM')))],
+            );
+            if (!confirmed) return;
+            try {
+                await api.deleteAiChat(chat.id);
+                showToast(t('GRAFIDA_MSG_CHAT_DELETED'), 'success');
+                await renderAiChatsBanner();
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+        });
+
+        const actions = el('div', 'ai-chat-row-actions', openBtn, renameBtn, delBtn);
+        row.appendChild(titleEl);
+        row.appendChild(actions);
+        return row;
+    }
+
+    /**
+     * Load a saved chat by id: hydrate _history, mark the loaded position so
+     * close can offer PATCH, and render.
+     *
+     * After loading, _docContextEmbedded is set to false so the first new message
+     * the user sends re-embeds the current article context (the stored transcript
+     * has it stripped).
+     *
+     * @param {number} chatId
+     */
+    async function _openSavedChat(chatId) {
+        try {
+            const chat = await api.getAiChat(chatId);
+            _history = (chat.messages || []).map(m => ({ role: m.role, content: m.content }));
+            // Re-embed doc context on the next user message so the AI has fresh
+            // article content when the conversation continues.
+            _docContextEmbedded = false;
+            _loadedChatId       = chatId;
+            _loadedHistoryLength = _history.length;
+            _renderConversation();
+            const conv = document.getElementById('ai-conversation');
+            if (conv) conv.scrollTop = conv.scrollHeight;
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    }
+
+    /**
+     * Called when the AI panel closes (from _closePanel, which awaits this).
+     *
+     * — If a saved chat was loaded and the user added new turns: offer to save
+     *   the updated transcript via PATCH.
+     * — If this is a fresh conversation with at least one user+assistant exchange:
+     *   show the "Remember?" modal with a title field. On Remember:
+     *     1. Auto-save the draft if State.currentDraftId is null.
+     *     2. Auto-generate a title via a brief non-streaming sendChat if blank.
+     *     3. POST /api/ai/chats to persist.
+     */
+    async function _onPanelClose() {
+        const hasExchange = _history.some(m => m.role === 'user')
+                         && _history.some(m => m.role === 'assistant');
+
+        if (_loadedChatId !== null) {
+            // Continuing a saved chat — capture id before clearing state.
+            const chatId      = _loadedChatId;
+            const hasNewTurns = _history.length > _loadedHistoryLength;
+            _loadedChatId        = null;
+            _loadedHistoryLength = 0;
+
+            if (!hasNewTurns) return;
+
+            const save = await confirmYesNo(
+                t('GRAFIDA_MSG_SAVE_CHAT_CHANGES'),
+                [el('p', null, txt(t('GRAFIDA_MSG_REMEMBER_CHAT_DESC')))],
+            );
+            if (!save) return;
+
+            try {
+                await api.updateAiChat(chatId, { messages: _buildStoredMessages() });
+                showToast(t('GRAFIDA_MSG_CHAT_SAVED'), 'success');
+            } catch (err) {
+                showToast(err.message, 'error');
+            }
+            return;
+        }
+
+        if (!hasExchange) return;
+
+        // Fresh conversation — offer to remember.
+        const title = await _showRememberModal();
+        if (title === null) return;  // Discard
+
+        // Auto-save the draft if not yet persisted.
+        if (State.currentDraftId == null) {
+            try {
+                await saveDraft();
+            } catch {
+                showToast(t('GRAFIDA_MSG_CHAT_SAVED'), 'error');
+                return;
+            }
+        }
+        if (State.currentDraftId == null) return;
+
+        // Auto-generate title when blank.
+        let chatTitle = title;
+        if (!chatTitle) {
+            chatTitle = await _autoGenerateTitle() || new Date().toLocaleString();
+        }
+
+        const serviceId = (_activeTool ? (_activeTool.serviceId || null) : null)
+                       ?? State.aiDefaultServiceId
+                       ?? null;
+
+        try {
+            await api.createAiChat({
+                draftId:   State.currentDraftId,
+                serviceId,
+                title:     chatTitle,
+                messages:  _buildStoredMessages(),
+            });
+            showToast(t('GRAFIDA_MSG_CHAT_SAVED'), 'success');
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    }
+
+    /**
+     * Show the "Remember this conversation?" modal with a title field.
+     *
+     * Resolves to the trimmed title string (possibly empty, meaning "auto-generate")
+     * when the user confirms, or null when they discard / close.
+     *
+     * @returns {Promise<string|null>}
+     */
+    function _showRememberModal() {
+        return new Promise(resolve => {
+            let settled = false;
+
+            const input = el('input', 'form-control');
+            input.type        = 'text';
+            input.placeholder = t('GRAFIDA_PLACEHOLDER_CHAT_TITLE');
+
+            const body = [
+                el('p', null, txt(t('GRAFIDA_MSG_REMEMBER_CHAT_DESC'))),
+                el('div', 'form-group',
+                    el('label', null, txt(t('GRAFIDA_LBL_CHAT_TITLE'))),
+                    input,
+                ),
+            ];
+
+            const finish = (remember) => {
+                if (settled) return;
+                settled = true;
+                document.removeEventListener('keydown', onKey, true);
+                closeModal();
+                resolve(remember ? input.value.trim() : null);
+            };
+
+            function onKey(e) {
+                if (e.key === 'Enter')  { e.preventDefault(); finish(true);  }
+                else if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+            }
+
+            const rememberBtn = iconBtn('bookmark', t('GRAFIDA_BTN_REMEMBER'), 'btn', 'btn-primary');
+            const discardBtn  = iconBtn('xmark',    t('GRAFIDA_BTN_DISCARD'),  'btn', 'btn-secondary');
+
+            rememberBtn.addEventListener('click', () => finish(true));
+            discardBtn.addEventListener('click',  () => finish(false));
+
+            document.addEventListener('keydown', onKey, true);
+            showModal(t('GRAFIDA_MSG_REMEMBER_CHAT'), body, [discardBtn, rememberBtn]);
+            document.getElementById('modal-overlay').onclick = (e) => {
+                if (e.target === e.currentTarget) finish(false);
+            };
+            setTimeout(() => input.focus(), 0);
+        });
+    }
+
+    /**
+     * Ask the AI to summarise the current conversation into a short 3-6 word title.
+     * Returns the trimmed title string (quotes stripped), or null on failure.
+     *
+     * @returns {Promise<string|null>}
+     */
+    async function _autoGenerateTitle() {
+        const serviceId = (_activeTool ? (_activeTool.serviceId || null) : null)
+                       ?? State.aiDefaultServiceId;
+        if (!serviceId) return null;
+
+        const conversationTurns = _history.map(m => ({
+            role:    m.role,
+            content: m.role === 'user' ? _stripDocContext(m.content) : m.content,
+        }));
+
+        try {
+            const result = await GrafidaAI.sendChat(
+                serviceId,
+                [
+                    {
+                        role:    'system',
+                        content: 'Summarise this conversation into a short 3-6 word title. Return only the title.',
+                    },
+                    ...conversationTurns,
+                ],
+                { stream: false },
+            );
+            const text = (result.text || '').trim().replace(/^["']|["']$/g, '');
+            return text || null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * Build the list of message objects to store from the current _history.
+     *
+     * User messages have their document-context preamble stripped (so re-opening
+     * the chat doesn't double-embed it). Only user and assistant roles are stored;
+     * system messages are injected at runtime and never persisted.
+     *
+     * @returns {Array<{role: string, content: string, toolKey: null, sortOrder: number}>}
+     */
+    function _buildStoredMessages() {
+        return _history
+            .filter(m => m.role === 'user' || m.role === 'assistant')
+            .map((m, i) => ({
+                role:      m.role,
+                content:   m.role === 'user' ? _stripDocContext(m.content) : m.content,
+                toolKey:   null,
+                sortOrder: i,
+            }));
     }
 
     // -------------------------------------------------------------------------

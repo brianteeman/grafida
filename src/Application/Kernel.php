@@ -16,6 +16,7 @@ use Boson\Component\Http\Response;
 use Boson\Component\Http\Static\StaticProviderInterface;
 use Boson\Contracts\Http\RequestInterface;
 use Boson\Contracts\Http\ResponseInterface;
+use Grafida\Ai\AiChatRepository;
 use Grafida\Ai\AiProxy;
 use Grafida\Ai\AiServiceManager;
 use Grafida\Ai\AiServiceRepository;
@@ -79,6 +80,7 @@ final class Kernel
 
         $settings    = new SettingsRepository($pdo);
         $aiToolRepo  = new AiToolRepository($pdo);
+        $aiChatRepo  = new AiChatRepository($pdo);
         $aiDefaults  = new Defaults();
         $apiClient   = new ApiClient();
 
@@ -114,6 +116,7 @@ final class Kernel
             aiServices: $aiServices,
             aiDefaults: $aiDefaults,
             aiTools: $aiToolRepo,
+            aiChats: $aiChatRepo,
             settings: $settings,
             aiProxy: $aiProxy,
             dialog: $dialog,

@@ -14,6 +14,9 @@ namespace Grafida\Http;
 use Boson\Api\Dialog\DialogApiInterface;
 use Boson\Contracts\Http\RequestInterface;
 use Boson\Contracts\Http\ResponseInterface;
+use Grafida\Ai\AiChat;
+use Grafida\Ai\AiChatRepository;
+use Grafida\Ai\AiMessage;
 use Grafida\Ai\AiProxyException;
 use Grafida\Ai\AiServiceManager;
 use Grafida\Ai\AiTool;
@@ -147,6 +150,13 @@ final class ApiController
         'GRAFIDA_PLACEHOLDER_AI_CHAT',
         'GRAFIDA_MSG_AI_NO_SERVICE', 'GRAFIDA_MSG_AI_EMPTY',
         'GRAFIDA_MSG_AI_COPIED', 'GRAFIDA_MSG_AI_COPY_FAIL',
+        // Saved chats (Step 8)
+        'GRAFIDA_MSG_REMEMBER_CHAT', 'GRAFIDA_MSG_REMEMBER_CHAT_DESC',
+        'GRAFIDA_LBL_CHAT_TITLE', 'GRAFIDA_PLACEHOLDER_CHAT_TITLE',
+        'GRAFIDA_BTN_REMEMBER', 'GRAFIDA_BTN_DISCARD',
+        'GRAFIDA_MSG_CHAT_SAVED', 'GRAFIDA_MSG_CHAT_DELETED', 'GRAFIDA_MSG_CHAT_RENAMED',
+        'GRAFIDA_MSG_NO_AI_CHATS', 'GRAFIDA_MSG_DELETE_CHAT_CONFIRM',
+        'GRAFIDA_LBL_RENAME_CHAT', 'GRAFIDA_MSG_SAVE_CHAT_CHANGES',
     ];
 
     public function __construct(
@@ -167,6 +177,7 @@ final class ApiController
         private readonly AiServiceManager $aiServices,
         private readonly Defaults $aiDefaults,
         private readonly AiToolRepository $aiTools,
+        private readonly AiChatRepository $aiChats,
         private readonly SettingsRepository $settings,
         private readonly AiProxy $aiProxy,
         private readonly ?DialogApiInterface $dialog = null,
@@ -217,6 +228,7 @@ final class ApiController
             $method === 'PUT'  && $path === '/api/ai/system-prompt'  => $this->setSystemPrompt($body),
             $method === 'POST' && $path === '/api/ai/tools'          => $this->createAiTool($body),
             $method === 'POST' && $path === '/api/ai/proxy'          => $this->aiProxy($body),
+            $method === 'POST' && $path === '/api/ai/chats'          => $this->createAiChat($body),
 
             default => $this->parameterised($method, $path, $body, $request),
         };
@@ -322,6 +334,10 @@ final class ApiController
         if ($method === 'GET' && preg_match('#^/api/media/(\d+)$#', $path, $m) === 1) {
             return $this->mediaBlob((int) $m[1]);
         }
+        if ($method === 'GET' && preg_match('#^/api/drafts/(\d+)/chats$#', $path, $m) === 1) {
+            return $this->listDraftChats((int) $m[1]);
+        }
+
         if (preg_match('#^/api/drafts/(\d+)$#', $path, $m) === 1) {
             $id = (int) $m[1];
 
@@ -334,6 +350,17 @@ final class ApiController
         }
         if ($method === 'POST' && preg_match('#^/api/drafts/(\d+)/publish$#', $path, $m) === 1) {
             return $this->publishDraft((int) $m[1]);
+        }
+
+        if (preg_match('#^/api/ai/chats/(\d+)$#', $path, $m) === 1) {
+            $id = (int) $m[1];
+
+            return match ($method) {
+                'GET'    => $this->getAiChat($id),
+                'PATCH'  => $this->updateAiChat($id, $body),
+                'DELETE' => $this->deleteAiChat($id),
+                default  => Json::error('Method not allowed', 405),
+            };
         }
 
         return Json::error('Not found: ' . $path, 404);
@@ -1374,6 +1401,156 @@ final class ApiController
         $this->drafts->delete($id);
 
         return Json::ok();
+    }
+
+    // ------------------------------------------------------------------
+    //  AI chat handlers
+    // ------------------------------------------------------------------
+
+    /** Lists saved chats (metadata only) for a draft, ordered newest first. */
+    private function listDraftChats(int $draftId): ResponseInterface
+    {
+        $chats = $this->aiChats->forDraft($draftId);
+
+        return Json::ok(array_map(static fn (AiChat $c): array => $c->toArray(), $chats));
+    }
+
+    /** @param array<string, mixed> $body */
+    private function createAiChat(array $body): ResponseInterface
+    {
+        $draftIdRaw = $body['draftId'] ?? null;
+
+        if (!is_numeric($draftIdRaw)) {
+            return Json::error('A numeric draftId is required.', 400);
+        }
+
+        $draftId = (int) $draftIdRaw;
+
+        $serviceIdRaw = $body['serviceId'] ?? null;
+        $serviceId    = is_numeric($serviceIdRaw) ? (int) $serviceIdRaw : null;
+
+        $messages = $this->parseAiMessages($body, null);
+
+        $chat = new AiChat(
+            id: null,
+            draftId: $draftId,
+            serviceId: $serviceId,
+            title: $this->str($body, 'title'),
+            messages: $messages,
+        );
+
+        $id      = $this->aiChats->create($chat);
+        $created = $this->aiChats->find($id);
+
+        return Json::ok($created?->toArray(), 201);
+    }
+
+    /** Returns a single chat with all its messages. */
+    private function getAiChat(int $id): ResponseInterface
+    {
+        $chat = $this->aiChats->find($id);
+
+        if ($chat === null) {
+            return Json::error('Chat not found', 404);
+        }
+
+        return Json::ok($chat->toArray());
+    }
+
+    /**
+     * Renames a chat and/or replaces its messages.
+     *
+     * Accepts `{title?, messages?}`. An empty/absent `title` leaves the existing
+     * title unchanged; a non-empty `title` renames the chat. A present `messages`
+     * key (even an empty array) replaces the stored transcript.
+     *
+     * @param array<string, mixed> $body
+     */
+    private function updateAiChat(int $id, array $body): ResponseInterface
+    {
+        $chat = $this->aiChats->find($id);
+
+        if ($chat === null) {
+            return Json::error('Chat not found', 404);
+        }
+
+        if (array_key_exists('title', $body)) {
+            $title = $this->str($body, 'title');
+            if ($title !== '') {
+                $this->aiChats->rename($id, $title);
+            }
+        }
+
+        if (array_key_exists('messages', $body)) {
+            $messages = $this->parseAiMessages($body, $id);
+            $this->aiChats->replaceMessages($id, $messages);
+        }
+
+        $updated = $this->aiChats->find($id);
+
+        return Json::ok($updated?->toArray());
+    }
+
+    /** Deletes a chat and, via ON DELETE CASCADE, all its messages. */
+    private function deleteAiChat(int $id): ResponseInterface
+    {
+        if ($this->aiChats->find($id) === null) {
+            return Json::error('Chat not found', 404);
+        }
+
+        $this->aiChats->delete($id);
+
+        return Json::ok();
+    }
+
+    /**
+     * Parses the `messages` array from a request body into a list of AiMessage objects.
+     *
+     * @param array<string, mixed> $body
+     * @param int|null             $chatId  Pre-assigned chat id (for updates) or null (for creates).
+     *
+     * @return list<AiMessage>
+     */
+    private function parseAiMessages(array $body, ?int $chatId): array
+    {
+        $raw = $body['messages'] ?? null;
+
+        if (!is_array($raw)) {
+            return [];
+        }
+
+        $messages = [];
+        $i        = 0;
+
+        foreach ($raw as $m) {
+            if (!is_array($m)) {
+                continue;
+            }
+
+            $role    = is_string($m['role'] ?? null) ? $m['role'] : '';
+            $content = is_string($m['content'] ?? null) ? $m['content'] : '';
+
+            if ($role === '' || $content === '') {
+                continue;
+            }
+
+            $toolKeyRaw = $m['toolKey'] ?? null;
+            $toolKey    = is_string($toolKeyRaw) && $toolKeyRaw !== '' ? $toolKeyRaw : null;
+            $sortOrder  = isset($m['sortOrder']) && is_numeric($m['sortOrder']) ? (int) $m['sortOrder'] : $i;
+
+            $messages[] = new AiMessage(
+                id: null,
+                chatId: $chatId,
+                role: $role,
+                content: $content,
+                toolKey: $toolKey,
+                sortOrder: $sortOrder,
+            );
+
+            ++$i;
+        }
+
+        return $messages;
     }
 
     private function publishDraft(int $id): ResponseInterface
