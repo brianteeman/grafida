@@ -2101,6 +2101,11 @@ async function initTinyMCE(draft) {
         promotion: false,
         branding: false,
         skin: editorSkin(),
+        // The editor UI follows the interface language: load the matching pack
+        // from js/tinymce/langs/ (en-GB has none — TinyMCE's default UI is English).
+        ...(editorLanguage()
+            ? { language: editorLanguage(), language_url: '/js/tinymce/langs/' + editorLanguage() + '.js' }
+            : {}),
         // Use the native webview spell checker (the old TinyMCE spellchecker
         // plugin was removed in v6+). This sets spellcheck="true" on the editing
         // body so WKWebView/WebKitGTK/Edge underline misspellings; suggestions
@@ -3898,6 +3903,23 @@ function editorSkin() {
 /** Returns the built-in TinyMCE content CSS matching the resolved theme. */
 function editorContentCss() {
     return State.resolvedTheme === 'dark' ? 'dark' : 'default';
+}
+
+// Maps a Grafida interface language tag (e.g. "fr-FR") to the TinyMCE language
+// code of the pack bundled under js/tinymce/langs/. en-GB has no pack — TinyMCE's
+// built-in UI is English — so it is intentionally absent (returns null → default).
+const TINYMCE_LANGS = {
+    'el-GR': 'el',
+    'fr-FR': 'fr_FR',
+    'de-DE': 'de',
+    'es-ES': 'es',
+    'it-IT': 'it',
+    'pt-PT': 'pt_PT',
+};
+
+/** Returns the TinyMCE language code matching the interface language, or null for the English default. */
+function editorLanguage() {
+    return TINYMCE_LANGS[State.language] || null;
 }
 
 async function applyDisplayModeChange(mode) {

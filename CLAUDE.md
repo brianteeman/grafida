@@ -227,6 +227,16 @@ dialog makes the endpoint return 503).
   "Automatic by Language", per-sentence detection works but **only among the languages enabled in that
   list** (so a German writer must enable German there). Windows/Linux likewise defer to their OS
   spell-check configuration. This is a documented limitation, not a bug.
+  **The editor UI language follows the interface language.** `tinymce.init()` is given a
+  `language` + `language_url` (`editorLanguage()` / the `TINYMCE_LANGS` map in `app.js`) pointing
+  at the matching pack vendored under `js/tinymce/langs/` (`el`, `fr_FR`, `de`, `es`, `it`,
+  `pt_PT` — sourced from the `tinymce-i18n` packs for TinyMCE 7). **en-GB has no pack** — TinyMCE's
+  built-in UI is English — so it (and any unmapped tag) falls through to the English default with no
+  `language` set. `language_url` is an absolute `/js/tinymce/langs/<code>.js` path because the init's
+  `document_base_url` is the *site* URL, which would otherwise mis-resolve a relative path. Adding a
+  shipped language needs a matching pack file + a `TINYMCE_LANGS` entry (none for languages TinyMCE
+  has no pack for — they get the English editor UI). This is the editor UI *chrome*; it is unrelated
+  to the spell-check dictionary (an OS setting, above) and the article content language.
   The active site is remembered client-side in `localStorage` (`grafida.lastSiteId`, via
   `rememberLastSite()` / `recallLastSite()`); it is not persisted server-side. On startup
   `bootstrap()` opens the **Articles** page (instead of **Sites**) when at least one site is
