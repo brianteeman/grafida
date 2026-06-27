@@ -1718,13 +1718,13 @@ body.resizing-col {
     gap: 4px;
 }
 
-/* One saved-chat row in the banner */
+/* One saved-chat row in the banner — title above, actions below */
 .ai-chat-row {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-    padding: 3px 4px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+    padding: 4px;
     border-radius: var(--radius);
 }
 
@@ -1734,10 +1734,7 @@ body.resizing-col {
 
 .ai-chat-title {
     font-size: 12px;
-    flex: 1;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
     color: var(--color-text);
 }
 
