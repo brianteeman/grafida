@@ -351,6 +351,7 @@ const api = {
     createAiTool: (body) => apiFetch('POST', '/api/ai/tools', body),
     deleteAiTool: (key) => apiFetch('DELETE', `/api/ai/tools/${key}`),
     aiProxy: (body) => apiFetch('POST', '/api/ai/proxy', body),
+    aiRender: (content, format) => apiFetch('POST', '/api/ai/render', { content, format: format || 'auto' }),
     // AI Chats (Step 8)
     getDraftChats: (draftId) => apiFetch('GET', `/api/drafts/${draftId}/chats`),
     createAiChat: (body) => apiFetch('POST', '/api/ai/chats', body),

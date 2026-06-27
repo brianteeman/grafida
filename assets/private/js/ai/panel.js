@@ -305,20 +305,20 @@
                 },
             });
 
-            // Non-streaming / proxy fallback: result.text holds the full response.
+            // Non-streaming / proxy fallback: result.text holds the full response
+            // (no tokens streamed in, so onToken never ran).
             if (!wantStream || result.usedFallback) {
                 fullText = result.text;
-                if (_streamingBubble) {
-                    const textEl = _streamingBubble.querySelector('.ai-bubble-text');
-                    if (textEl) textEl.textContent = fullText;
-                }
             }
 
             // Record the assistant turn.
             _history.push({ role: 'assistant', content: fullText });
 
-            // Attach Insert / Copy action buttons to the completed bubble.
+            // Render the completed response as formatted HTML and attach the
+            // Insert / Copy action buttons.
             if (_streamingBubble) {
+                const textEl = _streamingBubble.querySelector('.ai-bubble-text');
+                if (textEl) _renderRichText(textEl, fullText);
                 _addBubbleActions(_streamingBubble, fullText);
             }
 
@@ -328,7 +328,11 @@
                 if (fullText) {
                     // Keep partial response in history.
                     _history.push({ role: 'assistant', content: fullText });
-                    if (_streamingBubble) _addBubbleActions(_streamingBubble, fullText);
+                    if (_streamingBubble) {
+                        const textEl = _streamingBubble.querySelector('.ai-bubble-text');
+                        if (textEl) _renderRichText(textEl, fullText);
+                        _addBubbleActions(_streamingBubble, fullText);
+                    }
                 } else {
                     // Nothing produced: remove the streaming placeholder.
                     if (_streamingBubble) _streamingBubble.remove();
@@ -399,7 +403,7 @@
     function _buildAssistantBubble(content) {
         const bubble = el('div', 'ai-bubble ai-bubble-assistant');
         const textEl = el('div', 'ai-bubble-text');
-        textEl.textContent = content;
+        _renderRichText(textEl, content);
         bubble.appendChild(textEl);
         _addBubbleActions(bubble, content);
         return bubble;
@@ -502,6 +506,40 @@
     }
 
     // -------------------------------------------------------------------------
+    //  Rich-text rendering (formatted assistant output)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Render an assistant message as *formatted* text inside `textEl`.
+     *
+     * The reply is untrusted model output (HTML, or Markdown for the Generate
+     * tool). It is sent to the backend (`POST /api/ai/render`), which converts
+     * Markdown via CommonMark when needed and sanitises the HTML with Symfony's
+     * HtmlSanitizer; only the returned safe HTML is rendered. The raw text is
+     * shown first as an always-safe placeholder and kept if the request fails,
+     * so the panel never blocks on the render call.
+     *
+     * The raw `content` (not this rendered HTML) is still what Insert/Copy use.
+     *
+     * @param {HTMLElement} textEl
+     * @param {string}      content
+     */
+    function _renderRichText(textEl, content) {
+        // Immediate, always-safe placeholder (plain text — no HTML parsing).
+        textEl.textContent = content;
+        if (!content) return;
+
+        api.aiRender(content)
+            .then((res) => {
+                const html = res && typeof res.html === 'string' ? res.html : null;
+                if (html === null) return;  // keep the plain-text fallback
+                textEl.classList.add('ai-rich');
+                textEl.innerHTML = html;
+            })
+            .catch(() => { /* leave the plain-text fallback in place */ });
+    }
+
+    // -------------------------------------------------------------------------
     //  UI state helpers
     // -------------------------------------------------------------------------
 
@@ -553,14 +591,46 @@
     // -------------------------------------------------------------------------
 
     document.addEventListener('DOMContentLoaded', () => {
-        const sendBtn = document.getElementById('ai-btn-send');
-        const stopBtn = document.getElementById('ai-btn-stop');
-        const inputEl = document.getElementById('ai-input');
+        const sendBtn  = document.getElementById('ai-btn-send');
+        const stopBtn  = document.getElementById('ai-btn-stop');
+        const newBtn   = document.getElementById('ai-btn-new');
+        const closeBtn = document.getElementById('ai-btn-close');
+        const inputEl  = document.getElementById('ai-input');
 
-        if (sendBtn) sendBtn.addEventListener('click', _onSendClick);
-        if (stopBtn) stopBtn.addEventListener('click', _onStopClick);
+        if (sendBtn)  sendBtn.addEventListener('click', _onSendClick);
+        if (stopBtn)  stopBtn.addEventListener('click', _onStopClick);
+        if (newBtn)   newBtn.addEventListener('click', () => { _newChat(); });
+        if (closeBtn) {
+            closeBtn.title = t('GRAFIDA_BTN_CLOSE');
+            closeBtn.setAttribute('aria-label', t('GRAFIDA_BTN_CLOSE'));
+            closeBtn.addEventListener('click', () => { _closePanel(); });
+        }
         if (inputEl) inputEl.addEventListener('keydown', _onInputKeyDown);
     });
+
+    /**
+     * Start a fresh conversation without leaving the panel.
+     * Offers to remember the current conversation first (same flow as closing),
+     * then resets the history and refreshes the saved-chats banner.
+     */
+    async function _newChat() {
+        if (_abortCtrl) { _abortCtrl.abort(); _abortCtrl = null; }
+        _setStreaming(false);
+        _streamingBubble = null;
+
+        await _onPanelClose();
+
+        _activeTool          = null;
+        _history             = [];
+        _docContextEmbedded  = false;
+        _loadedChatId        = null;
+        _loadedHistoryLength = 0;
+        _renderConversation();
+        renderAiChatsBanner();
+
+        const inputEl = document.getElementById('ai-input');
+        if (inputEl) { inputEl.value = ''; inputEl.disabled = false; inputEl.focus(); }
+    }
 
     // -------------------------------------------------------------------------
     //  Step 8: saved chats banner + remember prompt

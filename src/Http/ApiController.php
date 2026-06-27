@@ -18,6 +18,7 @@ use Grafida\Ai\AiChat;
 use Grafida\Ai\AiChatRepository;
 use Grafida\Ai\AiMessage;
 use Grafida\Ai\AiProxyException;
+use Grafida\Ai\AiRenderer;
 use Grafida\Ai\AiServiceManager;
 use Grafida\Ai\AiTool;
 use Grafida\Ai\AiToolRepository;
@@ -145,6 +146,7 @@ final class ApiController
         // AI chat panel (Step 7)
         'GRAFIDA_LBL_AI_CHATS',
         'GRAFIDA_BTN_AI_ASSISTANT', 'GRAFIDA_BTN_AI_TOOLS',
+        'GRAFIDA_BTN_NEW_CHAT',
         'GRAFIDA_BTN_SEND', 'GRAFIDA_BTN_STOP',
         'GRAFIDA_BTN_AI_INSERT', 'GRAFIDA_BTN_COPY',
         'GRAFIDA_PLACEHOLDER_AI_CHAT',
@@ -180,6 +182,7 @@ final class ApiController
         private readonly AiChatRepository $aiChats,
         private readonly SettingsRepository $settings,
         private readonly AiProxy $aiProxy,
+        private readonly AiRenderer $aiRenderer,
         private readonly ?DialogApiInterface $dialog = null,
     ) {}
 
@@ -228,6 +231,7 @@ final class ApiController
             $method === 'PUT'  && $path === '/api/ai/system-prompt'  => $this->setSystemPrompt($body),
             $method === 'POST' && $path === '/api/ai/tools'          => $this->createAiTool($body),
             $method === 'POST' && $path === '/api/ai/proxy'          => $this->aiProxy($body),
+            $method === 'POST' && $path === '/api/ai/render'         => $this->renderAiReply($body),
             $method === 'POST' && $path === '/api/ai/chats'          => $this->createAiChat($body),
 
             default => $this->parameterised($method, $path, $body, $request),
@@ -904,6 +908,23 @@ final class ApiController
         }
 
         return Json::ok($result);
+    }
+
+    /**
+     * Render an AI assistant reply to sanitised HTML for the chat panel.
+     *
+     * The reply is untrusted model output (HTML, or Markdown for the Generate
+     * tool); {@see AiRenderer} converts Markdown via CommonMark when needed and
+     * sanitises the result with Symfony's HtmlSanitizer before it is shown.
+     *
+     * @param array<string, mixed> $body
+     */
+    private function renderAiReply(array $body): ResponseInterface
+    {
+        $content = $this->str($body, 'content');
+        $format  = $this->str($body, 'format', 'auto');
+
+        return Json::ok(['html' => $this->aiRenderer->render($content, $format)]);
     }
 
     /**

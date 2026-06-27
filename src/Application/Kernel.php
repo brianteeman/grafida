@@ -18,6 +18,7 @@ use Boson\Contracts\Http\RequestInterface;
 use Boson\Contracts\Http\ResponseInterface;
 use Grafida\Ai\AiChatRepository;
 use Grafida\Ai\AiProxy;
+use Grafida\Ai\AiRenderer;
 use Grafida\Ai\AiServiceManager;
 use Grafida\Ai\AiServiceRepository;
 use Grafida\Ai\AiToolRepository;
@@ -97,6 +98,7 @@ final class Kernel
         $storage     = new StorageService($pdo, $siteService);
         $aiServices  = new AiServiceManager(new AiServiceRepository($pdo), $secureStore);
         $aiProxy     = new AiProxy($aiServices, $aiDefaults, new HttpClient(300));
+        $markdown    = new MarkdownService();
 
         $this->api = new ApiController(
             sites: $siteService,
@@ -106,7 +108,8 @@ final class Kernel
             drafts: $drafts,
             media: $media,
             publish: $publish,
-            markdown: new MarkdownService(),
+            markdown: $markdown,
+            aiRenderer: new AiRenderer($markdown),
             language: $language,
             displayMode: $displayMode,
             fields: new FieldSupport(),

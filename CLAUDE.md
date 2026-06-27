@@ -204,7 +204,8 @@ dialog makes the endpoint return 503).
   **saved chats** (`ai_chats` + `ai_chat_messages`) linked to a draft; deleting the draft cascades
   them away. Transport is deliberately **inverted vs. AITiny — see the AI transport facts below**.
   Endpoints: `/api/ai/services[...]` (+ `/default`, `/resolved`), `/api/ai/tools[...]`,
-  `/api/ai/system-prompt`, `/api/ai/proxy`, `/api/ai/chats[...]`, `/api/drafts/{id}/chats`.
+  `/api/ai/system-prompt`, `/api/ai/proxy`, `/api/ai/render` (sanitise a reply for display — see the
+  AI facts), `/api/ai/chats[...]`, `/api/drafts/{id}/chats`.
 - `src/Support/` — `Resources`/`Paths` (filesystem locations), `App` (app identity/legal
   metadata: name, `VERSION`, copyright, licence + FSF URL, the verbatim Joomla! trademark
   disclaimer — sent to the SPA in the `bootstrap` payload's `app` key), and `UrlOpener`
@@ -336,19 +337,38 @@ failing compile or a genuine packaging-tool error is fatal. Pieces:
   direct `fetch()` (caught as a `TypeError`) or streaming is off, `sendChat()` retries once through this
   **dumb, host-allowlisted forwarder** (`AiProxy` validates the target host equals the configured
   service endpoint host — no open relay — and never injects the key; the JS supplies headers).
+- **LM Studio (and other local OpenAI-compatible servers) MUST have CORS enabled.** The direct
+  streaming `fetch()` runs from the webview's `boson://app` origin, so a JSON POST triggers a CORS
+  **preflight**. If the local server doesn't answer it (LM Studio defaults to CORS **off** — turn on
+  *Enable CORS* in its Developer/server settings, or run the server with the CORS flag), the direct
+  fetch fails, `sendChat()` falls back to `POST /api/ai/proxy`, and that **synchronous** PHP call
+  **occupies the single-threaded `boson://` kernel for the whole reply** — so the rest of the UI's
+  API calls stall ("the interface freezes") and nothing streams (the answer arrives all at once).
+  Enabling CORS restores live streaming and keeps the kernel free. This is the first thing to check
+  when a user reports the AI panel hanging with a local model.
 - **The API key is handed to local JS per call.** This is a deliberate desktop-only trade-off (JS and
   PHP are equally-trusted local code; the SPA loads no remote content) and the price of streaming —
   do not "fix" it by moving the call back to PHP (that kills streaming).
 - **UI:** a docked right-hand `#ai-panel` in the editor (`assets/private/js/ai/panel.js`) hosts the
   streaming conversation; the **document (title + HTML) is embedded as context in the first message**
   and follow-ups resend the whole history. A TinyMCE **AI Assistant** toolbar button toggles the panel
-  and an **AI tools** menu button runs any configured writing tool against the document. Each reply
+  and an **AI tools** menu button runs any configured writing tool against the document. The panel has
+  a **header** (`#ai-panel-header`) with the title plus **New chat** (`#ai-btn-new`, offers to remember
+  the current chat then resets) and **Close** (`#ai-btn-close`, runs the close/remember flow and hides)
+  buttons — the TinyMCE toolbar toggle is no longer the only way to close it. Each reply
   offers Insert-into-editor / Copy. Closing a non-empty chat offers to **remember** it: an unsaved
   draft is auto-saved first, a blank title is auto-generated via a short non-streaming completion, and
   the transcript is saved. Saved chats appear in the panel's **AI Chats** banner (open/continue/rename/
-  delete). Conversation bubbles render model output as **text** (safe); only Insert routes HTML into
-  TinyMCE. The same `provider`/`tool` config is managed from two **Settings** cards (AI Services, AI
-  Tools).
+  delete). Assistant replies are the model's HTML (or Markdown, for the Generate tool); the panel
+  renders them as **formatted** text. Because the output is untrusted, rendering is **sanitised
+  server-side**: `panel.js`'s `_renderRichText()` shows the raw reply as plain text first (always-safe
+  placeholder) then calls `POST /api/ai/render`, which `Ai\AiRenderer` turns into safe HTML —
+  auto-detecting Markdown vs HTML, converting Markdown via the existing CommonMark `MarkdownService`,
+  and sanitising the result with **Symfony's `HtmlSanitizer`** (the W3C safe-element subset +
+  relative links/medias). Only that returned HTML is set as `innerHTML`; if the call fails the
+  plain-text placeholder stays. Insert/Copy still use the **raw** model output, not the rendered HTML;
+  only Insert routes it into TinyMCE. The same `provider`/`tool` config is managed from two
+  **Settings** cards (AI Services, AI Tools).
 
 ## Conventions
 

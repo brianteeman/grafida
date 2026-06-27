@@ -138,6 +138,23 @@
                 <!-- AI assistant panel (toggled by the TinyMCE toolbar buttons) -->
                 <aside id="ai-panel" class="hidden" aria-label="AI Assistant">
 
+                    <!-- Panel header: title + New chat / Close actions -->
+                    <header id="ai-panel-header">
+                        <span class="ai-panel-header-title">
+                            <i class="fa-solid fa-wand-magic-sparkles" aria-hidden="true"></i>
+                            <span data-i18n="GRAFIDA_BTN_AI_ASSISTANT">AI Assistant</span>
+                        </span>
+                        <span class="ai-panel-header-actions">
+                            <button id="ai-btn-new" type="button" class="btn btn-secondary btn-sm">
+                                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                                <span data-i18n="GRAFIDA_BTN_NEW_CHAT">New chat</span>
+                            </button>
+                            <button id="ai-btn-close" type="button" class="btn btn-secondary btn-sm" aria-label="Close">
+                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            </button>
+                        </span>
+                    </header>
+
                     <!-- Step 8: AI Chats banner — hidden until Step 8 populates it -->
                     <div id="ai-chats-section" class="hidden">
                         <div class="ai-panel-section-title" data-i18n="GRAFIDA_LBL_AI_CHATS">AI Chats</div>
