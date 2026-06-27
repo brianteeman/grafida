@@ -14,6 +14,8 @@ namespace Grafida\Http;
 use Boson\Api\Dialog\DialogApiInterface;
 use Boson\Contracts\Http\RequestInterface;
 use Boson\Contracts\Http\ResponseInterface;
+use Grafida\Ai\AiServiceManager;
+use Grafida\Ai\Defaults;
 use Grafida\Article\Draft;
 use Grafida\Article\DraftRepository;
 use Grafida\Display\DisplayModeService;
@@ -108,6 +110,15 @@ final class ApiController
         'GRAFIDA_BTN_CANCEL_CROP', 'GRAFIDA_BTN_RESIZE', 'GRAFIDA_BTN_RESET',
         'GRAFIDA_LBL_WIDTH', 'GRAFIDA_LBL_HEIGHT', 'GRAFIDA_LBL_LOCK_ASPECT', 'GRAFIDA_LBL_DIMENSIONS',
         'GRAFIDA_MSG_CROP_HINT', 'GRAFIDA_LBL_MEDIA_PREVIEW',
+        'GRAFIDA_NAV_AI',
+        'GRAFIDA_LBL_AI_SERVICES', 'GRAFIDA_BTN_ADD_AI_SERVICE',
+        'GRAFIDA_LBL_AI_PROVIDER', 'GRAFIDA_LBL_AI_ENDPOINT',
+        'GRAFIDA_LBL_AI_MODEL', 'GRAFIDA_LBL_AI_KEY', 'GRAFIDA_LBL_AI_PARAMS',
+        'GRAFIDA_LBL_DEFAULT_AI_SERVICE', 'GRAFIDA_BTN_SET_DEFAULT',
+        'GRAFIDA_MSG_NO_AI_SERVICES',
+        'GRAFIDA_MSG_DELETE_AI_SERVICE_CONFIRM',
+        'GRAFIDA_MSG_AI_SERVICE_SAVED', 'GRAFIDA_MSG_AI_SERVICE_DELETED',
+        'GRAFIDA_MSG_AI_KEY_PLACEHOLDER', 'GRAFIDA_MSG_AI_INSECURE_WARNING',
     ];
 
     public function __construct(
@@ -125,6 +136,8 @@ final class ApiController
         private readonly ApiClient $apiClient,
         private readonly StorageService $storage,
         private readonly UrlOpener $urlOpener,
+        private readonly AiServiceManager $aiServices,
+        private readonly Defaults $aiDefaults,
         private readonly ?DialogApiInterface $dialog = null,
     ) {}
 
@@ -167,6 +180,8 @@ final class ApiController
             $method === 'POST' && $path === '/api/settings/storage/reset' => $this->resetStorage(),
             $method === 'POST' && $path === '/api/open-url'          => $this->openUrl($body),
             $method === 'POST' && $path === '/api/dialog/open-file'  => $this->openFile($body),
+            $method === 'GET'  && $path === '/api/ai/services'       => $this->listAiServices(),
+            $method === 'POST' && $path === '/api/ai/services'       => $this->createAiService($body),
 
             default => $this->parameterised($method, $path, $body, $request),
         };
@@ -177,6 +192,25 @@ final class ApiController
      */
     private function parameterised(string $method, string $path, array $body, RequestInterface $request): ResponseInterface
     {
+        if (preg_match('#^/api/ai/services/(\d+)/default$#', $path, $m) === 1) {
+            if ($method !== 'POST') {
+                return Json::error('Method not allowed', 405);
+            }
+
+            return $this->setAiServiceDefault((int) $m[1]);
+        }
+
+        if (preg_match('#^/api/ai/services/(\d+)$#', $path, $m) === 1) {
+            $id = (int) $m[1];
+
+            return match ($method) {
+                'GET'    => $this->getAiService($id),
+                'PATCH'  => $this->updateAiService($id, $body),
+                'DELETE' => $this->deleteAiService($id),
+                default  => Json::error('Method not allowed', 405),
+            };
+        }
+
         if (preg_match('#^/api/sites/(\d+)$#', $path, $m) === 1) {
             $id = (int) $m[1];
 
@@ -262,6 +296,9 @@ final class ApiController
 
     private function bootstrap(): ResponseInterface
     {
+        $aiServiceList  = $this->aiServices->list();
+        $aiDefault      = $this->aiServices->default();
+
         return Json::ok([
             'strings'             => $this->language->strings(self::UI_KEYS),
             'language'            => $this->language->currentTag(),
@@ -273,6 +310,10 @@ final class ApiController
             'supportedFieldTypes' => FieldSupport::SUPPORTED,
             'sites'               => array_map($this->siteArray(...), $this->sites->list()),
             'app'                 => App::info(),
+            'aiServices'          => array_map(static fn ($s) => $s->toArray(), $aiServiceList),
+            'aiDefaultServiceId'  => $aiDefault?->id,
+            'aiProviders'         => $this->aiDefaults->providers(),
+            'secureStoreAi'       => $this->aiServices->hasSecureStore(),
         ]);
     }
 
@@ -415,6 +456,124 @@ final class ApiController
         $this->sites->delete($id);
 
         return Json::ok();
+    }
+
+    // ------------------------------------------------------------------
+    //  AI service handlers
+    // ------------------------------------------------------------------
+
+    private function listAiServices(): ResponseInterface
+    {
+        return Json::ok(array_map(
+            static fn ($s) => $s->toArray(),
+            $this->aiServices->list(),
+        ));
+    }
+
+    private function getAiService(int $id): ResponseInterface
+    {
+        $service = $this->aiServices->find($id);
+
+        if ($service === null) {
+            return Json::error('AI service not found', 404);
+        }
+
+        return Json::ok($service->toArray());
+    }
+
+    /** @param array<string, mixed> $body */
+    private function createAiService(array $body): ResponseInterface
+    {
+        $allowInsecureVal = $body['allowInsecure'] ?? false;
+
+        $paramsRaw = $body['params'] ?? null;
+        /** @var array<string, mixed> $params */
+        $params = is_array($paramsRaw) ? $paramsRaw : [];
+
+        $service = $this->aiServices->create([
+            'name'          => $this->str($body, 'name'),
+            'provider'      => $this->str($body, 'provider'),
+            'endpoint'      => $this->str($body, 'endpoint'),
+            'model'         => $this->str($body, 'model'),
+            'key'           => $this->str($body, 'key'),
+            'params'        => $params,
+            'allowInsecure' => is_bool($allowInsecureVal) ? $allowInsecureVal : (bool) $allowInsecureVal,
+        ]);
+
+        return Json::ok($service->toArray(), 201);
+    }
+
+    /** @param array<string, mixed> $body */
+    private function updateAiService(int $id, array $body): ResponseInterface
+    {
+        $existing = $this->aiServices->find($id);
+
+        if ($existing === null) {
+            return Json::error('AI service not found', 404);
+        }
+
+        $allowInsecureVal = $body['allowInsecure'] ?? false;
+
+        $paramsRaw = $body['params'] ?? null;
+        /** @var array<string, mixed> $params */
+        $params = is_array($paramsRaw) ? $paramsRaw : $existing->params;
+
+        $data = [
+            'params'        => $params,
+            'allowInsecure' => is_bool($allowInsecureVal) ? $allowInsecureVal : (bool) $allowInsecureVal,
+        ];
+
+        // Only include fields that are explicitly provided in the body.
+        if (array_key_exists('name', $body)) {
+            $data['name'] = $this->str($body, 'name');
+        }
+        if (array_key_exists('provider', $body)) {
+            $data['provider'] = $this->str($body, 'provider');
+        }
+        if (array_key_exists('endpoint', $body)) {
+            $data['endpoint'] = $this->str($body, 'endpoint');
+        }
+        if (array_key_exists('model', $body)) {
+            $data['model'] = $this->str($body, 'model');
+        }
+
+        // Only re-store the key when a non-empty value is supplied.
+        $keyVal = $body['key'] ?? null;
+        if (is_string($keyVal) && $keyVal !== '') {
+            $data['key'] = $keyVal;
+        }
+
+        $service = $this->aiServices->update($id, $data);
+
+        return Json::ok($service->toArray());
+    }
+
+    private function deleteAiService(int $id): ResponseInterface
+    {
+        $service = $this->aiServices->find($id);
+
+        if ($service === null) {
+            return Json::error('AI service not found', 404);
+        }
+
+        $this->aiServices->delete($id);
+
+        return Json::ok();
+    }
+
+    private function setAiServiceDefault(int $id): ResponseInterface
+    {
+        $service = $this->aiServices->find($id);
+
+        if ($service === null) {
+            return Json::error('AI service not found', 404);
+        }
+
+        $this->aiServices->setDefault($id);
+
+        $updated = $this->aiServices->find($id);
+
+        return Json::ok($updated?->toArray());
     }
 
     private function references(int $siteId, bool $refresh): ResponseInterface

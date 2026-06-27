@@ -16,6 +16,9 @@ use Boson\Component\Http\Response;
 use Boson\Component\Http\Static\StaticProviderInterface;
 use Boson\Contracts\Http\RequestInterface;
 use Boson\Contracts\Http\ResponseInterface;
+use Grafida\Ai\AiServiceManager;
+use Grafida\Ai\AiServiceRepository;
+use Grafida\Ai\Defaults;
 use Grafida\Article\DraftRepository;
 use Grafida\Display\DisplayModeService;
 use Grafida\Field\FieldSupport;
@@ -28,6 +31,7 @@ use Grafida\Publish\PublishService;
 use Grafida\Reference\EditorCssService;
 use Grafida\Reference\ReferenceRepository;
 use Grafida\Reference\ReferenceService;
+use Grafida\Secret\SecretStore;
 use Grafida\Secret\SecretStoreFactory;
 use Grafida\Site\FaviconRepository;
 use Grafida\Site\FaviconService;
@@ -56,13 +60,22 @@ final class Kernel
         ?PDO $pdo = null,
         ?string $basePath = null,
         ?DialogApiInterface $dialog = null,
+        SecretStore|false|null $secureStore = null,
     ) {
         $pdo      = $pdo ?? Database::get();
         $basePath = $basePath ?? Resources::base();
 
-        $settings    = new SettingsRepository($pdo);
-        $secureStore = SecretStoreFactory::secureStore();
-        $apiClient   = new ApiClient();
+        // null  → use the factory (production default)
+        // false → no secure store (test: force insecure-fallback path)
+        // SecretStore instance → use the provided store (test: in-memory stub)
+        if ($secureStore === null) {
+            $secureStore = SecretStoreFactory::secureStore();
+        } elseif ($secureStore === false) {
+            $secureStore = null;
+        }
+
+        $settings  = new SettingsRepository($pdo);
+        $apiClient = new ApiClient();
 
         $siteService = new SiteService(new SiteRepository($pdo), $apiClient, $secureStore);
         $favicons    = new FaviconService(new FaviconRepository($pdo));
@@ -75,6 +88,7 @@ final class Kernel
         $language    = new LanguageService($settings, $basePath);
         $displayMode = new DisplayModeService($settings);
         $storage     = new StorageService($pdo, $siteService);
+        $aiServices  = new AiServiceManager(new AiServiceRepository($pdo), $secureStore);
 
         $this->api = new ApiController(
             sites: $siteService,
@@ -91,6 +105,8 @@ final class Kernel
             apiClient: $apiClient,
             storage: $storage,
             urlOpener: new UrlOpener(),
+            aiServices: $aiServices,
+            aiDefaults: new Defaults(),
             dialog: $dialog,
         );
     }
