@@ -32,22 +32,20 @@ final class LanguageService
     public const AUTO        = 'auto';
     public const SETTING_KEY = 'ui_language';
 
-    /** Languages the application ships, as tag => endonym. */
-    public const AVAILABLE = [
-        'en-GB' => 'English (United Kingdom)',
-        'el-GR' => 'Ελληνικά (Ελλάδα)',
-        'fr-FR' => 'Français (France)',
-        'de-DE' => 'Deutsch (Deutschland)',
-        'es-ES' => 'Español (España)',
-        'it-IT' => 'Italiano (Italia)',
-        'pt-PT' => 'Português (Portugal)',
-    ];
+    /** Translation key each language file carries to name itself in its own tongue. */
+    private const ENDONYM_KEY = 'GRAFIDA_LANGUAGE_ENDONYM';
 
     private const EXTENSION = 'com_grafida';
 
     private ?Language $language = null;
     private ?Language $fallback = null;
     private ?string $resolvedTag = null;
+
+    /** @var array<string, string>|null Cached tag => endonym map. */
+    private ?array $available = null;
+
+    /** @var list<string>|null Cached list of shipped language tags. */
+    private ?array $availableTags = null;
 
     public function __construct(
         private readonly SettingsRepository $settings,
@@ -64,6 +62,42 @@ final class LanguageService
         return $this->resolvedTag;
     }
 
+    /**
+     * The languages the application ships, as an ordered tag => endonym map.
+     *
+     * Discovered at runtime by scanning the language directory: every `<tag>/<tag>.com_grafida.ini`
+     * is a shipped language, and its `GRAFIDA_LANGUAGE_ENDONYM` key names it in its own tongue (so
+     * adding a translation needs no code change). The default language sorts first, the rest by endonym.
+     *
+     * @return array<string, string>
+     */
+    public function available(): array
+    {
+        if ($this->available !== null) {
+            return $this->available;
+        }
+
+        $map = [];
+
+        foreach ($this->availableTags() as $tag) {
+            $map[$tag] = $this->readEndonym($tag) ?? $tag;
+        }
+
+        uksort($map, function (string $a, string $b) use ($map): int {
+            if ($a === self::DEFAULT_TAG) {
+                return -1;
+            }
+
+            if ($b === self::DEFAULT_TAG) {
+                return 1;
+            }
+
+            return strcoll($map[$a], $map[$b]);
+        });
+
+        return $this->available = $map;
+    }
+
     /** The stored override ("auto" when auto-detecting). */
     public function override(): string
     {
@@ -73,7 +107,7 @@ final class LanguageService
     /** Sets and persists the language override (use self::AUTO for auto-detect). */
     public function setOverride(string $tag): void
     {
-        $tag = $tag === self::AUTO || isset(self::AVAILABLE[$tag]) ? $tag : self::AUTO;
+        $tag = $tag === self::AUTO || $this->isAvailable($tag) ? $tag : self::AUTO;
         $this->settings->set(self::SETTING_KEY, $tag);
 
         // Force re-resolution on the next translate().
@@ -144,13 +178,13 @@ final class LanguageService
     {
         $override = $this->override();
 
-        if ($override !== self::AUTO && isset(self::AVAILABLE[$override])) {
+        if ($override !== self::AUTO && $this->isAvailable($override)) {
             return $override;
         }
 
         $detected = $this->detectOsLanguage();
 
-        return $detected !== null && isset(self::AVAILABLE[$detected]) ? $detected : self::DEFAULT_TAG;
+        return $detected !== null && $this->isAvailable($detected) ? $detected : self::DEFAULT_TAG;
     }
 
     /**
@@ -181,7 +215,7 @@ final class LanguageService
         if (\count($parts) < 2) {
             // Match by language part alone (e.g. "fr" -> "fr-FR").
             $lang = strtolower($parts[0]);
-            foreach (array_keys(self::AVAILABLE) as $tag) {
+            foreach ($this->availableTags() as $tag) {
                 if (str_starts_with(strtolower($tag), $lang . '-')) {
                     return $tag;
                 }
@@ -192,6 +226,75 @@ final class LanguageService
 
         $candidate = strtolower($parts[0]) . '-' . strtoupper($parts[1]);
 
-        return isset(self::AVAILABLE[$candidate]) ? $candidate : null;
+        return $this->isAvailable($candidate) ? $candidate : null;
+    }
+
+    /** Whether the given tag is one of the languages the application ships. */
+    private function isAvailable(string $tag): bool
+    {
+        return \in_array($tag, $this->availableTags(), true);
+    }
+
+    /**
+     * Discovers the shipped language tags by scanning the language directory for
+     * `<tag>/<tag>.com_grafida.ini` files. en-GB is always present (the canonical source).
+     *
+     * @return list<string>
+     */
+    private function availableTags(): array
+    {
+        if ($this->availableTags !== null) {
+            return $this->availableTags;
+        }
+
+        $tags = [self::DEFAULT_TAG];
+
+        $dirs = glob($this->basePath . '/language/*', \GLOB_ONLYDIR);
+
+        foreach ($dirs === false ? [] : $dirs as $dir) {
+            $tag = basename($dir);
+
+            if ($tag === self::DEFAULT_TAG || \in_array($tag, $tags, true)) {
+                continue;
+            }
+
+            // Only count it as a shipped language if it actually carries our extension's strings.
+            if (is_file($dir . '/' . $tag . '.' . self::EXTENSION . '.ini')) {
+                $tags[] = $tag;
+            }
+        }
+
+        return $this->availableTags = $tags;
+    }
+
+    /**
+     * Reads a language's self-name (endonym) straight from its INI file, without loading the
+     * whole catalogue. Returns null when the file or the key is missing.
+     */
+    private function readEndonym(string $tag): ?string
+    {
+        $file = $this->basePath . '/language/' . $tag . '/' . $tag . '.' . self::EXTENSION . '.ini';
+
+        $handle = @fopen($file, 'r');
+
+        if ($handle === false) {
+            return null;
+        }
+
+        try {
+            while (($line = fgets($handle)) !== false) {
+                if (!str_starts_with(ltrim($line), self::ENDONYM_KEY)) {
+                    continue;
+                }
+
+                if (preg_match('/^\s*' . self::ENDONYM_KEY . '\s*=\s*"(.*)"\s*$/u', $line, $m) === 1) {
+                    return $m[1];
+                }
+            }
+        } finally {
+            fclose($handle);
+        }
+
+        return null;
     }
 }

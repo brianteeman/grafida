@@ -229,7 +229,7 @@ final class ApiController
             'strings'             => $this->language->strings(self::UI_KEYS),
             'language'            => $this->language->currentTag(),
             'languageOverride'    => $this->language->override(),
-            'availableLanguages'  => LanguageService::AVAILABLE,
+            'availableLanguages'  => $this->language->available(),
             'displayMode'         => $this->displayMode->current(),
             'systemPrefersDark'   => $this->displayMode->systemPrefersDark(),
             'secureStore'         => $this->sites->hasSecureStore(),
