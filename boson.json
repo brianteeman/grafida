@@ -48,16 +48,13 @@
         "directories": [
             "assets/private",
             "language",
-            "storage/migrations"
+            "storage/migrations",
+            "src/Ai/resources"
         ],
         "finder": [
             {
                 "directory": "src",
                 "name": "*.php"
-            },
-            {
-                "directory": "src",
-                "name": "*.json"
             },
             {
                 "directory": "vendor",
