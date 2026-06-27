@@ -121,8 +121,11 @@ dialog makes the endpoint return 503).
   To **edit an already-inserted image** (dimensions, description, alignment, CSS), selecting it shows a
   floating context toolbar (`addContextToolbar('grafidaImageTools')`, predicate = `img`) whose **Image**
   item re-opens that same dialog; the dialog carries the Dimensions fields (`image_dimensions`) and an
-  Advanced tab (`image_advtab`: CSS class, inline style, border, spacing). Double-clicking the image or the
-  toolbar/Insert-menu **Image** button work too. The editor `content_style` also forces
+  Advanced tab (`image_advtab`: inline style, border, spacing). Double-clicking the image or the
+  toolbar/Insert-menu **Image** button work too. The same context toolbar's **CSS class…** item
+  (`imageclass` button) opens a small prompt to set any free-text CSS class(es) on the image (the
+  Insert/Edit Image dialog has no class field); it pre-fills the current `class` and writes it back in one
+  undo step (empty clears it). The editor `content_style` also forces
   `img { max-width: 100%; height: auto }`: Joomla bakes a photo's full intrinsic size into the tag (e.g.
   `width="4032"`), and without a constraining rule the picture overflows the editor's scroll box and becomes
   un-clickable in the WKWebView (broken hit-testing) — scaling it to fit keeps it selectable/editable, and

@@ -46,6 +46,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | alt text | Texto alternativo | Image alt attribute. |
 | caption | Subtítulo | Image caption. Official Joomla! term (COM_CONTENT_FIELD_IMAGE_CAPTION_LABEL = «Subtítulo»), even though «Pie de foto» is more literal. |
 | image class | Clase de la imagen | Joomla float_intro/float_fulltext: a free-text CSS class. |
+| CSS class | Clase CSS | Free-text CSS class(es) for an inline body image (image context-toolbar action). |
 | media library | Multimedia | The site's Media Manager, browsed when picking an image. |
 | decorative image | imagen decorativa | image_*_alt_empty: alt text intentionally empty. |
 | display mode | modo de visualización | Light/dark theme preference setting. |

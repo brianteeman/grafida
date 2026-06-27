@@ -52,6 +52,7 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | alt text | Alternativtext | Image alt attribute. |
 | caption | Bildunterschrift | Image caption. |
 | image class | Bild-CSS-Klasse | Joomla float_intro/float_fulltext: a free-text CSS class. |
+| CSS class | CSS-Klasse | Free-text CSS class(es) for an inline body image (image context-toolbar action). |
 | media library | Medien | The site's Media Manager, browsed when picking an image. |
 | decorative image | dekoratives Bild | image_*_alt_empty: alt text intentionally empty. |
 | display mode | Anzeigemodus | Light/dark theme preference setting. |

@@ -2129,16 +2129,49 @@ async function initTinyMCE(draft) {
                 onAction: () => openSourceCodeEditor(editor),
             });
 
+            // "CSS class…" action: set any CSS class(es) on the selected image.
+            // TinyMCE's image dialog has no free-text class field, so we add a
+            // small prompt that pre-fills the image's current class and writes it
+            // back in one undo step. Empty input clears the attribute.
+            editor.ui.registry.addButton('imageclass', {
+                text: t('GRAFIDA_BTN_IMAGE_CLASS'),
+                tooltip: t('GRAFIDA_BTN_IMAGE_CLASS'),
+                onAction: () => {
+                    const node = editor.selection.getNode();
+                    if (!node || node.nodeName.toLowerCase() !== 'img') return;
+                    editor.windowManager.open({
+                        title: t('GRAFIDA_LBL_IMAGE_CLASS'),
+                        body: {
+                            type: 'panel',
+                            items: [{ type: 'input', name: 'cls', label: t('GRAFIDA_LBL_IMAGE_CLASS') }],
+                        },
+                        initialData: { cls: node.getAttribute('class') || '' },
+                        buttons: [
+                            { type: 'cancel', text: t('GRAFIDA_BTN_CANCEL') },
+                            { type: 'submit', text: t('GRAFIDA_BTN_SAVE'), primary: true },
+                        ],
+                        onSubmit: (dialog) => {
+                            const cls = (dialog.getData().cls || '').trim().replace(/\s+/g, ' ');
+                            editor.undoManager.transact(() => {
+                                editor.dom.setAttrib(node, 'class', cls || null);
+                            });
+                            editor.nodeChanged();
+                            dialog.close();
+                        },
+                    });
+                },
+            });
+
             // Floating toolbar shown when an image is selected, so editing an
-            // image's properties (size, alt, alignment) is discoverable: the
-            // "image" item re-opens TinyMCE's Insert/Edit Image dialog — which is
-            // where the Dimensions (width/height), description and Advanced (CSS,
-            // border, spacing) fields live — for the already-inserted picture.
+            // image's properties (size, alt, alignment, class) is discoverable: the
+            // "image" item re-opens TinyMCE's Insert/Edit Image dialog — where the
+            // Dimensions (width/height), description and Advanced (CSS, border,
+            // spacing) fields live — and "imageclass" sets free-text CSS classes.
             editor.ui.registry.addContextToolbar('grafidaImageTools', {
                 predicate: (node) => node.nodeName.toLowerCase() === 'img',
                 position: 'node',
                 scope: 'node',
-                items: 'image | alignleft aligncenter alignright',
+                items: 'image imageclass | alignleft aligncenter alignright',
             });
 
             editor.on('init', () => {

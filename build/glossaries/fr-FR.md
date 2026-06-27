@@ -46,6 +46,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | alt text | Texte alternatif | Image alt attribute. |
 | caption | Légende | Image caption. |
 | image class | Classe de l’image | Joomla float_intro/float_fulltext: a free-text CSS class. |
+| CSS class | Classe CSS | Free-text CSS class(es) for an inline body image (image context-toolbar action). |
 | media library | Médias | The site's Media Manager, browsed when picking an image. |
 | decorative image | image décorative | image_*_alt_empty: alt text intentionally empty. |
 | display mode | mode d’affichage | Light/dark theme preference setting. |
