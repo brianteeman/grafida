@@ -16,8 +16,10 @@ use Boson\Component\Http\Response;
 use Boson\Component\Http\Static\StaticProviderInterface;
 use Boson\Contracts\Http\RequestInterface;
 use Boson\Contracts\Http\ResponseInterface;
+use Grafida\Ai\AiProxy;
 use Grafida\Ai\AiServiceManager;
 use Grafida\Ai\AiServiceRepository;
+use Grafida\Ai\AiToolRepository;
 use Grafida\Ai\Defaults;
 use Grafida\Article\DraftRepository;
 use Grafida\Display\DisplayModeService;
@@ -37,6 +39,7 @@ use Grafida\Site\FaviconRepository;
 use Grafida\Site\FaviconService;
 use Grafida\Site\SiteRepository;
 use Grafida\Site\SiteService;
+use Grafida\Http\HttpClient;
 use Grafida\Storage\Database;
 use Grafida\Storage\SettingsRepository;
 use Grafida\Storage\StorageService;
@@ -74,8 +77,10 @@ final class Kernel
             $secureStore = null;
         }
 
-        $settings  = new SettingsRepository($pdo);
-        $apiClient = new ApiClient();
+        $settings    = new SettingsRepository($pdo);
+        $aiToolRepo  = new AiToolRepository($pdo);
+        $aiDefaults  = new Defaults();
+        $apiClient   = new ApiClient();
 
         $siteService = new SiteService(new SiteRepository($pdo), $apiClient, $secureStore);
         $favicons    = new FaviconService(new FaviconRepository($pdo));
@@ -89,6 +94,7 @@ final class Kernel
         $displayMode = new DisplayModeService($settings);
         $storage     = new StorageService($pdo, $siteService);
         $aiServices  = new AiServiceManager(new AiServiceRepository($pdo), $secureStore);
+        $aiProxy     = new AiProxy($aiServices, $aiDefaults, new HttpClient(300));
 
         $this->api = new ApiController(
             sites: $siteService,
@@ -106,7 +112,10 @@ final class Kernel
             storage: $storage,
             urlOpener: new UrlOpener(),
             aiServices: $aiServices,
-            aiDefaults: new Defaults(),
+            aiDefaults: $aiDefaults,
+            aiTools: $aiToolRepo,
+            settings: $settings,
+            aiProxy: $aiProxy,
             dialog: $dialog,
         );
     }

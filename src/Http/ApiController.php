@@ -14,8 +14,12 @@ namespace Grafida\Http;
 use Boson\Api\Dialog\DialogApiInterface;
 use Boson\Contracts\Http\RequestInterface;
 use Boson\Contracts\Http\ResponseInterface;
+use Grafida\Ai\AiProxyException;
 use Grafida\Ai\AiServiceManager;
+use Grafida\Ai\AiTool;
+use Grafida\Ai\AiToolRepository;
 use Grafida\Ai\Defaults;
+use Grafida\Ai\AiProxy;
 use Grafida\Article\Draft;
 use Grafida\Article\DraftRepository;
 use Grafida\Display\DisplayModeService;
@@ -33,6 +37,7 @@ use Grafida\Site\FaviconService;
 use Grafida\Site\SecureStoreUnavailableException;
 use Grafida\Site\Site;
 use Grafida\Site\SiteService;
+use Grafida\Storage\SettingsRepository;
 use Grafida\Storage\StorageService;
 use Grafida\Support\App;
 use Grafida\Support\UrlOpener;
@@ -119,6 +124,16 @@ final class ApiController
         'GRAFIDA_MSG_DELETE_AI_SERVICE_CONFIRM',
         'GRAFIDA_MSG_AI_SERVICE_SAVED', 'GRAFIDA_MSG_AI_SERVICE_DELETED',
         'GRAFIDA_MSG_AI_KEY_PLACEHOLDER', 'GRAFIDA_MSG_AI_INSECURE_WARNING',
+        'GRAFIDA_LBL_AI_TOOLS', 'GRAFIDA_BTN_ADD_AI_TOOL',
+        'GRAFIDA_LBL_AI_TOOL_KEY', 'GRAFIDA_LBL_AI_TOOL_PROMPT',
+        'GRAFIDA_LBL_AI_TONE', 'GRAFIDA_LBL_AI_OVERRIDE_SYSTEM',
+        'GRAFIDA_LBL_AI_SORT_ORDER', 'GRAFIDA_LBL_AI_SYSTEM_PROMPT',
+        'GRAFIDA_BTN_RESTORE_DEFAULT',
+        'GRAFIDA_MSG_NO_AI_TOOLS',
+        'GRAFIDA_MSG_DELETE_AI_TOOL_CONFIRM',
+        'GRAFIDA_MSG_AI_TOOL_SAVED', 'GRAFIDA_MSG_AI_TOOL_DELETED',
+        'GRAFIDA_MSG_AI_SYSTEM_PROMPT_SAVED',
+        'GRAFIDA_MSG_AI_HOST_MISMATCH',
     ];
 
     public function __construct(
@@ -138,6 +153,9 @@ final class ApiController
         private readonly UrlOpener $urlOpener,
         private readonly AiServiceManager $aiServices,
         private readonly Defaults $aiDefaults,
+        private readonly AiToolRepository $aiTools,
+        private readonly SettingsRepository $settings,
+        private readonly AiProxy $aiProxy,
         private readonly ?DialogApiInterface $dialog = null,
     ) {}
 
@@ -182,6 +200,10 @@ final class ApiController
             $method === 'POST' && $path === '/api/dialog/open-file'  => $this->openFile($body),
             $method === 'GET'  && $path === '/api/ai/services'       => $this->listAiServices(),
             $method === 'POST' && $path === '/api/ai/services'       => $this->createAiService($body),
+            $method === 'GET'  && $path === '/api/ai/tools'          => $this->listAiTools(),
+            $method === 'PUT'  && $path === '/api/ai/system-prompt'  => $this->setSystemPrompt($body),
+            $method === 'POST' && $path === '/api/ai/tools'          => $this->createAiTool($body),
+            $method === 'POST' && $path === '/api/ai/proxy'          => $this->aiProxy($body),
 
             default => $this->parameterised($method, $path, $body, $request),
         };
@@ -192,6 +214,20 @@ final class ApiController
      */
     private function parameterised(string $method, string $path, array $body, RequestInterface $request): ResponseInterface
     {
+        if (preg_match('#^/api/ai/tools/([A-Za-z0-9_\-]+)$#', $path, $m) === 1) {
+            $key = $m[1];
+
+            return match ($method) {
+                'PATCH'  => $this->updateAiTool($key, $body),
+                'DELETE' => $this->deleteAiTool($key),
+                default  => Json::error('Method not allowed', 405),
+            };
+        }
+
+        if ($method === 'GET' && preg_match('#^/api/ai/services/(\d+)/resolved$#', $path, $m) === 1) {
+            return $this->resolvedAiService((int) $m[1], $request->url->query->get('tool') ?? '');
+        }
+
         if (preg_match('#^/api/ai/services/(\d+)/default$#', $path, $m) === 1) {
             if ($method !== 'POST') {
                 return Json::error('Method not allowed', 405);
@@ -299,6 +335,10 @@ final class ApiController
         $aiServiceList  = $this->aiServices->list();
         $aiDefault      = $this->aiServices->default();
 
+        // Only enabled tools, sorted, with each tool's resolved serviceId.
+        $allTools     = $this->aiDefaults->effectiveTools($this->aiTools);
+        $enabledTools = array_values(array_filter($allTools, static fn (array $t): bool => $t['enabled']));
+
         return Json::ok([
             'strings'             => $this->language->strings(self::UI_KEYS),
             'language'            => $this->language->currentTag(),
@@ -314,6 +354,7 @@ final class ApiController
             'aiDefaultServiceId'  => $aiDefault?->id,
             'aiProviders'         => $this->aiDefaults->providers(),
             'secureStoreAi'       => $this->aiServices->hasSecureStore(),
+            'aiTools'             => $enabledTools,
         ]);
     }
 
@@ -574,6 +615,295 @@ final class ApiController
         $updated = $this->aiServices->find($id);
 
         return Json::ok($updated?->toArray());
+    }
+
+    // ------------------------------------------------------------------
+    //  AI tool / system-prompt / proxy / resolved-config handlers
+    // ------------------------------------------------------------------
+
+    /**
+     * Returns the full effective tool list, the current system-prompt (override or
+     * bundled default), and all available tones.
+     */
+    private function listAiTools(): ResponseInterface
+    {
+        $systemPromptOverride = $this->settings->get('ai_system_prompt');
+        $systemPrompt         = ($systemPromptOverride !== null && $systemPromptOverride !== '')
+            ? $systemPromptOverride
+            : $this->aiDefaults->systemPrompt();
+
+        return Json::ok([
+            'tools'        => $this->aiDefaults->effectiveTools($this->aiTools),
+            'systemPrompt' => $systemPrompt,
+            'tones'        => $this->aiDefaults->tones(),
+        ]);
+    }
+
+    /**
+     * Stores or clears a system-prompt override.
+     *
+     * An empty/omitted `prompt` key restores the bundled default (the stored
+     * override is cleared so the setting is transparent on next read).
+     *
+     * @param array<string, mixed> $body
+     */
+    private function setSystemPrompt(array $body): ResponseInterface
+    {
+        $prompt = $this->str($body, 'prompt');
+
+        if ($prompt === '') {
+            // Restore default: store empty string so subsequent reads fall back.
+            $this->settings->set('ai_system_prompt', '');
+        } else {
+            $this->settings->set('ai_system_prompt', $prompt);
+        }
+
+        return Json::ok(['systemPrompt' => $prompt !== '' ? $prompt : $this->aiDefaults->systemPrompt()]);
+    }
+
+    /**
+     * Updates (upserts) a built-in tool's override. The request body may carry
+     * any subset of: prompt, params, tone, serviceId, enabled, sortOrder, title, icon.
+     *
+     * @param array<string, mixed> $body
+     */
+    private function updateAiTool(string $key, array $body): ResponseInterface
+    {
+        // A key that begins with nothing can't be overridden if no bundled tool
+        // exists — but we allow it for future flexibility. The override is always
+        // is_custom = false (PATCH is for built-ins only; POST creates custom tools).
+        $existing = $this->aiTools->findByKey($key);
+
+        $paramsRaw = $body['params'] ?? null;
+        /** @var array<string, mixed> $params */
+        $params = is_array($paramsRaw) ? $paramsRaw : ($existing !== null ? $existing->params : []);
+
+        $serviceIdRaw = $body['serviceId'] ?? null;
+        $serviceId    = is_numeric($serviceIdRaw) ? (int) $serviceIdRaw : ($existing !== null ? $existing->serviceId : null);
+
+        $enabledRaw = $body['enabled'] ?? null;
+        $enabled    = $enabledRaw !== null ? (bool) $enabledRaw : ($existing !== null ? $existing->enabled : true);
+
+        $sortOrderRaw = $body['sortOrder'] ?? null;
+        $sortOrder    = is_numeric($sortOrderRaw) ? (int) $sortOrderRaw : ($existing !== null ? $existing->sortOrder : 0);
+
+        $titleRaw = $body['title'] ?? null;
+        $title    = is_string($titleRaw) ? $titleRaw : ($existing !== null ? $existing->title : $key);
+
+        $iconRaw = $body['icon'] ?? null;
+        $icon    = is_string($iconRaw) ? $iconRaw : ($existing !== null ? $existing->icon : '');
+
+        $promptRaw = $body['prompt'] ?? null;
+        $prompt    = is_string($promptRaw) ? $promptRaw : ($existing !== null ? $existing->prompt : '');
+
+        $toneRaw = $body['tone'] ?? null;
+        $tone    = is_string($toneRaw) ? $toneRaw : ($existing !== null ? $existing->tone : '');
+
+        $overrideSystemRaw = $body['overrideSystem'] ?? null;
+        $overrideSystem    = $overrideSystemRaw !== null ? (bool) $overrideSystemRaw : ($existing !== null ? $existing->overrideSystem : false);
+
+        $tool = new AiTool(
+            id: $existing !== null ? $existing->id : null,
+            toolKey: $key,
+            title: $title,
+            icon: $icon,
+            prompt: $prompt,
+            overrideSystem: $overrideSystem,
+            tone: $tone,
+            params: $params,
+            serviceId: $serviceId,
+            isCustom: false,
+            enabled: $enabled,
+            sortOrder: $sortOrder,
+        );
+
+        $id = $this->aiTools->upsert($tool);
+
+        return Json::ok(array_merge($tool->toArray(), ['id' => $id]));
+    }
+
+    /**
+     * Creates a new custom tool (is_custom = true).
+     *
+     * Requires a unique `toolKey` in the body.  If the key already exists the
+     * request is rejected with 409.
+     *
+     * @param array<string, mixed> $body
+     */
+    private function createAiTool(array $body): ResponseInterface
+    {
+        $key = trim($this->str($body, 'toolKey'));
+
+        if ($key === '') {
+            return Json::error('A toolKey is required to create a custom AI tool.', 400);
+        }
+
+        if ($this->aiTools->findByKey($key) !== null) {
+            return Json::error('An AI tool with key "' . $key . '" already exists.', 409);
+        }
+
+        $paramsRaw = $body['params'] ?? null;
+        /** @var array<string, mixed> $params */
+        $params = is_array($paramsRaw) ? $paramsRaw : [];
+
+        $serviceIdRaw = $body['serviceId'] ?? null;
+        $serviceId    = is_numeric($serviceIdRaw) ? (int) $serviceIdRaw : null;
+
+        $overrideSystemRaw = $body['overrideSystem'] ?? null;
+        $overrideSystem    = $overrideSystemRaw !== null ? (bool) $overrideSystemRaw : false;
+
+        $enabledRaw = $body['enabled'] ?? null;
+        $enabled    = $enabledRaw !== null ? (bool) $enabledRaw : true;
+
+        $sortOrderRaw = $body['sortOrder'] ?? null;
+        $sortOrder    = is_numeric($sortOrderRaw) ? (int) $sortOrderRaw : 0;
+
+        $tool = new AiTool(
+            id: null,
+            toolKey: $key,
+            title: $this->str($body, 'title', $key),
+            icon: $this->str($body, 'icon'),
+            prompt: $this->str($body, 'prompt'),
+            overrideSystem: $overrideSystem,
+            tone: $this->str($body, 'tone'),
+            params: $params,
+            serviceId: $serviceId,
+            isCustom: true,
+            enabled: $enabled,
+            sortOrder: $sortOrder,
+        );
+
+        $id = $this->aiTools->upsert($tool);
+
+        return Json::ok(array_merge($tool->toArray(), ['id' => $id]), 201);
+    }
+
+    /**
+     * Deletes a tool override or custom tool by key.
+     */
+    private function deleteAiTool(string $key): ResponseInterface
+    {
+        if ($this->aiTools->findByKey($key) === null) {
+            return Json::error('AI tool "' . $key . '" not found.', 404);
+        }
+
+        $this->aiTools->delete($key);
+
+        return Json::ok();
+    }
+
+    /**
+     * Validates and forwards a non-streaming AI provider request.
+     *
+     * The body must supply `{serviceId, url, method, headers, body}`.  The
+     * proxy validates that the target URL's host matches the configured
+     * service endpoint — it never injects credentials (the JS side does that).
+     *
+     * @param array<string, mixed> $body
+     */
+    private function aiProxy(array $body): ResponseInterface
+    {
+        $serviceIdRaw = $body['serviceId'] ?? null;
+
+        if (!is_numeric($serviceIdRaw)) {
+            return Json::error('A numeric serviceId is required.', 400);
+        }
+
+        $url     = $this->str($body, 'url');
+        $method  = $this->str($body, 'method', 'POST');
+        $rawBody = $this->str($body, 'body');
+
+        $headersRaw = $body['headers'] ?? null;
+        /** @var array<string, string> $headers */
+        $headers = [];
+
+        if (is_array($headersRaw)) {
+            foreach ($headersRaw as $k => $v) {
+                if (is_string($k) && is_string($v)) {
+                    $headers[$k] = $v;
+                }
+            }
+        }
+
+        if ($url === '') {
+            return Json::error('A target URL is required.', 400);
+        }
+
+        try {
+            $result = $this->aiProxy->forward((int) $serviceIdRaw, $url, $method, $headers, $rawBody);
+        } catch (AiProxyException $e) {
+            return Json::error($e->getMessage(), $e->httpStatus);
+        }
+
+        return Json::ok($result);
+    }
+
+    /**
+     * Returns the complete resolved configuration the SPA transport needs to
+     * call the AI provider directly (for streaming via EventSource).
+     *
+     * The resolved configuration includes:
+     * - `endpoint`    — the service's configured base endpoint URL
+     * - `chatPath`    — the provider's chat completion path (e.g. `/chat/completions`)
+     * - `sseDialect`  — `"openai"` or `"anthropic"`
+     * - `model`       — the service's configured model identifier
+     * - `authHeader`  — the auth header name (`Authorization` or `X-Api-Key`)
+     * - `apiKey`      — the resolved API key (from OS keychain or insecure fallback)
+     * - `params`      — merged model params (service params ← tool params overlay)
+     *
+     * SECURITY NOTE (desktop-only trade-off):
+     * Returning the raw API key to local JavaScript is intentional here.
+     * Grafida is a single-user desktop application — the "browser" and the
+     * "server" run in the same OS process under the same user account.  There is
+     * no network boundary between PHP and the webview; exposing the key to the
+     * local JS runtime is no less secure than keeping it in PHP, and it is
+     * required to allow the SPA to open a native EventSource for SSE streaming
+     * (which PHP cannot proxy line-by-line without holding up the request thread).
+     */
+    private function resolvedAiService(int $id, string $toolKey): ResponseInterface
+    {
+        $service = $this->aiServices->find($id);
+
+        if ($service === null) {
+            return Json::error('AI service not found', 404);
+        }
+
+        $providers = $this->aiDefaults->providers();
+        $preset    = $providers[$service->provider] ?? null;
+
+        // Resolved endpoint: service's own field (may be empty for preset providers).
+        $endpoint = $service->endpoint !== '' ? $service->endpoint : (
+            is_array($preset) ? ($preset['endpoint'] ?? '') : ''
+        );
+
+        $chatPath   = is_array($preset) ? ($preset['chat_path'] ?? '/chat/completions') : '/chat/completions';
+        $sseDialect = is_array($preset) ? ($preset['sse_dialect'] ?? 'openai') : 'openai';
+        $authType   = is_array($preset) ? ($preset['auth'] ?? 'bearer') : 'bearer';
+        $authHeader = $authType === 'x-api-key' ? 'X-Api-Key' : 'Authorization';
+
+        $apiKey = $this->aiServices->resolveKey($id);
+
+        // Merge params: service params as base, tool-specific params as overlay.
+        /** @var array<string, mixed> $params */
+        $params = $service->params;
+
+        if ($toolKey !== '') {
+            $tool = $this->aiTools->findByKey($toolKey);
+
+            if ($tool !== null && $tool->params !== []) {
+                $params = array_merge($params, $tool->params);
+            }
+        }
+
+        return Json::ok([
+            'endpoint'   => $endpoint,
+            'chatPath'   => $chatPath,
+            'sseDialect' => $sseDialect,
+            'model'      => $service->model,
+            'authHeader' => $authHeader,
+            'apiKey'     => $apiKey,
+            'params'     => $params,
+        ]);
     }
 
     private function references(int $siteId, bool $refresh): ResponseInterface
