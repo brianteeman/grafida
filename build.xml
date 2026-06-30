@@ -1,0 +1,322 @@
+<?xml version="1.0"?>
+<!--
+  ~ Grafida — edit Joomla! articles on your desktop.
+  ~
+  ~ @copyright  Copyright (c) 2026 Nicholas K. Dionysopoulos
+  ~ @license    GNU General Public License version 3, or later
+  -->
+
+<project name="Grafida" description="Grafida — desktop Joomla! article editor" default="git" basedir=".">
+
+	<property name="dirs.root" value="${phing.dir}" />
+	<property name="dirs.icon" value="${dirs.root}/build/icon" />
+	<property name="boson.config" value="${dirs.root}/boson.json" />
+	<property name="compile.target.script" value="${dirs.root}/build/tasks/compile-target.php" />
+	<property name="assets.marker" value="${dirs.root}/assets/private/js/tinymce/tinymce.min.js" />
+	<property name="composer.marker" value="${dirs.root}/vendor/autoload.php" />
+
+	<!--
+	====================================================================================================
+	Tasks - General
+	====================================================================================================
+	-->
+
+	<!-- Default target: build the native binaries for every platform (no installers / DMG packaging). -->
+	<target name="git"
+			description="Build the application for all platforms (binaries only — no installers/DMG)"
+			depends="git-macos-arm,git-macos-x86,git-win-x86,git-linux-x86,git-linux-arm,git-phar">
+		<echo>Built all Grafida targets (binaries only). Run scripts/build-all.sh for installers/DMG packaging.</echo>
+	</target>
+
+	<!--
+	Everything that must be on disk before a compile. boson.json bundles assets/private (and reads the
+	icons) at COMPILE time, so the Composer dependencies (incl. the Boson compiler), the npm-managed
+	front-end libraries and the per-platform icons all have to exist first. Phing runs each target at
+	most once per invocation, so the six per-platform targets share a single preparation pass. Every
+	sub-target is guarded — skipped when its output is already in place (pass -Drefresh.assets=1 to
+	force a re-vendor). The order matters: Composer's post-install-cmd itself runs `vendor:assets`, so
+	on a fresh clone prepare-composer populates the assets too and prepare-assets then skips.
+	-->
+	<target name="prepare" depends="prepare-composer,prepare-icons,prepare-assets"
+			description="Ensure dependencies, icons + front-end libraries are on disk before compiling" />
+
+	<!--
+	Fresh-clone case: `git clone … && phing`. The Composer dependencies (including the Boson compiler in
+	require-dev) are gitignored, so install them if vendor/autoload.php is absent. `composer install`
+	fires post-install-cmd → `vendor:assets`, so this also vendors the front-end libraries on a fresh
+	checkout (prepare-assets then no-ops).
+	-->
+	<condition property="composer.present">
+		<available file="${composer.marker}" type="file" />
+	</condition>
+
+	<target name="prepare-composer" unless="composer.present"
+			description="Install the Composer dependencies (only if vendor/ is missing)">
+		<echo>Composer dependencies missing — running composer install</echo>
+		<exec executable="composer" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="install" />
+		</exec>
+	</target>
+
+	<!--
+	The per-platform icons (Grafida.icns / Grafida.ico / the PNG set) are committed, so this normally
+	no-ops; it only re-rasterises them from build/icon/grafida.svg if they have gone missing.
+	-->
+	<condition property="icons.present">
+		<and>
+			<available file="${dirs.icon}/Grafida.icns" type="file" />
+			<available file="${dirs.icon}/Grafida.ico" type="file" />
+		</and>
+	</condition>
+
+	<target name="prepare-icons" unless="icons.present"
+			description="Rasterise the application icons from the master SVG (only if missing)">
+		<echo>Application icons missing — regenerating from build/icon/grafida.svg</echo>
+		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="scripts/make-icons.sh" />
+		</exec>
+	</target>
+
+	<!--
+	The front-end libraries (TinyMCE, CodeMirror, FontAwesome) are npm-managed and gitignored, yet
+	boson.json bundles assets/private at COMPILE time — so they must be vendored first. `vendor:assets`
+	is idempotent (an mtime guard skips files already copied). We skip the whole step when the marker
+	file is already present, unless -Drefresh.assets=1 forces a re-vendor.
+	-->
+	<condition property="skip.assets">
+		<and>
+			<available file="${assets.marker}" type="file" />
+			<not><isset property="refresh.assets" /></not>
+		</and>
+	</condition>
+
+	<target name="prepare-assets" unless="skip.assets"
+			description="Vendor the npm-managed front-end libraries (TinyMCE, CodeMirror, FontAwesome)">
+		<echo>Vendoring front-end libraries (composer run-script vendor:assets)</echo>
+		<exec executable="composer" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="run-script" />
+			<arg value="vendor:assets" />
+		</exec>
+	</target>
+
+	<!--
+	====================================================================================================
+	Tasks - Per-platform binaries
+
+	`boson compile` builds every entry in boson.json's `target` array at once. build/tasks/compile-target.php
+	filters that master config down to a single target at runtime (see its header) so each task below
+	produces exactly one platform's binary.
+	====================================================================================================
+	-->
+
+	<target name="git-macos-arm" depends="prepare" description="Compile the macOS (Apple Silicon) binary">
+		<exec executable="php" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="${compile.target.script}" />
+			<arg value="--type=macos" />
+			<arg value="--arch=arm64" />
+		</exec>
+	</target>
+
+	<target name="git-macos-x86" depends="prepare" description="Compile the macOS (Intel) binary">
+		<exec executable="php" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="${compile.target.script}" />
+			<arg value="--type=macos" />
+			<arg value="--arch=amd64" />
+		</exec>
+	</target>
+
+	<target name="git-win-x86" depends="prepare" description="Compile the Windows (x64) binary">
+		<exec executable="php" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="${compile.target.script}" />
+			<arg value="--type=windows" />
+			<arg value="--arch=amd64" />
+		</exec>
+	</target>
+
+	<target name="git-linux-x86" depends="prepare" description="Compile the Linux (x64) binary">
+		<exec executable="php" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="${compile.target.script}" />
+			<arg value="--type=linux" />
+			<arg value="--arch=amd64" />
+		</exec>
+	</target>
+
+	<target name="git-linux-arm" depends="prepare" description="Compile the Linux (ARM64) binary">
+		<exec executable="php" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="${compile.target.script}" />
+			<arg value="--type=linux" />
+			<arg value="--arch=arm64" />
+		</exec>
+	</target>
+
+	<target name="git-phar" depends="prepare" description="Compile the cross-platform PHAR">
+		<exec executable="php" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="${compile.target.script}" />
+			<arg value="--type=phar" />
+		</exec>
+	</target>
+
+	<!--
+	====================================================================================================
+	Tasks - Run
+
+	`run` compiles the binary for the CURRENT host (via the matching git-* target) and launches it.
+	Phing `depends` is static, so the host's OS+arch is resolved at runtime into the run.* properties
+	and the compile is dispatched with <phingcall>. The git-* targets emit a bare self-contained binary
+	(the .app/.dmg/installers belong to the package-* targets), so we execute it directly from its
+	output directory — its dylib/.so and bundled assets sit alongside it there.
+	====================================================================================================
+	-->
+
+	<target name="run" depends="run-resolve"
+			description="Compile the binary for THIS host and launch it">
+		<fail unless="run.compile.target"
+			  message="Unsupported host for 'run' (OS/arch not recognised). Supported: macOS &amp; Linux on arm64/x86_64, Windows on x86_64." />
+		<echo>Host: ${run.label} — compiling (${run.compile.target}) then launching ${run.bindir}/${run.binname}</echo>
+		<phingcall target="${run.compile.target}" />
+		<exec executable="${run.exec}" dir="${run.bindir}" passthru="true" checkreturn="true" />
+	</target>
+
+	<target name="run-detect-os">
+		<condition property="host.windows"><os family="windows" /></condition>
+		<condition property="host.mac"><os family="mac" /></condition>
+		<condition property="host.linux">
+			<and>
+				<os family="unix" />
+				<not><os family="mac" /></not>
+			</and>
+		</condition>
+	</target>
+
+	<!-- Architecture comes from `uname -m` (arm64/aarch64 vs x86_64). Skipped on Windows, where the
+	     only target is x86_64 and `uname` may be absent. -->
+	<target name="run-detect-arch" depends="run-detect-os" unless="host.windows">
+		<exec executable="uname" outputProperty="host.machine" checkreturn="true">
+			<arg value="-m" />
+		</exec>
+	</target>
+
+	<!-- First-match-wins: Phing properties are immutable, so the first matching <condition> sticks. -->
+	<target name="run-resolve" depends="run-detect-arch">
+		<!-- macOS (Apple Silicon) -->
+		<condition property="run.compile.target" value="git-macos-arm">
+			<and><isset property="host.mac" /><equals arg1="${host.machine}" arg2="arm64" /></and>
+		</condition>
+		<condition property="run.bindir" value="${dirs.root}/build/macos/aarch64">
+			<and><isset property="host.mac" /><equals arg1="${host.machine}" arg2="arm64" /></and>
+		</condition>
+		<condition property="run.label" value="macOS (Apple Silicon)">
+			<and><isset property="host.mac" /><equals arg1="${host.machine}" arg2="arm64" /></and>
+		</condition>
+
+		<!-- macOS (Intel) -->
+		<condition property="run.compile.target" value="git-macos-x86">
+			<and><isset property="host.mac" /><equals arg1="${host.machine}" arg2="x86_64" /></and>
+		</condition>
+		<condition property="run.bindir" value="${dirs.root}/build/macos/amd64">
+			<and><isset property="host.mac" /><equals arg1="${host.machine}" arg2="x86_64" /></and>
+		</condition>
+		<condition property="run.label" value="macOS (Intel)">
+			<and><isset property="host.mac" /><equals arg1="${host.machine}" arg2="x86_64" /></and>
+		</condition>
+
+		<!-- Linux (ARM64) -->
+		<condition property="run.compile.target" value="git-linux-arm">
+			<and><isset property="host.linux" /><equals arg1="${host.machine}" arg2="aarch64" /></and>
+		</condition>
+		<condition property="run.bindir" value="${dirs.root}/build/linux/aarch64">
+			<and><isset property="host.linux" /><equals arg1="${host.machine}" arg2="aarch64" /></and>
+		</condition>
+		<condition property="run.label" value="Linux (ARM64)">
+			<and><isset property="host.linux" /><equals arg1="${host.machine}" arg2="aarch64" /></and>
+		</condition>
+
+		<!-- Linux (x64) -->
+		<condition property="run.compile.target" value="git-linux-x86">
+			<and><isset property="host.linux" /><equals arg1="${host.machine}" arg2="x86_64" /></and>
+		</condition>
+		<condition property="run.bindir" value="${dirs.root}/build/linux/amd64">
+			<and><isset property="host.linux" /><equals arg1="${host.machine}" arg2="x86_64" /></and>
+		</condition>
+		<condition property="run.label" value="Linux (x64)">
+			<and><isset property="host.linux" /><equals arg1="${host.machine}" arg2="x86_64" /></and>
+		</condition>
+
+		<!-- Windows (x64) -->
+		<condition property="run.compile.target" value="git-win-x86"><isset property="host.windows" /></condition>
+		<condition property="run.bindir" value="${dirs.root}/build/windows/amd64"><isset property="host.windows" /></condition>
+		<condition property="run.label" value="Windows (x64)"><isset property="host.windows" /></condition>
+
+		<!-- Launch command: the Windows binary is grafida.exe, everything else the bare ./grafida. -->
+		<condition property="run.binname" value="grafida.exe"><isset property="host.windows" /></condition>
+		<property name="run.binname" value="grafida" />
+		<condition property="run.exec" value="${run.bindir}/grafida.exe"><isset property="host.windows" /></condition>
+		<property name="run.exec" value="${run.bindir}/grafida" />
+	</target>
+
+	<!--
+	====================================================================================================
+	Tasks - Per-platform packages
+
+	Each package-* target first builds its platform's binary (depends on the matching git-* target),
+	then wraps it into the distributable in build/dist/ via the scripts/make-*.sh helpers (the same
+	ones scripts/build-all.sh uses). The version comes from App::VERSION unless GRAFIDA_VERSION is set.
+	macOS .app/.dmg packaging needs a macOS host (hdiutil); the Windows installer needs `makensis` on
+	the PATH (else it falls back to a portable .zip).
+	====================================================================================================
+	-->
+
+	<target name="package"
+			description="Build and package the application for all platforms (installers, DMG, tarballs, PHAR)"
+			depends="package-macos-arm,package-macos-x86,package-win-x86,package-linux-x86,package-linux-arm,package-phar">
+		<echo>Packaged all Grafida platforms into build/dist/.</echo>
+	</target>
+
+	<target name="package-macos-arm" depends="git-macos-arm" description="Package the macOS (Apple Silicon) .app + .dmg">
+		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="scripts/make-macos-app.sh" />
+			<arg value="arm64" />
+		</exec>
+		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="scripts/make-dmg.sh" />
+			<arg value="arm64" />
+		</exec>
+	</target>
+
+	<target name="package-macos-x86" depends="git-macos-x86" description="Package the macOS (Intel) .app + .dmg">
+		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="scripts/make-macos-app.sh" />
+			<arg value="amd64" />
+		</exec>
+		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="scripts/make-dmg.sh" />
+			<arg value="amd64" />
+		</exec>
+	</target>
+
+	<target name="package-win-x86" depends="git-win-x86" description="Package the Windows (x64) installer (or portable .zip)">
+		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="scripts/make-windows-installer.sh" />
+		</exec>
+	</target>
+
+	<target name="package-linux-x86" depends="git-linux-x86" description="Package the Linux (x64) .tar.gz">
+		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="scripts/make-linux-tarball.sh" />
+			<arg value="amd64" />
+		</exec>
+	</target>
+
+	<target name="package-linux-arm" depends="git-linux-arm" description="Package the Linux (ARM64) .tar.gz">
+		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="scripts/make-linux-tarball.sh" />
+			<arg value="arm64" />
+		</exec>
+	</target>
+
+	<target name="package-phar" depends="git-phar" description="Package the cross-platform PHAR">
+		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="scripts/make-phar-dist.sh" />
+		</exec>
+	</target>
+</project>

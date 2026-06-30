@@ -314,22 +314,58 @@ runs `composer run-script vendor:assets` before compiling to populate `assets/pr
 
 `composer build` → `scripts/build-all.sh` is the **one-shot** compile-and-package pipeline; it
 runs `boson compile` (every target in `boson.json`) then packages each platform into
-**`build/dist/`** (gitignored). The version comes from `App::VERSION` (override via
-`GRAFIDA_VERSION`). Per-platform packaging is tolerant (missing binary → warn+skip), but a
-failing compile or a genuine packaging-tool error is fatal. Pieces:
+**`build/dist/`** (gitignored) by delegating to the per-platform `scripts/make-*.sh` helpers (the
+same ones the Phing `package-*` targets call — single source of truth). The version comes from
+`App::VERSION` (override via `GRAFIDA_VERSION`). Per-platform packaging is tolerant (missing binary →
+warn+skip), but a failing compile or a genuine packaging-tool error is fatal. Pieces:
 - macOS (arm64+amd64, macOS host only): `scripts/make-macos-app.sh <arch>` assembles
   `build/macos/<bosondir>/Grafida.app` (the bare binary + dylib + `assets/`, Info.plist,
   ad-hoc dylib signature) — Boson names the arm64 dir `aarch64`, amd64 stays `amd64` — then
   `scripts/make-dmg.sh <arch>` wraps it (via `hdiutil`) into `Grafida-<v>-macos-<arch>.dmg`
   with an `/Applications` symlink.
-- Linux (amd64+arm64): a `.tar.gz` of the per-arch output dir (binary + `libboson-linux-*.so`
-  + `assets/`) plus the icon, `grafida.desktop`, and `build/linux-install.sh` (renamed
-  `install.sh`) — a per-user XDG desktop-integration installer.
-- Windows (amd64): `build/windows-installer.nsi` compiled by **NSIS** `makensis`, which runs
-  natively on macOS/Linux (no Wine/Docker/Windows) → `Grafida-<v>-windows-amd64-Setup.exe`
-  (per-user install in `%LOCALAPPDATA%\Programs\Grafida`). Falls back to a portable `.zip` if
-  `makensis` is absent.
-- PHAR: the compiler's `build/phar/grafida.phar`, copied to `Grafida-<v>.phar`.
+- Linux (amd64+arm64): `scripts/make-linux-tarball.sh <arch>` builds a `.tar.gz` of the per-arch
+  output dir (binary + `libboson-linux-*.so` + `assets/`) plus the icon, `grafida.desktop`, and
+  `build/linux-install.sh` (renamed `install.sh`) — a per-user XDG desktop-integration installer.
+- Windows (amd64): `scripts/make-windows-installer.sh` compiles `build/windows-installer.nsi` with
+  **NSIS** `makensis`, which runs natively on macOS/Linux (no Wine/Docker/Windows) →
+  `Grafida-<v>-windows-amd64-Setup.exe` (per-user install in `%LOCALAPPDATA%\Programs\Grafida`).
+  Falls back to a portable `.zip` if `makensis` is absent.
+- PHAR: `scripts/make-phar-dist.sh` copies the compiler's `build/phar/grafida.phar` to `Grafida-<v>.phar`.
+
+**Binaries-only build (no packaging):** `build.xml` (root) is a **Phing** buildfile whose default
+target `git` (also `composer build:git`) compiles the native binary for **every** platform but stops
+short of the installers/DMG — `git` depends on six per-platform targets (`git-macos-arm`,
+`git-macos-x86`, `git-win-x86`, `git-linux-x86`, `git-linux-arm`, `git-phar`). **Phing is expected as a
+globally-installed command** (`phing` on the PATH — like the other Akeeba projects; it is deliberately
+*not* a Composer dev dependency), so `composer build:git` just shells out to `phing git`. Because
+`boson compile` builds *all* `boson.json` targets in one pass with no per-OS CLI flag, each target
+shells out to `build/tasks/compile-target.php`, which filters the master `boson.json` down to the one
+requested `--type`/`--arch` at runtime (pinning an explicit `root` so the throwaway single-target config
+can live in `build/.temp/`), drops the stale box/entrypoint cache, then runs `boson compile
+--config=<temp>`. All six depend on a guarded `prepare` (sub-targets `prepare-composer` +
+`prepare-icons` + `prepare-assets`) that, only when their output is missing, runs `composer install`
+(so a fresh `git clone … && phing` bootstraps itself — and since Composer's post-install-cmd runs
+`vendor:assets`, that also vendors the front-end libraries), re-rasterises the icons, and vendors the
+front-end libraries (force a re-vendor with `-Drefresh.assets=1`); Phing runs `prepare` once per
+invocation.
+
+**Packaged build via Phing:** the `package` target (also `composer build:package`) builds *and*
+packages every platform into `build/dist/` — it depends on six per-platform `package-*` targets
+(`package-macos-arm/-x86`, `package-win-x86`, `package-linux-x86/-arm`, `package-phar`), and each
+`package-X` depends on its matching `git-X` (so it compiles the binary first) then shells out to the
+relevant `scripts/make-*.sh` helper. This is the Phing equivalent of `scripts/build-all.sh`
+(`composer build`); both produce the same artifacts through the same per-platform scripts, so use
+whichever entry point you prefer (`build-all.sh` adds a tolerant warn-and-continue summary across all
+platforms, the Phing targets let you build/package a single platform on demand).
+
+**Run on this host:** the `run` target (also `composer start`) compiles the binary for the *current*
+host and launches it. Since Phing `depends` is static, `run` resolves the host's OS+arch at runtime
+(`<os family>` + `uname -m`) into `run.*` properties, dispatches the matching `git-*` compile with
+`<phingcall>`, then executes the bare self-contained binary directly from its output dir (e.g.
+`build/macos/aarch64/grafida`; `grafida.exe` on Windows) — *not* the `.app`/installer, which belong to
+the `package-*` targets. macOS arm64→`git-macos-arm`, macOS x86_64→`git-macos-x86`,
+Linux aarch64→`git-linux-arm`, Linux x86_64→`git-linux-x86`, Windows→`git-win-x86`; an unrecognised
+host fails with a clear message.
 
 ## Key Joomla API facts (verified against Joomla 5.4 source)
 

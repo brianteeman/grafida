@@ -127,27 +127,12 @@ for ARCH in amd64 arm64; do
 
     if [[ -f "$LINUX_BIN" ]]; then
         heading "Packaging Linux ($ARCH): .tar.gz"
-        STAGE_ROOT="build/.stage-linux-$BOSON_DIR"
-        STAGE="$STAGE_ROOT/grafida"
-        rm -rf "$STAGE_ROOT"; mkdir -p "$STAGE"
-        cp -R "build/linux/$BOSON_DIR/." "$STAGE/"
-
-        # Desktop integration: ship the icon, the .desktop launcher and the
-        # per-user installer (see build/linux-install.sh).
-        cp "$ICON_DIR/grafida.png"       "$STAGE/grafida.png"
-        cp "$ICON_DIR/grafida.desktop"   "$STAGE/grafida.desktop"
-        cp "build/linux-install.sh"      "$STAGE/install.sh"
-        chmod +x "$STAGE/install.sh" "$STAGE/grafida"
-
-        TGZ="$DIST/Grafida-${VERSION}-linux-${ARCH}.tar.gz"
-        rm -f "$TGZ"
-        if tar -czf "$TGZ" -C "$STAGE_ROOT" grafida; then
-            PRODUCED+=("$TGZ")
+        if GRAFIDA_VERSION="$VERSION" bash scripts/make-linux-tarball.sh "$ARCH"; then
+            PRODUCED+=("$DIST/Grafida-${VERSION}-linux-${ARCH}.tar.gz")
         else
             warn "Linux $ARCH tarball failed"
             FAIL=1
         fi
-        rm -rf "$STAGE_ROOT"
     else
         warn "Linux $ARCH binary missing ($LINUX_BIN) — skipped"
     fi
@@ -158,47 +143,20 @@ done
 # ---------------------------------------------------------------------------
 WIN_BIN="build/windows/amd64/grafida.exe"
 if [[ -f "$WIN_BIN" ]]; then
-    # makensis runs natively on macOS/Linux, so the installer cross-compiles
-    # from this host (no Wine/Docker/Windows). Fallback: a portable .zip.
-    MAKENSIS="$(command -v makensis 2>/dev/null || true)"
-
-    if [[ -n "$MAKENSIS" ]]; then
-        heading "Packaging Windows (amd64): NSIS installer (native makensis)"
+    heading "Packaging Windows (amd64): NSIS installer (or portable .zip fallback)"
+    if GRAFIDA_VERSION="$VERSION" bash scripts/make-windows-installer.sh; then
+        # The script emits a Setup.exe when makensis is present, else a portable .zip.
         SETUP="$DIST/Grafida-${VERSION}-windows-amd64-Setup.exe"
-        # makensis chdir's to the script dir, so pass ABSOLUTE source/output paths.
-        if "$MAKENSIS" -V2 \
-            "-DSRCDIR=$ROOT/build/windows/amd64" \
-            "-DOUTFILE=$ROOT/$SETUP" \
-            "-DLICENSEFILE=$ROOT/LICENSE.txt" \
-            "-DICONFILE=$ROOT/$ICON_DIR/Grafida.ico" \
-            "-DAPPVERSION=$VERSION" \
-            build/windows-installer.nsi; then
+        ZIP_OUT="$DIST/Grafida-${VERSION}-windows-amd64.zip"
+        if [[ -f "$SETUP" ]]; then
             PRODUCED+=("$SETUP")
-        else
-            warn "NSIS (makensis) build failed"
-            FAIL=1
+        elif [[ -f "$ZIP_OUT" ]]; then
+            PRODUCED+=("$ZIP_OUT")
+            warn "No NSIS compiler found — produced a portable .zip. Install NSIS ('brew install makensis') for a native Windows installer."
         fi
     else
-        heading "Packaging Windows (amd64): portable .zip (no makensis found)"
-        warn "No installer compiler found — produced a portable .zip. Install NSIS ('brew install makensis') for a native Windows installer."
-        STAGE_ROOT="build/.stage-win"
-        STAGE="$STAGE_ROOT/Grafida"
-        rm -rf "$STAGE_ROOT"; mkdir -p "$STAGE"
-        cp -R "build/windows/amd64/." "$STAGE/"
-        cp "$ICON_DIR/Grafida.ico" "$STAGE/Grafida.ico"
-        ZIP_OUT="$DIST/Grafida-${VERSION}-windows-amd64.zip"
-        rm -f "$ZIP_OUT"
-        if command -v zip >/dev/null 2>&1; then
-            if ( cd "$STAGE_ROOT" && zip -qr "$ROOT/$ZIP_OUT" "Grafida" ); then
-                PRODUCED+=("$ZIP_OUT")
-            else
-                warn "Windows .zip packaging failed"
-                FAIL=1
-            fi
-        else
-            warn "'zip' not available — skipped Windows .zip"
-        fi
-        rm -rf "$STAGE_ROOT"
+        warn "Windows packaging failed"
+        FAIL=1
     fi
 else
     warn "Windows binary missing ($WIN_BIN) — skipped"
@@ -208,9 +166,13 @@ fi
 # 5. PHAR (cross-platform; emitted by the compiler)
 # ---------------------------------------------------------------------------
 if [[ -f "build/phar/grafida.phar" ]]; then
-    PHAR_OUT="$DIST/Grafida-${VERSION}.phar"
-    cp "build/phar/grafida.phar" "$PHAR_OUT"
-    PRODUCED+=("$PHAR_OUT")
+    heading "Packaging PHAR"
+    if GRAFIDA_VERSION="$VERSION" bash scripts/make-phar-dist.sh; then
+        PRODUCED+=("$DIST/Grafida-${VERSION}.phar")
+    else
+        warn "PHAR packaging failed"
+        FAIL=1
+    fi
 else
     warn "PHAR missing (build/phar/grafida.phar) — skipped"
 fi
