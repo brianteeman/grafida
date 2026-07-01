@@ -2,31 +2,27 @@
 
 **Edit Joomla! content on your desktop.**
 
-Grafida is a cross-platform desktop application for creating and editing
-[Joomla!](https://www.joomla.org) articles through the Joomla Web Services (REST) API.
-Connect to one or more Joomla 5.4+ sites, write articles in a rich editor, work offline,
-and publish when you are ready.
+Grafida is a cross-platform desktop application for creating and editing [Joomla!](https://www.joomla.org) articles. 
 
-It is built with [Boson](https://bosonphp.com) (PHP on the desktop) and runs natively on
-**macOS, Windows, and Linux**.
+> [!IMPORTANT]
+> Grafida is focused on content _authoring_, not content management. It only provides an essential subset of features compared to the full Joomla! article editor page.
 
-## Features
+Grafida uses the Joomla Web Services (REST) API. It's built with [Boson](https://bosonphp.com) (PHP on the desktop) and runs natively on **macOS, Windows, and Linux**. It _does not_ use Electron; Boson uses the resource-efficient WebView provided by your Operating System.
 
-- **Multiple sites** — connect to several Joomla sites; API tokens are stored in your OS
-  secret store (macOS Keychain, Windows DPAPI, Linux libsecret), never in plaintext unless
-  you explicitly opt in.
-- **Rich editing** — TinyMCE 7 with a custom *Read more* button that inserts the Joomla
-  introtext/fulltext separator, styled with your site template's `editor.css`.
-- **Categories, tags, and access levels** — picked from live, cached site data; new tags are
-  created automatically on publish.
-- **Custom fields** — edit the supported core field types; the app warns you when a required
-  field uses a type only Joomla's backend can edit (and offers the article HTML to copy).
-- **Media** — pick and upload to the Joomla Media Manager; images added offline are stored
-  locally and uploaded automatically on publish.
-- **Markdown import** — convert a Markdown file to HTML in one click.
-- **Offline drafts** — everything is saved locally in SQLite; publishing is a deliberate action.
-- **Translated** — English (en-GB) plus Greek, French, German, Spanish, Italian, and Portuguese,
-  with automatic OS-language detection and a manual override.
+## Key Features
+
+- **Multiple sites**. Connect to several Joomla sites. You can even publish the same content on multiple sites without leaving the editor screen.
+- **Rich editing**. Uses the same TinyMCE editor as Joomla, it has full support for Joomla's “Read More”, and it's styled with your site template's `editor.css`.
+- **AI assistance on your terms**. Connect to an inference provider, or a local inference app (e.g. LM Studio) to get AI-powered assistance writing and editing your content. Keeps track of the discussions. Completely optional – you won't even see it if you don't configure it. 
+- **Categories, tags, and access levels**. Picked from live, cached site data; new tags are created automatically on publish.
+- **Joomla Fields (partial support)**. Edit the supported core field types (`calendar`, `checkboxes`, `color`, `integer`, `list`, `radio`, `text`, `textarea`, `url`). The app warns you when a required field uses a type only Joomla's backend can edit (and offers the article HTML to copy).
+- **Media**. Pick and upload to the Joomla Media Manager; images added offline are stored locally and uploaded automatically on publish.
+- **Markdown import**. Import a Markdown file to HTML in one click.
+- **Offline drafts**. Everything is saved locally in SQLite; publishing is a deliberate action.
+- **Speaks your language**. English (en-GB; canonical language) plus machine-translated into Greek, French, German, Spanish, Italian, and Portuguese. Automatic Operating System language detection and a manual override. Uses standard Joomla INI language files for easier translation.
+- **Dark Mode**. Never again will you burn your retinas writing a blog post at night. Detect the Operating System's setting, lets you override it.
+- **Plays nice with your OS**. Application storage and configuration is stored in the OS-prescribed locations. The app tells you exactly where that is.
+- **Security first**. API tokens are stored in your OS secret store (macOS Keychain, Windows DPAPI, Linux libsecret), never in plaintext unless you explicitly opt in.
 
 ## Requirements
 
@@ -45,6 +41,44 @@ It is built with [Boson](https://bosonphp.com) (PHP on the desktop) and runs nat
    where the introtext should end.
 5. Click **Publish** to send the article to your site, or just keep editing — drafts are saved
    locally and automatically.
+
+## Philosophy
+
+### Raison d'être
+
+Joomla! is an excellent Content _Management_ System. However, its plethora of content management features has made content authoring in the Joomla article edit page fairly painful. This is not a complaint; power comes with complexity, and we – the Joomla community – chose power over simplicity.
+
+Inexperienced users find the tiny content area surrounded by a swarm of inscrutable options utterly bewildering. Experienced users find the tiny content area unusable, having to use external tools for authoring, resulting in excessive copying and pasting. Nobody's happy – which is why we see the overuse (and abuse) of page builders on sites that can't have possibly benefited from using one. They put content first.
+
+You know what else puts content first? Desktop content authoring applications made for WordPress. Remember Windows Live Writer? MarsEdit? What if we could bring that to Joomla? After all, modern Joomla has a rich API which should allow make that possible. 
+
+### Focused content authoring
+
+The driving force behind Grafida is making _content authoring_ simple, but powerful. A title. A big content area. Sit down and work on your words. You need some AI assistance to elucidate your point? Configure it once, and it's right there when you need it. It's like a word processor, but it “speaks” the native data type of your CMS. When you're done, you hit Publish. Spotted a problem? Fix it, hit Publish again. No fuss, no mess, no copy-pasting shenanigans, no stress.
+
+You need to _manage_ your content? Log into your site with your browser. Manage your content with the plethora of options Joomla and its extensions give you. Tell Joomla how to show the article page. Who can edit it. Add OpenGraph images. Work your SEO magic. You don't really need to touch the content for most, if not all, of that anyway.
+
+Content authoring and content management are not mutually exclusive. _They work together_. Any changes you made in Joomla can be brought back to Grafida for further editing and published back into Joomla without messing up your content management options.
+
+The goal is to use Grafida for distraction-free content authoring, and Joomla itself for content management.
+
+## Out-of-scope features
+
+Grafida is not your Joomla article editor page wrapped in a web view. It is a standalone desktop application, designed to work off-line. Between this fundamental design choice and Joomla's architecture, there are several features and interactions with core and third party extensions which are explicitly out-of-scope of this project.
+
+Indicatively:
+
+* **Editor buttons** (typically provided by `editors-xtd` plugins). Not exposed through the API. Rendered server-side by Joomla. Many interact with Joomla extensions in the front- or backend. Cannot implement outside Joomla.
+* **Live preview on your site**. Cannot implement outside Joomla. If you're wondering why, look at its core code. It's a clever hack, but it cannot be replicated externally 😊
+* **Joomla Fields**. Only a small subset of core field types (calendar, checkboxes, color, integer, list, radio, text, textarea, url) are supported. Other core field types require server-side rendering. Field types provided by third party plugins are explicitly unsupported as we have no way of knowing how they are supposed to be rendered. You need to edit those fields in the backend of your site.
+* **Content plugins**. “Plugin codes” such as `{loadmodule 123}` will be rendered as plain text in the preview. Cannot be addressed. These are rendered server-side by Joomla itself using the `onContentPrepare` plugin event which cannot be accessed over the API. 
+* **Plugins rendering additional editor fields or tabs**. Some system, content, etc plugins implement additional fields or editors tab. For example, what we do in SocialMagick and AITiny. This hinges on server-side plugin events which are not exposed by the API. Even if that wasn't the case, many fields rely on server-side rendering, or make assumptions about running in the Joomla's backend with a known CSS and JavaScript framework which is not the case for Grafida. 
+* **Article Permissions**. This data is not exposed by the API. 
+* **Workflows**. Beyond the fact this relies on server-side rendering, we consider this a management –not content authoring– feature, making it explicitly out-of-scope for this project.
+* **The full collection of the Joomla article edit page fields**. These fields are not exposed through the API. They depend on your Joomla version and access level, therefore we can't “fake it” by doing our own implementation either.
+* **Joomla Media Manager**. Grafida does not actually show you Joomla's Media Manager. It shows you its own, cut-down media manager using the media information it receives over the API. It is intentionally kept simple. This is a design choice which won't change; we are not interested in creating a full-blown media manager!
+* **Third party media managers**. Third party media managers are rendered server-side inside Joomla itself. We cannot even access them through the API. Even if we could, it would require creating an explicit implementation for each make and version of third party media manager, making this thoroughly impractical. 
+* **Third party content extensions** such as Page Builders, CCKs, etc. They replace Joomla's content management completely, and / or use undocumented data structures which are heavily dependent on the make and version of the third party extension you are using. You would need a separate implementation of each page builder / CCK inside Grafida which is both impractical and morally questionable (it would amount to “stealing” other people's software).
 
 ## Building from source
 
@@ -106,6 +140,9 @@ cannot read from inside the packed binary).
 For distribution, sign the macOS bundle with a Developer ID identity and notarise it (the
 script only applies an ad-hoc signature, which is enough to run locally); sign the Windows
 installer with `signtool`.
+
+> [!NOTE]
+> We are not currently signing published releases.
 
 ### Application icons
 
