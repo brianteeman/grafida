@@ -2431,6 +2431,13 @@ async function initTinyMCE(draft) {
             editor.addShortcut('ctrl+shift+q', 'Blockquote block', () => {
                 editor.execCommand('mceToggleFormat', false, 'blockquote');
             });
+            // meta+s is TinyMCE's own alias for ctrl+s on Windows/Linux and
+            // cmd+s on macOS. The editor's iframe has its own document, so the
+            // document-level Ctrl/Cmd+S listener in app.js never fires while
+            // it has focus — this is the editor-focused half of that shortcut.
+            editor.addShortcut('meta+s', 'Save draft', () => {
+                saveDraft();
+            });
 
             editor.on('init', () => {
                 editor.setContent(draft.html || '');
@@ -5099,6 +5106,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const btnSaveDraft = document.getElementById('btn-save-draft');
     if (btnSaveDraft) btnSaveDraft.addEventListener('click', saveDraft);
+
+    // Ctrl/Cmd+S saves the open draft from anywhere in the editor screen
+    // (metadata sidebar, AI panel, etc.) — not only while TinyMCE has focus,
+    // which is handled separately by an editor.addShortcut('meta+s', …) since
+    // TinyMCE's iframe has its own document and never sees this listener.
+    document.addEventListener('keydown', (e) => {
+        if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 's') return;
+        if (State.activeScreen !== 'editor' || !State.currentDraft) return;
+        e.preventDefault();
+        saveDraft();
+    });
 
     const btnPublish = document.getElementById('btn-publish');
     if (btnPublish) btnPublish.addEventListener('click', publishDraft);
