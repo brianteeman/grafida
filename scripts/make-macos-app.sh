@@ -77,15 +77,78 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-# The Boson SFX executable ships with its own valid ad-hoc signature
-# (identifier "micro.sfx"), which is what lets it run on Apple Silicon — do NOT
-# re-sign it. We only (best-effort) sign the bundled dylib. A bundle-level
-# signature around a pre-signed SFX is unreliable with an ad-hoc identity, so we
-# skip it: the app runs locally as-is. For DISTRIBUTION, sign the whole bundle
-# with a real Developer ID identity and notarise:
-#   codesign --force --options runtime --sign "Developer ID Application: …" "$APP"
-#   xcrun notarytool submit … && xcrun stapler staple "$APP"
-if command -v codesign >/dev/null 2>&1; then
+# Code signing.
+#
+# For DISTRIBUTION set MACOS_SIGN_IDENTITY to a "Developer ID Application: …"
+# identity (see build/readme/01-macos-signing.md). We then sign inside-out — the
+# bundled dylib(s), then the main executable, then the whole bundle — each with
+# the hardened runtime (--options runtime) and the entitlements the Boson SFX +
+# bundled PHP runtime need (build/macos/entitlements.plist). This REPLACES the
+# binary's original ad-hoc "micro.sfx" signature, which cannot be notarised.
+#
+# For LOCAL dev (MACOS_SIGN_IDENTITY unset) we keep the previous behaviour: the
+# pre-signed SFX is left alone and we only ad-hoc sign the bundled dylib. A
+# bundle-level ad-hoc signature around a pre-signed SFX is unreliable, so we skip
+# it — the app runs locally as-is (but such a build cannot be notarised).
+SIGN_IDENTITY="${MACOS_SIGN_IDENTITY:-}"
+ENTITLEMENTS="${MACOS_ENTITLEMENTS:-$ROOT/build/macos/entitlements.plist}"
+
+if [ -n "$SIGN_IDENTITY" ]; then
+  if ! command -v codesign >/dev/null 2>&1; then
+    echo "MACOS_SIGN_IDENTITY is set but 'codesign' was not found — install Xcode or the Command Line Tools." >&2
+    exit 1
+  fi
+  if [ ! -f "$ENTITLEMENTS" ]; then
+    echo "Entitlements file not found at $ENTITLEMENTS." >&2
+    exit 1
+  fi
+  echo "Signing with Developer ID identity: $SIGN_IDENTITY"
+
+  # 1) inner dylibs first (normal Mach-O files — these sign cleanly)
+  for dylib in "$MACOS"/*.dylib; do
+    [ -f "$dylib" ] || continue
+    codesign --force --timestamp --options runtime --sign "$SIGN_IDENTITY" "$dylib"
+  done
+
+  # 2) the main executable.
+  #
+  # KNOWN LIMITATION — see build/readme/01-macos-signing.md ("Signing impossible under current Boson architecture"). Boson's
+  # compiled binary is a phpmicro self-executable: a Mach-O followed by the PHP
+  # PHAR appended *after* the code signature (EOF). codesign requires its
+  # signature to be the last bytes of the file, so any trailing data makes it
+  # fail with "main executable failed strict validation". phpmicro locates that
+  # PHAR as the bytes from the Mach-O image-end to EOF, so the payload cannot be
+  # moved into a Mach-O segment without breaking startup. There is therefore no
+  # way (today) to Developer-ID sign / notarise the combined binary from here;
+  # it needs a fix in Boson/phpmicro. We detect the trailing payload and fail
+  # with a clear message instead of a cryptic codesign error.
+  MACHO_END="$(otool -l "$MACOS/grafida" 2>/dev/null | awk '
+    /LC_CODE_SIGNATURE/ {sig=1}
+    sig && /dataoff/ {off=$2}
+    sig && /datasize/ {print off+$2; exit}')"
+  FILE_SIZE="$(stat -f%z "$MACOS/grafida")"
+  if [ -n "$MACHO_END" ] && [ "$FILE_SIZE" -gt "$MACHO_END" ]; then
+    echo "" >&2
+    echo "ERROR: cannot Developer-ID sign $MACOS/grafida." >&2
+    echo "  The Boson binary has $((FILE_SIZE - MACHO_END)) bytes of PHP payload appended after its" >&2
+    echo "  Mach-O signature (EOF $FILE_SIZE > Mach-O end $MACHO_END). codesign rejects trailing" >&2
+    echo "  data, and the payload cannot be relocated without breaking phpmicro startup." >&2
+    echo "  This is a Boson/phpmicro limitation. See the 'Signing impossible under" >&2
+    echo "  current Boson architecture' section of build/readme/01-macos-signing.md." >&2
+    echo "  Leave MACOS_SIGN_IDENTITY unset to build an ad-hoc (local-only) app instead." >&2
+    exit 1
+  fi
+  codesign --force --timestamp --options runtime \
+    --entitlements "$ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$MACOS/grafida"
+
+  # 3) the whole bundle
+  codesign --force --timestamp --options runtime \
+    --entitlements "$ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$APP"
+
+  codesign --verify --deep --strict --verbose=2 "$APP"
+  echo "Signed and verified: $APP"
+elif command -v codesign >/dev/null 2>&1; then
+  # Local dev: best-effort ad-hoc signature on the bundled dylib only.
   for dylib in "$MACOS"/*.dylib; do
     [ -f "$dylib" ] && codesign --force --sign - "$dylib" >/dev/null 2>&1 || true
   done

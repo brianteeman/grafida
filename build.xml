@@ -26,6 +26,16 @@
 	<property file="${dirs.root}/build/build.properties" override="true" />
 
 	<!--
+	macOS code-signing / notarisation defaults. These do NOT override values set in build.properties
+	(above); they merely default to empty so the package-macos-* targets can forward them to the build
+	scripts without leaving an unexpanded ${...} literal when build.properties omits them. Set
+	macos.sign.identity + macos.notary.profile in build.properties to sign+notarise — see
+	build/readme/01-macos-signing.md.
+	-->
+	<property name="macos.sign.identity" value="" />
+	<property name="macos.notary.profile" value="" />
+
+	<!--
 	Custom Phing tasks live in build/tasks/ under the `tasks\` namespace; the classpath points at build/
 	so `tasks\Foo` resolves to build/tasks/Foo.php.
 	-->
@@ -305,10 +315,13 @@
 		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
 			<arg value="scripts/make-macos-app.sh" />
 			<arg value="arm64" />
+			<env key="MACOS_SIGN_IDENTITY" value="${macos.sign.identity}" />
 		</exec>
 		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
 			<arg value="scripts/make-dmg.sh" />
 			<arg value="arm64" />
+			<env key="MACOS_SIGN_IDENTITY" value="${macos.sign.identity}" />
+			<env key="MACOS_NOTARY_PROFILE" value="${macos.notary.profile}" />
 		</exec>
 	</target>
 
@@ -316,10 +329,13 @@
 		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
 			<arg value="scripts/make-macos-app.sh" />
 			<arg value="amd64" />
+			<env key="MACOS_SIGN_IDENTITY" value="${macos.sign.identity}" />
 		</exec>
 		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
 			<arg value="scripts/make-dmg.sh" />
 			<arg value="amd64" />
+			<env key="MACOS_SIGN_IDENTITY" value="${macos.sign.identity}" />
+			<env key="MACOS_NOTARY_PROFILE" value="${macos.notary.profile}" />
 		</exec>
 	</target>
 

@@ -8,6 +8,11 @@
 !glossaries/**
 !icon/
 !icon/**
+!readme/
+!readme/**
+# macOS signing entitlements (non-secret build input; committed)
+!macos/
+!macos/entitlements.plist
 # Packaging sources used by scripts/build-all.sh (committed; not build output)
 !linux-install.sh
 !windows-installer.nsi

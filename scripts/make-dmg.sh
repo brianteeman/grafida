@@ -62,4 +62,32 @@ hdiutil convert "$TEMP_DMG" -format UDZO -imagekey zlib-level=9 -o "$DMG"
 rm -f "$TEMP_DMG"
 rm -rf "$STAGING"
 
+# Sign + notarise the finished DMG for distribution.
+#
+# MACOS_SIGN_IDENTITY  — a "Developer ID Application: …" identity signs the DMG.
+# MACOS_NOTARY_PROFILE — a notarytool keychain profile (see
+#                        build/readme/01-macos-signing.md) additionally submits
+#                        the DMG to Apple and staples the ticket.
+# Both unset → the DMG is left unsigned (previous behaviour, fine for local dev).
+SIGN_IDENTITY="${MACOS_SIGN_IDENTITY:-}"
+NOTARY_PROFILE="${MACOS_NOTARY_PROFILE:-}"
+
+if [ -n "$SIGN_IDENTITY" ]; then
+  echo "Signing DMG with Developer ID identity: $SIGN_IDENTITY"
+  codesign --force --timestamp --sign "$SIGN_IDENTITY" "$DMG"
+fi
+
+if [ -n "$NOTARY_PROFILE" ]; then
+  if [ -z "$SIGN_IDENTITY" ]; then
+    echo "MACOS_NOTARY_PROFILE is set but MACOS_SIGN_IDENTITY is not — notarisation requires a signed DMG." >&2
+    exit 1
+  fi
+  echo "Submitting DMG for notarisation (profile: $NOTARY_PROFILE) — this can take a few minutes…"
+  xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
+  echo "Stapling notarisation ticket…"
+  xcrun stapler staple "$DMG"
+  xcrun stapler validate "$DMG"
+  echo "Notarised and stapled: $DMG"
+fi
+
 echo "Done: $DMG"

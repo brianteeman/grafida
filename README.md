@@ -42,6 +42,22 @@ Grafida uses the Joomla Web Services (REST) API. It's built with [Boson](https:/
 5. Click **Publish** to send the article to your site, or just keep editing — drafts are saved
    locally and automatically.
 
+### Releases are unsigned
+
+Grafida's downloads are **not code-signed** (this is currently impossible — a Boson limitation;
+see [Building from source](#building-from-source) for the technical reason). What this means
+when you first launch a downloaded build:
+
+- **macOS** — Gatekeeper will block the app on first run because it is neither signed with a
+  Developer ID nor notarised. To open it anyway: right-click (or Control-click) **Grafida.app**
+  in Finder and choose **Open**, then confirm **Open** in the dialog — you only need to do this
+  once. (If you moved the app and macOS reports it as “damaged”, clear the quarantine flag with
+  `xattr -dr com.apple.quarantine /Applications/Grafida.app`.) For the full technical background
+  see [`build/readme/01-macos-signing.md`](build/readme/01-macos-signing.md).
+- **Windows** — SmartScreen may show a “Windows protected your PC” warning for the unsigned
+  installer. Click **More info → Run anyway** to proceed.
+- **Linux** — no signing is involved; nothing extra is required.
+
 ## Philosophy
 
 ### Raison d'être
@@ -137,12 +153,22 @@ End users do not need PHP installed. The bundled language files and SQL migratio
 once, on first launch, into the application data directory (because `parse_ini_file()`/`glob()`
 cannot read from inside the packed binary).
 
-For distribution, sign the macOS bundle with a Developer ID identity and notarise it (the
-script only applies an ad-hoc signature, which is enough to run locally); sign the Windows
-installer with `signtool`.
+The macOS packaging script applies an ad-hoc signature, which is enough to run the app
+locally on the build machine.
 
 > [!NOTE]
-> We are not currently signing published releases.
+> **Published releases are unsigned, and code signing is currently *impossible* — this is a
+> Boson limitation, not a decision.** `boson compile` produces a phpmicro self-executable
+> whose PHP payload is appended *after* the binary's code-signature region. Apple's `codesign`
+> (and, we expect, Windows `signtool`) requires the signature to be the trailing content of the
+> file, so the appended payload makes signing fail; and the payload cannot be relocated without
+> breaking startup. We verified this in depth for macOS and, because Boson uses the same binary
+> format on every platform, did not even attempt Windows signing. Linux is unaffected (no
+> OS-enforced binary-signature gate). Full technical analysis:
+> [`build/readme/01-macos-signing.md`](build/readme/01-macos-signing.md) — the *Signing
+> impossible under current Boson architecture* section. The Developer ID signing/notarisation
+> pipeline is wired up and ready, so releases will be signed as soon as Boson can emit a
+> signable binary.
 
 ### Application icons
 
