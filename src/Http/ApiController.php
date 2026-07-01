@@ -45,6 +45,7 @@ use Grafida\Storage\SettingsRepository;
 use Grafida\Storage\StorageService;
 use Grafida\Support\App;
 use Grafida\Support\UrlOpener;
+use Grafida\Update\UpdateService;
 
 /**
  * Routes and handles the application's internal JSON API (the front-end calls
@@ -81,6 +82,7 @@ final class ApiController
         'GRAFIDA_MSG_UNSAVED_TITLE', 'GRAFIDA_MSG_UNSAVED_CHANGES',
         'GRAFIDA_MSG_DELETE_DRAFT_TITLE', 'GRAFIDA_MSG_DELETE_DRAFT_CONFIRM',
         'GRAFIDA_MSG_DRAFT_DELETED', 'GRAFIDA_MSG_DELETE_SITE_CONFIRM',
+        'GRAFIDA_MSG_UPDATE_AVAILABLE',
         'GRAFIDA_LBL_ABOUT', 'GRAFIDA_BTN_ABOUT', 'GRAFIDA_LBL_VERSION', 'GRAFIDA_LBL_LICENSE',
         'GRAFIDA_ABOUT_VIEW_LICENSE', 'GRAFIDA_BTN_CLOSE',
         'GRAFIDA_LBL_SITE', 'GRAFIDA_MSG_CHANGE_SITE_TITLE', 'GRAFIDA_MSG_CHANGE_SITE_CONFIRM',
@@ -185,6 +187,7 @@ final class ApiController
         private readonly SettingsRepository $settings,
         private readonly AiProxy $aiProxy,
         private readonly AiRenderer $aiRenderer,
+        private readonly UpdateService $updates,
         private readonly ?DialogApiInterface $dialog = null,
     ) {}
 
@@ -222,6 +225,7 @@ final class ApiController
             $method === 'POST' && $path === '/api/settings/language' => $this->setLanguage($body),
             $method === 'POST' && $path === '/api/settings/display-mode' => $this->setDisplayMode($body),
             $method === 'GET'  && $path === '/api/settings/system-theme' => $this->systemTheme(),
+            $method === 'GET'  && $path === '/api/update'            => $this->updateStatus(),
             $method === 'GET'  && $path === '/api/settings/storage'  => $this->storageInfo(),
             $method === 'POST' && $path === '/api/settings/storage/open'  => $this->openStorageFolder(),
             $method === 'POST' && $path === '/api/settings/storage/reset' => $this->resetStorage(),
@@ -1872,6 +1876,15 @@ final class ApiController
     private function systemTheme(): ResponseInterface
     {
         return Json::ok(['systemPrefersDark' => $this->displayMode->systemPrefersDark()]);
+    }
+
+    /**
+     * Reports whether a newer version is available (refreshing the 12-hour cache
+     * from the CDN if needed). Called asynchronously by the SPA at start-up.
+     */
+    private function updateStatus(): ResponseInterface
+    {
+        return Json::ok($this->updates->status());
     }
 
     private function storageInfo(): ResponseInterface

@@ -36,6 +36,8 @@ const State = {
     secureStore: true,
     supportedFieldTypes: [],
     app: {},
+    // The latest update-check result: {available, version, infoURL, download} or null.
+    update: null,
     sites: [],
     currentSiteId: null,
     // The draft currently open in the editor. Held in memory and only written to
@@ -329,6 +331,7 @@ const api = {
     setLanguage: (tag) => apiFetch('POST', '/api/settings/language', { tag }),
     setDisplayMode: (mode) => apiFetch('POST', '/api/settings/display-mode', { mode }),
     systemTheme: () => apiFetch('GET', '/api/settings/system-theme'),
+    checkUpdate: () => apiFetch('GET', '/api/update'),
     getStorageInfo: () => apiFetch('GET', '/api/settings/storage'),
     openStorageFolder: () => apiFetch('POST', '/api/settings/storage/open'),
     resetStorage: () => apiFetch('POST', '/api/settings/storage/reset'),
@@ -3931,6 +3934,8 @@ function applyStrings() {
     });
     renderSiteSelector();
     renderSettingsScreen();
+    renderSidebarFooter();
+    renderUpdateNotice();
 }
 
 // ============================================================
@@ -4710,6 +4715,53 @@ function renderSidebarFooter() {
     label.textContent = version ? t('GRAFIDA_LBL_VERSION') + ' ' + version : t('GRAFIDA_BTN_ABOUT');
 }
 
+/**
+ * Show or hide the "New version available" notice above the version label.
+ * The Download button opens the new version's GitHub release page in the
+ * user's browser so they can fetch and install the update themselves.
+ */
+function renderUpdateNotice() {
+    const box = document.getElementById('sidebar-update');
+    if (!box) return;
+
+    clearNode(box);
+
+    const update = State.update;
+    if (!update || !update.available) {
+        box.hidden = true;
+        return;
+    }
+
+    const msg = el('span', 'update-msg', t('GRAFIDA_MSG_UPDATE_AVAILABLE'));
+
+    const downloadBtn = iconBtn('download', t('GRAFIDA_BTN_DOWNLOAD'), 'btn', 'btn-sm', 'btn-success');
+    const url = update.infoURL || update.download;
+    downloadBtn.disabled = !url;
+    downloadBtn.addEventListener('click', async () => {
+        if (!url) return;
+        try {
+            await api.openUrl(url);
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    });
+
+    box.appendChild(msg);
+    box.appendChild(downloadBtn);
+    box.hidden = false;
+}
+
+/** Asynchronously check for a newer version and surface the notice if one exists. */
+async function checkForUpdate() {
+    try {
+        State.update = await api.checkUpdate();
+    } catch (err) {
+        // Best-effort: a failed check must never disrupt the app.
+        State.update = null;
+    }
+    renderUpdateNotice();
+}
+
 /** Open the licence text in the user's default web browser. */
 async function openLicenseUrl() {
     const url = State.app.licenseUrl;
@@ -4913,6 +4965,11 @@ async function bootstrap() {
     } else {
         showScreen('sites');
     }
+
+    // Fire-and-forget: the update check runs after the UI is rendered so a slow
+    // (or stale-cache-refreshing) request never blocks start-up. The 12-hour
+    // cache lives server-side, so calling this on every launch is cheap.
+    checkForUpdate();
 }
 
 // ============================================================

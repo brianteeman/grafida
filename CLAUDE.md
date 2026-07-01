@@ -171,6 +171,22 @@ dialog makes the endpoint return 503).
   also **writes the rewritten HTML back into the local draft** (so the stored draft mirrors what was
   published and a re-publish does not upload the images again); `data-path` is added to the editor's
   `extended_valid_elements` so it survives a TinyMCE round-trip.
+- `src/Update/UpdateService.php` — the **update checker**. On startup the SPA calls
+  `GET /api/update` (`api.checkUpdate()`) **fire-and-forget after the initial render**, so a slow
+  fetch never blocks start-up. `UpdateService::status()` refreshes a per-user cache of the
+  CDN-published update JSON (`https://cdn.akeeba.com/updates/grafida.json`, built by the
+  `UpdateJson` release task: `{version,date,infoURL,download,releaseNotes}`) **at most once every 12
+  hours** — the "last fetched" time is the cache file's mtime. The cache lives in the per-user
+  **config** dir (`Paths::updatesFile()`/`configDir()` — Linux `$XDG_CONFIG_HOME/grafida/updates.json`
+  (falls back `~/.config`), macOS `~/Library/Application Support/Grafida/updates.json`, Windows
+  `%APPDATA%\Grafida\updates.json`); note config ≠ data on Linux only. A failed fetch falls back to
+  any existing cache, or writes an empty `{}` (so the 12-hour back-off applies to failures too and it
+  does not refetch every launch). `status()` compares the cached `version` with `App::VERSION` via
+  `version_compare` and returns `{available, version, infoURL, download}`. When available, the SPA
+  (`renderUpdateNotice()`) shows a **bold green “New version available”** message
+  (`GRAFIDA_MSG_UPDATE_AVAILABLE`) above the sidebar-footer version label, with a **Download** button
+  (`GRAFIDA_BTN_DOWNLOAD`) that opens the release's `infoURL` (the GitHub release page) in the OS
+  browser via `api.openUrl()`. The Kernel wires it with a short-timeout `HttpClient(5)`.
 - `src/Display/DisplayModeService.php` — persists the interface display-mode preference
   (`auto`/`light`/`dark`) in `settings`; sent to the SPA as the `bootstrap` payload's
   `displayMode` key and written via `POST /api/settings/display-mode`. Because Boson's

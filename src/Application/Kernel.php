@@ -45,8 +45,11 @@ use Grafida\Http\HttpClient;
 use Grafida\Storage\Database;
 use Grafida\Storage\SettingsRepository;
 use Grafida\Storage\StorageService;
+use Grafida\Support\App;
+use Grafida\Support\Paths;
 use Grafida\Support\Resources;
 use Grafida\Support\UrlOpener;
+use Grafida\Update\UpdateService;
 use PDO;
 
 /**
@@ -99,6 +102,7 @@ final class Kernel
         $aiServices  = new AiServiceManager(new AiServiceRepository($pdo), $secureStore);
         $aiProxy     = new AiProxy($aiServices, $aiDefaults, new HttpClient(300));
         $markdown    = new MarkdownService();
+        $updates     = new UpdateService(new HttpClient(5), App::VERSION, Paths::updatesFile());
 
         $this->api = new ApiController(
             sites: $siteService,
@@ -122,6 +126,7 @@ final class Kernel
             aiChats: $aiChatRepo,
             settings: $settings,
             aiProxy: $aiProxy,
+            updates: $updates,
             dialog: $dialog,
         );
     }
