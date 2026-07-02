@@ -486,8 +486,20 @@
         insertBtn.addEventListener('click', () => {
             const editor = State.tinyMCEEditor;
             if (!editor) return;
-            editor.insertContent(content);
-            editor.focus();
+            // The reply is often Markdown (the Generate tool) or loose HTML.
+            // TinyMCE needs real HTML, so convert it through the same
+            // Markdown-vs-HTML render/sanitise pipeline that formats the bubbles
+            // (POST /api/ai/render). Fall back to the raw text if that fails.
+            api.aiRender(content)
+                .then((res) => {
+                    const html = res && typeof res.html === 'string' ? res.html : null;
+                    editor.insertContent(html !== null ? html : content);
+                    editor.focus();
+                })
+                .catch(() => {
+                    editor.insertContent(content);
+                    editor.focus();
+                });
         });
 
         const copyBtn = iconBtn('copy', t('GRAFIDA_BTN_COPY'), 'btn', 'btn-sm', 'btn-secondary');
@@ -553,7 +565,8 @@
      * shown first as an always-safe placeholder and kept if the request fails,
      * so the panel never blocks on the render call.
      *
-     * The raw `content` (not this rendered HTML) is still what Insert/Copy use.
+     * Copy uses the raw `content`; Insert re-renders it to HTML through the same
+     * pipeline before dropping it into TinyMCE (see `_addBubbleActions`).
      *
      * @param {HTMLElement} textEl
      * @param {string}      content

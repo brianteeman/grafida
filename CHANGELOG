@@ -8,5 +8,6 @@ Grafida 0.1
 + Offline media picker, inline image handling and a full online Media Manager screen
 + Publish articles back to the site (intro/full-text split, categories, tags, custom fields, images)
 + AI chat assistant and writing tools (multiple configurable providers; streaming replies)
++ Inserting an AI reply into the editor converts Markdown to HTML and preserves class/style formatting
 + Markdown import, light/dark/auto interface theme, and seven interface languages
 + Native desktop application for macOS, Windows and Linux built with Boson

@@ -59,6 +59,33 @@ final class AiRendererTest extends TestCase
         self::assertStringNotContainsString('javascript:', $html);
     }
 
+    public function testKeepsClassAttribute(): void
+    {
+        // editor.css classes (Joomla's Styles drop-down) must survive so Insert
+        // preserves the styling the reply asked for.
+        $html = $this->renderer()->render('<p class="lead text-center">Intro</p>');
+
+        self::assertStringContainsString('class="lead text-center"', $html);
+    }
+
+    public function testKeepsStyleAttribute(): void
+    {
+        $html = $this->renderer()->render('<p style="text-align: center; color: #036">Centered</p>');
+
+        self::assertStringContainsString('text-align', $html);
+        self::assertStringContainsString('color', $html);
+    }
+
+    public function testKeepsClassAndStyleOnImages(): void
+    {
+        $html = $this->renderer()->render(
+            '<img src="images/a.jpg" class="img-fluid" style="float: right" alt="x">'
+        );
+
+        self::assertStringContainsString('class="img-fluid"', $html);
+        self::assertStringContainsString('float', $html);
+    }
+
     public function testConvertsMarkdownWhenInputIsNotHtml(): void
     {
         $html = $this->renderer()->render("# Heading\n\nSome **bold** text.");

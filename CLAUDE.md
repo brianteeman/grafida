@@ -520,12 +520,18 @@ map is for when the update mechanism itself is built.
   (always-safe placeholder) then calls `POST /api/ai/render`, which `Ai\AiRenderer` turns into safe
   HTML — auto-detecting Markdown vs HTML, converting Markdown via the existing CommonMark
   `MarkdownService`, and sanitising the result with **Symfony's `HtmlSanitizer`** (the W3C safe-element
-  subset + relative links/medias). Only that returned HTML is set as `innerHTML`; if the call fails the
+  subset + relative links/medias, **plus the `class`/`style` attributes** — article markup relies on
+  editor.css classes and inline styling, and Insert drops this same sanitised HTML into the article, so
+  stripping them would mangle styled content; script/iframe/event-handlers and `javascript:` URLs stay
+  blocked). Only that returned HTML is set as `innerHTML`; if the call fails the
   plain-text placeholder stays. **Streaming replies format live** (chatbot-style), not only at the end:
   `_createStreamRenderer()` re-renders the accumulating reply through the same `/api/ai/render` pipeline,
   throttled to ~200 ms, with sequenced results so a slow/stale render can never roll the view backwards;
   `finish()` does the authoritative final render. Reflow jumps as blocks resolve are expected/acceptable.
-  Insert/Copy still use the **raw** model output, not the rendered HTML; only Insert routes it into TinyMCE. The same `provider`/`tool` config is managed from two
+  **Copy** uses the **raw** model output; **Insert** re-renders it through the same
+  `/api/ai/render` pipeline (Markdown→HTML + sanitise) before dropping it into TinyMCE — the reply is
+  frequently Markdown (the Generate tool) or loose HTML, and `editor.insertContent()` needs real HTML,
+  so inserting the raw text would leak literal Markdown (`**bold**`, `#` headings, …) into the article. The same `provider`/`tool` config is managed from two
   **Settings** cards (AI Services, AI Tools).
 
 ## Conventions
