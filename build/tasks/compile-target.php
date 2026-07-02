@@ -25,8 +25,12 @@ declare(strict_types=1);
  *   php build/tasks/compile-target.php --type=linux   --arch=amd64
  *   php build/tasks/compile-target.php --type=linux   --arch=arm64
  *   php build/tasks/compile-target.php --type=phar
+ *   php build/tasks/compile-target.php --all
  *
  * The `phar` target carries no architecture, so --arch is omitted for it.
+ * --all keeps every target (scripts/build-all.sh uses it) — it still goes
+ * through this script so the custom-SFX injection and output-dir pre-cleaning
+ * below apply to the all-targets build too.
  *
  * Boson resolves `directories`/`finder` paths relative to the config's `root`
  * (which otherwise defaults to the config file's own directory), while `output`
@@ -42,18 +46,19 @@ $root = \dirname(__DIR__, 2);
 // ---------------------------------------------------------------------------
 // Parse --type / --arch arguments
 // ---------------------------------------------------------------------------
-$options = \getopt('', ['type:', 'arch::', 'config::']);
+$options = \getopt('', ['type:', 'arch::', 'config::', 'all']);
+$all     = isset($options['all']);
 $type    = isset($options['type']) ? (string) $options['type'] : '';
 $arch    = isset($options['arch']) ? (string) $options['arch'] : '';
 $config  = isset($options['config']) ? (string) $options['config'] : ($root . '/boson.json');
 
-if ($type === '')
+if (!$all && $type === '')
 {
-    \fwrite(\STDERR, "ERROR: the --type argument is required (macos|windows|linux|phar).\n");
+    \fwrite(\STDERR, "ERROR: the --type argument is required (macos|windows|linux|phar), or pass --all.\n");
     exit(2);
 }
 
-if ($type !== 'phar' && $arch === '')
+if (!$all && $type !== 'phar' && $arch === '')
 {
     \fwrite(\STDERR, "ERROR: the --arch argument is required for the '{$type}' target.\n");
     exit(2);
@@ -76,7 +81,7 @@ if (!\is_array($json) || !isset($json['target']) || !\is_array($json['target']))
     exit(1);
 }
 
-$matches = \array_values(
+$matches = $all ? $json['target'] : \array_values(
     \array_filter(
         $json['target'],
         static function (array $target) use ($type, $arch): bool {
@@ -111,25 +116,31 @@ $json['target'] = $matches;
 // A stock Boson SFX appends the app PHAR after the executable's code-signature
 // region, which makes the binary unsignable (see build/readme/01-macos-signing.md).
 // Dropping a patched micro.sfx (built from the nikosdion/phpmicro `sibling-phar`
-// fork via static-php-cli) into build/sfx/<os>-<cpu>.standard.sfx makes the
-// compiled binary able to load its payload from a sibling "<binary>.phar" file
-// once make-macos-app.sh splits it, so the executable can be Developer-ID signed.
+// fork via static-php-cli — scripts/fetch-sfx.sh downloads the CI-built ones)
+// into build/sfx/<os>-<cpu>.standard.sfx makes the compiled binary able to load
+// its payload from a sibling "<binary>.phar" file once make-macos-app.sh splits
+// it, so the executable can be Developer-ID signed.
 // The key is only injected when the file exists: Boson errors out on a dangling
 // `sfx` path, and machines without a custom SFX must keep building normally.
-$sfxCpu = ['arm64' => 'aarch64', 'amd64' => 'x86_64'][$arch] ?? null;
+$sfxCpuMap = ['arm64' => 'aarch64', 'amd64' => 'x86_64'];
 
-if ($type !== 'phar' && $sfxCpu !== null)
+foreach ($json['target'] as $i => $target)
 {
-    $sfxRelative = "build/sfx/{$type}-{$sfxCpu}.standard.sfx";
+    $targetType = (string) ($target['type'] ?? '');
+    $sfxCpu     = $sfxCpuMap[$target['arch'] ?? ''] ?? null;
+
+    if ($targetType === 'phar' || $targetType === '' || $sfxCpu === null)
+    {
+        continue;
+    }
+
+    $sfxRelative = "build/sfx/{$targetType}-{$sfxCpu}.standard.sfx";
 
     if (\is_file($root . '/' . $sfxRelative))
     {
         \fwrite(\STDOUT, "==> Using custom SFX runtime: {$sfxRelative}\n");
 
-        foreach ($json['target'] as $i => $target)
-        {
-            $json['target'][$i]['sfx'] = $sfxRelative;
-        }
+        $json['target'][$i]['sfx'] = $sfxRelative;
     }
 }
 
@@ -148,7 +159,7 @@ if (!\is_dir($tempDir) && !\mkdir($tempDir, 0755, true) && !\is_dir($tempDir))
     exit(1);
 }
 
-$label    = $type === 'phar' ? 'phar' : "{$type}-{$arch}";
+$label    = $all ? 'all' : ($type === 'phar' ? 'phar' : "{$type}-{$arch}");
 $tempFile = $tempDir . '/boson.' . $label . '.json';
 
 \file_put_contents(
@@ -171,14 +182,21 @@ foreach (['box.json', 'entrypoint.php', 'grafida.phar'] as $stale)
 // ---------------------------------------------------------------------------
 // Compile just this target
 // ---------------------------------------------------------------------------
-// Pre-clean the target's output directory: Boson's own cleanup task chokes on
+// Pre-clean each target's output directory: Boson's own cleanup task chokes on
 // leftovers it did not create — notably the Grafida.app bundle (which contains
 // symlinks) assembled there by scripts/make-macos-app.sh after a previous
 // build — and then aborts the whole compile.
-if ($type !== 'phar')
+foreach ($json['target'] as $target)
 {
-    $archDir   = $arch === 'arm64' ? 'aarch64' : 'amd64';
-    $outputDir = $root . "/build/{$type}/{$archDir}";
+    $targetType = (string) ($target['type'] ?? '');
+
+    if ($targetType === 'phar' || $targetType === '')
+    {
+        continue;
+    }
+
+    $archDir   = ($target['arch'] ?? '') === 'arm64' ? 'aarch64' : 'amd64';
+    $outputDir = $root . "/build/{$targetType}/{$archDir}";
 
     if (\is_dir($outputDir))
     {

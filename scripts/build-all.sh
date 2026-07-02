@@ -70,19 +70,23 @@ if [[ ! -f "assets/private/js/tinymce/tinymce.min.js" ]] || [[ "${GRAFIDA_REFRES
     composer run-script vendor:assets || warn "front-end vendoring reported problems"
 fi
 
+# The patched sibling-payload micro.sfx runtimes make macOS builds Developer-ID
+# signable (see build/readme/01-macos-signing.md). Fetch the CI-built ones into
+# the gitignored build/sfx/ when missing — best effort: without them the build
+# falls back to the stock (unsignable) Boson runtime.
+heading "Fetching patched micro.sfx runtimes (scripts/fetch-sfx.sh)"
+bash scripts/fetch-sfx.sh || warn "could not fetch all patched SFX runtimes — affected targets use the stock runtime"
+
 # ---------------------------------------------------------------------------
 # 1. Compile all targets (fatal on failure)
 # ---------------------------------------------------------------------------
-# Drop the compiler's generated box config + entrypoint stub so they are always
-# rebuilt from the current boson.json. The compiler only regenerates them when
-# their mtime is older than boson.json's (CreateBoxConfigTask / CreateEntrypointTask);
-# that cache can go stale and silently pack the phar from an out-of-date inclusion
-# list (e.g. dropping src/Ai/resources), which then fails at runtime. The cached
-# *.sfx runtimes are left untouched so we do not re-download them every build.
-rm -f build/.temp/box.json build/.temp/entrypoint.php build/.temp/grafida.phar
-
-heading "Compiling binaries for all targets ($BOSON compile) — v$VERSION"
-if ! php "$BOSON" compile; then
+# compile-target.php --all wraps `boson compile` for every target: it drops the
+# compiler's stale box-config/entrypoint cache, injects the custom SFX runtimes
+# from build/sfx/ into a throwaway config, and pre-cleans the per-target output
+# dirs (Boson's own cleanup chokes on a leftover Grafida.app and would abort,
+# silently leaving a stale binary).
+heading "Compiling binaries for all targets (compile-target.php --all) — v$VERSION"
+if ! php build/tasks/compile-target.php --all; then
     echo "ERROR: 'boson compile' failed. Aborting." >&2
     exit 1
 fi

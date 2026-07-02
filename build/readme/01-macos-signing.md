@@ -232,10 +232,23 @@ but Grafida ships a working solution: a **patched phpmicro SFX runtime** that ca
 load its PHP payload from a *sibling file*, so the executable stays a clean,
 signable Mach-O. The one-time setup:
 
-1. **Build the patched `micro.sfx`** with static-php-cli from the
-   [`nikosdion/phpmicro`](https://github.com/nikosdion/phpmicro) fork, branch
-   **`sibling-phar`** (a small, additive patch on top of `static-php/phpmicro`,
-   the fork static-php-cli actually builds):
+1. **Get the patched `micro.sfx`.** The normal way is to download the CI-built
+   binaries — GitHub Actions on the
+   [`nikosdion/phpmicro`](https://github.com/nikosdion/phpmicro) fork
+   (workflow `build-sfx.yml`, branch **`sibling-phar`**) builds them for macOS
+   arm64 + x86_64 on every push and publishes them to the rolling
+   **`sfx-latest`** release:
+
+   ```bash
+   scripts/fetch-sfx.sh          # downloads into build/sfx/, verifies SHA-256
+   ```
+
+   This runs automatically (best-effort, skipped when the files exist) from the
+   Phing `prepare-sfx` step of the macOS compile targets and from
+   `scripts/build-all.sh`, so on a networked machine there is normally nothing
+   to do. To **build it yourself instead** — static-php-cli pointed at the fork
+   (a small, additive patch on top of `static-php/phpmicro`, the fork
+   static-php-cli actually builds):
 
    ```bash
    git clone https://github.com/crazywhalecc/static-php-cli && cd static-php-cli
@@ -253,12 +266,16 @@ signable Mach-O. The one-time setup:
    **`php-micro`** in current static-php-cli (an older `micro:` prefix is
    silently ignored — check `downloads/php-micro/` really contains the patch!).
 
-2. **Drop it into the project** (gitignored — each build machine provides its own):
+2. **Make sure it sits in `build/sfx/`** (gitignored — each build machine
+   provides its own). `fetch-sfx.sh` puts it there already; for a manual build:
 
    ```bash
    cp buildroot/bin/micro.sfx <grafida>/build/sfx/macos-aarch64.standard.sfx   # arm64
    # amd64 builds go to build/sfx/macos-x86_64.standard.sfx
    ```
+
+   (`fetch-sfx.sh` never overwrites an existing file, so a locally built SFX
+   wins until you pass `--force`.)
 
 3. **Build normally** (`phing package-macos-arm`, `composer build`, …). The
    pieces fit together automatically:

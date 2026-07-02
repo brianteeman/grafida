@@ -342,10 +342,17 @@ warn+skip), but a failing compile or a genuine packaging-tool error is fatal. Pi
   `micro.sfx` built with static-php-cli from the `nikosdion/phpmicro` fork's `sibling-phar`
   branch (which adds an additive fallback — no appended payload → load `"<self>.phar"`, then
   `"../Resources/<self>.phar"`, realpath-canonicalised so the offset stream hooks keep
-  matching) is dropped into the gitignored `build/sfx/<os>-<cpu>.standard.sfx`;
-  `build/tasks/compile-target.php` injects it as the Boson target's `sfx` when present (and
-  pre-cleans the output dir — Boson's cleanup chokes on the previous `Grafida.app`, silently
-  leaving a stale binary). `make-macos-app.sh` detects the patched runtime, splits the
+  matching) lives in the gitignored `build/sfx/<os>-<cpu>.standard.sfx`. **The fork's own
+  GitHub Actions (`build-sfx.yml`) builds the SFX for macOS arm64+x86_64 on every push to
+  `sibling-phar`** (via stock static-php-cli pointed at the repo with `-L`) and publishes it
+  to the rolling `sfx-latest` release; `scripts/fetch-sfx.sh` downloads + SHA-256-verifies
+  the assets into `build/sfx/` (never overwrites existing files; `--force` re-downloads) and
+  runs automatically from the Phing `prepare-sfx` step (macOS git targets) and
+  `build-all.sh` — best-effort, offline builds fall back to the stock runtime.
+  `build/tasks/compile-target.php` injects the SFX as the Boson target's `sfx` when present,
+  and pre-cleans the output dirs — Boson's cleanup chokes on the previous `Grafida.app`,
+  silently leaving a stale binary; `build-all.sh` compiles through `compile-target.php --all`
+  for the same reason. `make-macos-app.sh` detects the patched runtime, splits the
   compiled binary into a clean Mach-O stub (`Contents/MacOS/grafida`) + payload
   (`Contents/Resources/grafida.phar`; codesign refuses data files in `Contents/MacOS`, so
   `assets/` also live in Resources with a dylib symlink for the phar's mounts), and signs the

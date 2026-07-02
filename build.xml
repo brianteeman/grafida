@@ -139,6 +139,28 @@
 	</target>
 
 	<!--
+	The patched sibling-payload micro.sfx runtimes (built by GitHub Actions on the nikosdion/phpmicro
+	fork, rolling "sfx-latest" release) make macOS builds Developer-ID signable — see
+	build/readme/01-macos-signing.md. Download them into the gitignored build/sfx/ when missing.
+	Best-effort on purpose (failonerror=false): offline machines still build fine, they just fall
+	back to the stock (unsignable) Boson runtime. scripts/fetch-sfx.sh has a force flag to re-download.
+	-->
+	<condition property="sfx.present">
+		<and>
+			<available file="${dirs.root}/build/sfx/macos-aarch64.standard.sfx" type="file" />
+			<available file="${dirs.root}/build/sfx/macos-x86_64.standard.sfx" type="file" />
+		</and>
+	</condition>
+
+	<target name="prepare-sfx" unless="sfx.present"
+			description="Download the patched signable micro.sfx runtimes (only if missing)">
+		<echo>Fetching the patched micro.sfx runtimes into build/sfx/ (best effort)</echo>
+		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="false">
+			<arg value="scripts/fetch-sfx.sh" />
+		</exec>
+	</target>
+
+	<!--
 	====================================================================================================
 	Tasks - Per-platform binaries
 
@@ -148,7 +170,7 @@
 	====================================================================================================
 	-->
 
-	<target name="git-macos-arm" depends="prepare" description="Compile the macOS (Apple Silicon) binary">
+	<target name="git-macos-arm" depends="prepare,prepare-sfx" description="Compile the macOS (Apple Silicon) binary">
 		<exec executable="php" dir="${dirs.root}" passthru="true" checkreturn="true">
 			<arg value="${compile.target.script}" />
 			<arg value="--type=macos" />
@@ -156,7 +178,7 @@
 		</exec>
 	</target>
 
-	<target name="git-macos-x86" depends="prepare" description="Compile the macOS (Intel) binary">
+	<target name="git-macos-x86" depends="prepare,prepare-sfx" description="Compile the macOS (Intel) binary">
 		<exec executable="php" dir="${dirs.root}" passthru="true" checkreturn="true">
 			<arg value="${compile.target.script}" />
 			<arg value="--type=macos" />
