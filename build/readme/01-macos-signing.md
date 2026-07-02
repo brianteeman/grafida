@@ -225,15 +225,94 @@ that still works.
 
 ---
 
-## Signing impossible under current Boson architecture
+## Signing works — via the patched SFX runtime (read this!)
 
-**Everything above is correct and complete — but it cannot currently succeed.**
-Developer ID signing + notarisation of a Grafida release is **impossible today**,
-and the reason is the structure of the binary that `boson compile` produces, not
-anything about the Apple account, the certificates, or these scripts. Published
-releases are therefore **unsigned**. This section records *exactly why*, so nobody
-re-investigates it from scratch, and so we can re-test cleanly against future
-Boson releases.
+**Signing a stock Boson build is impossible** (the analysis below explains why),
+but Grafida ships a working solution: a **patched phpmicro SFX runtime** that can
+load its PHP payload from a *sibling file*, so the executable stays a clean,
+signable Mach-O. The one-time setup:
+
+1. **Build the patched `micro.sfx`** with static-php-cli from the
+   [`nikosdion/phpmicro`](https://github.com/nikosdion/phpmicro) fork, branch
+   **`sibling-phar`** (a small, additive patch on top of `static-php/phpmicro`,
+   the fork static-php-cli actually builds):
+
+   ```bash
+   git clone https://github.com/crazywhalecc/static-php-cli && cd static-php-cli
+   composer install
+   bin/spc doctor --auto-fix
+   EXTS="ctype,curl,dom,ffi,filter,iconv,libxml,mbstring,opcache,openssl,pdo,pdo_sqlite,phar,shmop,sockets,sodium,sqlite3,xml,zlib"
+   bin/spc download --with-php=8.4 --for-extensions="$EXTS" \
+     -G "php-micro:sibling-phar:https://github.com/nikosdion/phpmicro.git"
+   bin/spc build "$EXTS" --build-micro
+   ```
+
+   The extension list mirrors Boson's *standard* macOS SFX edition
+   (`vendor/boson-php/compiler/src/Target/MacOSBuiltinTarget.php`); the PHP
+   version should match Boson's runtime (8.4 today). Note the source is named
+   **`php-micro`** in current static-php-cli (an older `micro:` prefix is
+   silently ignored — check `downloads/php-micro/` really contains the patch!).
+
+2. **Drop it into the project** (gitignored — each build machine provides its own):
+
+   ```bash
+   cp buildroot/bin/micro.sfx <grafida>/build/sfx/macos-aarch64.standard.sfx   # arm64
+   # amd64 builds go to build/sfx/macos-x86_64.standard.sfx
+   ```
+
+3. **Build normally** (`phing package-macos-arm`, `composer build`, …). The
+   pieces fit together automatically:
+
+   * `build/tasks/compile-target.php` injects the custom `sfx` into the
+     throwaway Boson config whenever `build/sfx/<os>-<cpu>.standard.sfx`
+     exists, so `boson compile` links the app against the patched runtime.
+   * `scripts/make-macos-app.sh` detects the patched runtime in the compiled
+     binary, **splits** it — the clean Mach-O stub becomes
+     `Contents/MacOS/grafida`, the payload becomes
+     `Contents/Resources/grafida.phar` — lays the bundle out per Apple's rules
+     (only signed Mach-O code in `Contents/MacOS`; the phar and `assets/` in
+     `Contents/Resources`, plus a dylib symlink there for the phar's mounts),
+     and signs everything with the hardened runtime.
+   * At launch the patched stub finds no appended payload and falls back to
+     `"<self>.phar"` and then `"../Resources/<self>.phar"` — the payload —
+     which it reads exactly like an appended one (including Boson's extra-INI
+     block; the offset stream hooks all apply, keyed to the canonicalised
+     sibling path).
+
+   Without `build/sfx/` present, everything builds as before (stock SFX,
+   combined binary, ad-hoc signature) — but Developer-ID signing then aborts
+   with a clear error.
+
+Re-test the patch when bumping Boson (its runtime PHP version or SFX build may
+change) and rebuild the SFX from the fork after rebasing it onto upstream
+`static-php/phpmicro` as needed. A debugging aid is baked into the fork: run any
+binary with `MICRO_TRACE_OPEN=1` to log every plain-file open and whether the
+payload-offset hooks engaged.
+
+**Gotchas discovered the hard way** (all handled by the current scripts, listed
+so nobody trips over them again):
+
+* The sibling path must be **canonicalised** (`realpath`) inside phpmicro — the
+  offset hooks match the payload by exact path string, and a `..` component
+  (from the `../Resources` candidate) makes some phar reads miss the offset and
+  fail with bogus `zlib: data error` / "internal corruption" errors.
+* `codesign` refuses **any non-code file inside `Contents/MacOS`** ("code object
+  is not signed at all") — hence the Resources layout.
+* Boson's compile **cleanup task fails** on a leftover `Grafida.app` (it cannot
+  delete the symlink-containing bundle), which used to abort the compile and
+  leave a **stale binary** in place — `compile-target.php` now pre-cleans the
+  output directory. If signing/testing ever seems to disagree with the code you
+  just changed, verify the stub: `head -c $(stat -f%z build/sfx/<sfx>) <binary> | md5`
+  must equal `md5 build/sfx/<sfx>`.
+
+---
+
+## Why a stock Boson binary cannot be signed (historical analysis)
+
+Everything below documents why Developer ID signing of the **unpatched** Boson
+output fails — the reason the patched SFX above exists. It remains accurate for
+stock builds. This section records *exactly why*, so nobody re-investigates it
+from scratch, and so we can re-test cleanly against future Boson releases.
 
 ### What we proved works
 
@@ -324,17 +403,18 @@ OS-enforced binary-signature gate, so it is unaffected.)
 
 ### What the build does today
 
-* `MACOS_SIGN_IDENTITY` **unset** → ad-hoc signing (local dev). Works; not
-  distributable through Gatekeeper without the user overriding it.
-* `MACOS_SIGN_IDENTITY` **set** → `make-macos-app.sh` signs the dylib(s), then
-  **detects the trailing payload on the main binary and aborts with a clear
-  error pointing here**, instead of emitting a cryptic codesign failure. The
-  Developer ID wiring is otherwise complete, so the moment Boson can emit a
-  signable binary, setting the identity + notary profile will "just work".
+* Patched SFX present in `build/sfx/` (see the top of this document) →
+  `make-macos-app.sh` splits the binary into a clean stub + sibling phar and
+  signs the whole bundle: **ad-hoc** when `MACOS_SIGN_IDENTITY` is unset (local
+  dev), **Developer ID + hardened runtime** when set (distributable, and
+  notarised when `MACOS_NOTARY_PROFILE` is also set).
+* No patched SFX (stock Boson runtime) → the legacy combined binary with an
+  ad-hoc-signed dylib; setting `MACOS_SIGN_IDENTITY` **aborts with a clear
+  error** pointing here, because the combined binary cannot be signed.
 
 ### Re-testing against a future Boson
 
-Re-run `scripts/make-macos-app.sh arm64` with `MACOS_SIGN_IDENTITY` set. If it no
-longer reports trailing data (i.e. the payload is now inside the Mach-O image),
-signing + notarisation may have become possible — proceed through the steps above
-and verify with `spctl` / `stapler validate`.
+Should Boson ever emit a signable binary natively (payload inside the Mach-O
+image, or its own sibling-payload mode), the patched-SFX detour becomes
+unnecessary: re-run `scripts/make-macos-app.sh arm64` with `MACOS_SIGN_IDENTITY`
+set and no `build/sfx/` runtime; if the stock binary signs, retire the fork.

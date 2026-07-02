@@ -42,20 +42,19 @@ Grafida uses the Joomla Web Services (REST) API. It's built with [Boson](https:/
 5. Click **Publish** to send the article to your site, or just keep editing — drafts are saved
    locally and automatically.
 
-### Releases are unsigned
+### Code signing
 
-Grafida's downloads are **not code-signed** (this is currently impossible — a Boson limitation;
-see [Building from source](#building-from-source) for the technical reason). What this means
-when you first launch a downloaded build:
-
-- **macOS** — Gatekeeper will block the app on first run because it is neither signed with a
-  Developer ID nor notarised. To open it anyway: right-click (or Control-click) **Grafida.app**
-  in Finder and choose **Open**, then confirm **Open** in the dialog — you only need to do this
-  once. (If you moved the app and macOS reports it as “damaged”, clear the quarantine flag with
-  `xattr -dr com.apple.quarantine /Applications/Grafida.app`.) For the full technical background
-  see [`build/readme/01-macos-signing.md`](build/readme/01-macos-signing.md).
-- **Windows** — SmartScreen may show a “Windows protected your PC” warning for the unsigned
-  installer. Click **More info → Run anyway** to proceed.
+- **macOS** — releases are **signed with a Developer ID and notarised by Apple** (builds made
+  with the patched SFX runtime; see
+  [`build/readme/01-macos-signing.md`](build/readme/01-macos-signing.md)). The app opens like
+  any other downloaded application. If you run an *older, unsigned* release, right-click
+  **Grafida.app** in Finder and choose **Open**, then confirm — or clear the quarantine flag
+  with `xattr -dr com.apple.quarantine /Applications/Grafida.app` if macOS reports it as
+  “damaged”.
+- **Windows** — the installer is **not signed**; SmartScreen may show a “Windows protected your
+  PC” warning. Click **More info → Run anyway** to proceed. (Authenticode signing is expected to
+  become possible through the same sibling-payload approach used on macOS, but has not been
+  attempted yet.)
 - **Linux** — no signing is involved; nothing extra is required.
 
 ## Philosophy
@@ -157,18 +156,18 @@ The macOS packaging script applies an ad-hoc signature, which is enough to run t
 locally on the build machine.
 
 > [!NOTE]
-> **Published releases are unsigned, and code signing is currently *impossible* — this is a
-> Boson limitation, not a decision.** `boson compile` produces a phpmicro self-executable
-> whose PHP payload is appended *after* the binary's code-signature region. Apple's `codesign`
-> (and, we expect, Windows `signtool`) requires the signature to be the trailing content of the
-> file, so the appended payload makes signing fail; and the payload cannot be relocated without
-> breaking startup. We verified this in depth for macOS and, because Boson uses the same binary
-> format on every platform, did not even attempt Windows signing. Linux is unaffected (no
-> OS-enforced binary-signature gate). Full technical analysis:
-> [`build/readme/01-macos-signing.md`](build/readme/01-macos-signing.md) — the *Signing
-> impossible under current Boson architecture* section. The Developer ID signing/notarisation
-> pipeline is wired up and ready, so releases will be signed as soon as Boson can emit a
-> signable binary.
+> **macOS Developer ID signing and notarisation work, but need a patched PHP runtime.** A stock
+> `boson compile` produces a phpmicro self-executable whose PHP payload is appended *after* the
+> binary's code-signature region; Apple's `codesign` requires the signature to be the trailing
+> content of the file, so a stock build can never be signed. Grafida solves this with a patched
+> phpmicro SFX (the [`nikosdion/phpmicro`](https://github.com/nikosdion/phpmicro) `sibling-phar`
+> branch, built via static-php-cli and dropped into `build/sfx/`): the packaging script splits
+> the compiled binary into a clean, signable Mach-O stub plus a sibling
+> `Contents/Resources/grafida.phar` the stub loads at run time. Without the patched SFX in
+> `build/sfx/`, builds fall back to the stock combined binary (ad-hoc signature only). Windows
+> `signtool` is expected to have the same structural problem and the same cure, but this has not
+> been attempted yet; Linux is unaffected (no OS-enforced binary-signature gate). Full recipe
+> and technical analysis: [`build/readme/01-macos-signing.md`](build/readme/01-macos-signing.md).
 
 ### Application icons
 

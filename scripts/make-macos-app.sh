@@ -35,13 +35,56 @@ VERSION="${GRAFIDA_VERSION:-$(sed -nE "s/.*VERSION = '([^']+)'.*/\1/p" "$ROOT/sr
 APP="$SRC_DIR/Grafida.app"
 MACOS="$APP/Contents/MacOS"
 
+RES="$APP/Contents/Resources"
+
 echo "Assembling $APP (arch: $ARCH, version: $VERSION)"
 rm -rf "$APP"
-mkdir -p "$MACOS" "$APP/Contents/Resources"
+mkdir -p "$MACOS" "$RES"
 
-cp "$BIN" "$MACOS/grafida"
-cp "$SRC_DIR"/*.dylib "$MACOS/" 2>/dev/null || true
-[ -d "$SRC_DIR/assets" ] && cp -R "$SRC_DIR/assets" "$MACOS/assets"
+# Boson's compiled binary is a phpmicro self-executable: a Mach-O stub with the
+# PHP payload appended after the code signature. codesign rejects trailing data,
+# so such a combined binary can never be Developer-ID signed. When the binary
+# was compiled against the PATCHED SFX runtime (build/sfx/macos-<cpu>.standard.sfx,
+# built from the nikosdion/phpmicro `sibling-phar` fork — see
+# build/readme/01-macos-signing.md) we can split it instead: the clean Mach-O
+# stub becomes the bundle executable and the payload moves to
+# Contents/Resources/grafida.phar, which the patched stub finds at run time
+# (it looks for "<self>.phar" then "../Resources/<self>.phar"). Data files must
+# live in Resources — codesign refuses non-code files inside Contents/MacOS.
+# The phar's own directory is then Resources, and Boson's entrypoint mounts
+# `assets/public` and the libboson dylib relative to the phar, so the assets go
+# to Resources too and the dylib (real file in MacOS, where signed code lives)
+# gets a symlink there.
+SIBLING_SFX=0
+if LC_ALL=C grep -q "next to this executable" "$BIN"; then
+  MACHO_END="$(otool -l "$BIN" 2>/dev/null | awk '
+    /LC_CODE_SIGNATURE/ {sig=1}
+    sig && /dataoff/ {off=$2}
+    sig && /datasize/ {print off+$2; exit}')"
+  FILE_SIZE="$(stat -f%z "$BIN")"
+  if [ -n "$MACHO_END" ] && [ "$FILE_SIZE" -gt "$MACHO_END" ]; then
+    SIBLING_SFX=1
+  else
+    echo "Warning: patched SFX detected but could not locate the appended payload — using the legacy (unsignable) layout." >&2
+  fi
+fi
+
+if [ "$SIBLING_SFX" = 1 ]; then
+  echo "Patched sibling-payload SFX detected: splitting $((FILE_SIZE - MACHO_END)) payload bytes into Contents/Resources/grafida.phar"
+  head -c "$MACHO_END" "$BIN" > "$MACOS/grafida"
+  tail -c "+$((MACHO_END + 1))" "$BIN" > "$RES/grafida.phar"
+  cp "$SRC_DIR"/*.dylib "$MACOS/" 2>/dev/null || true
+  [ -d "$SRC_DIR/assets" ] && cp -R "$SRC_DIR/assets" "$RES/assets"
+  for dylib in "$MACOS"/*.dylib; do
+    [ -f "$dylib" ] && ln -s "../MacOS/$(basename "$dylib")" "$RES/$(basename "$dylib")"
+  done
+else
+  # Legacy layout: the combined self-executable with its data beside it. Runs
+  # locally (ad-hoc) but can never be Developer-ID signed / notarised.
+  cp "$BIN" "$MACOS/grafida"
+  cp "$SRC_DIR"/*.dylib "$MACOS/" 2>/dev/null || true
+  [ -d "$SRC_DIR/assets" ] && cp -R "$SRC_DIR/assets" "$MACOS/assets"
+fi
 chmod +x "$MACOS/grafida"
 
 # Application icon. Generate it from the master SVG if it is missing.
@@ -110,34 +153,17 @@ if [ -n "$SIGN_IDENTITY" ]; then
     codesign --force --timestamp --options runtime --sign "$SIGN_IDENTITY" "$dylib"
   done
 
-  # 2) the main executable.
-  #
-  # KNOWN LIMITATION — see build/readme/01-macos-signing.md ("Signing impossible under current Boson architecture"). Boson's
-  # compiled binary is a phpmicro self-executable: a Mach-O followed by the PHP
-  # PHAR appended *after* the code signature (EOF). codesign requires its
-  # signature to be the last bytes of the file, so any trailing data makes it
-  # fail with "main executable failed strict validation". phpmicro locates that
-  # PHAR as the bytes from the Mach-O image-end to EOF, so the payload cannot be
-  # moved into a Mach-O segment without breaking startup. There is therefore no
-  # way (today) to Developer-ID sign / notarise the combined binary from here;
-  # it needs a fix in Boson/phpmicro. We detect the trailing payload and fail
-  # with a clear message instead of a cryptic codesign error.
-  MACHO_END="$(otool -l "$MACOS/grafida" 2>/dev/null | awk '
-    /LC_CODE_SIGNATURE/ {sig=1}
-    sig && /dataoff/ {off=$2}
-    sig && /datasize/ {print off+$2; exit}')"
-  FILE_SIZE="$(stat -f%z "$MACOS/grafida")"
-  if [ -n "$MACHO_END" ] && [ "$FILE_SIZE" -gt "$MACHO_END" ]; then
+  if [ "$SIBLING_SFX" != 1 ]; then
     echo "" >&2
     echo "ERROR: cannot Developer-ID sign $MACOS/grafida." >&2
-    echo "  The Boson binary has $((FILE_SIZE - MACHO_END)) bytes of PHP payload appended after its" >&2
-    echo "  Mach-O signature (EOF $FILE_SIZE > Mach-O end $MACHO_END). codesign rejects trailing" >&2
-    echo "  data, and the payload cannot be relocated without breaking phpmicro startup." >&2
-    echo "  This is a Boson/phpmicro limitation. See the 'Signing impossible under" >&2
-    echo "  current Boson architecture' section of build/readme/01-macos-signing.md." >&2
-    echo "  Leave MACOS_SIGN_IDENTITY unset to build an ad-hoc (local-only) app instead." >&2
+    echo "  The binary was compiled against a STOCK Boson SFX, whose appended PHP payload" >&2
+    echo "  makes it unsignable. Build the patched sibling-payload SFX and drop it in" >&2
+    echo "  build/sfx/macos-<cpu>.standard.sfx, then recompile — see" >&2
+    echo "  build/readme/01-macos-signing.md." >&2
     exit 1
   fi
+
+  # 2) the main executable (a clean Mach-O stub after the payload split above)
   codesign --force --timestamp --options runtime \
     --entitlements "$ENTITLEMENTS" --sign "$SIGN_IDENTITY" "$MACOS/grafida"
 
@@ -148,10 +174,22 @@ if [ -n "$SIGN_IDENTITY" ]; then
   codesign --verify --deep --strict --verbose=2 "$APP"
   echo "Signed and verified: $APP"
 elif command -v codesign >/dev/null 2>&1; then
-  # Local dev: best-effort ad-hoc signature on the bundled dylib only.
-  for dylib in "$MACOS"/*.dylib; do
-    [ -f "$dylib" ] && codesign --force --sign - "$dylib" >/dev/null 2>&1 || true
-  done
+  if [ "$SIBLING_SFX" = 1 ]; then
+    # Local dev with the split layout: ad-hoc sign the whole bundle (all
+    # Mach-O files are clean, so this works — it just isn't notarised).
+    for dylib in "$MACOS"/*.dylib; do
+      [ -f "$dylib" ] && codesign --force --sign - "$dylib" >/dev/null 2>&1 || true
+    done
+    codesign --force --sign - "$MACOS/grafida" >/dev/null 2>&1 || true
+    codesign --force --sign - "$APP" >/dev/null 2>&1 || true
+  else
+    # Local dev, legacy layout: best-effort ad-hoc signature on the bundled
+    # dylib only (a bundle-level signature around the pre-signed combined SFX
+    # is unreliable).
+    for dylib in "$MACOS"/*.dylib; do
+      [ -f "$dylib" ] && codesign --force --sign - "$dylib" >/dev/null 2>&1 || true
+    done
+  fi
 fi
 
 echo "Done: $APP"

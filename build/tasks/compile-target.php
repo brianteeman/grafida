@@ -105,6 +105,34 @@ if ($matches === [])
 
 $json['target'] = $matches;
 
+// ---------------------------------------------------------------------------
+// Use a custom (patched) SFX runtime when one is present in build/sfx/
+// ---------------------------------------------------------------------------
+// A stock Boson SFX appends the app PHAR after the executable's code-signature
+// region, which makes the binary unsignable (see build/readme/01-macos-signing.md).
+// Dropping a patched micro.sfx (built from the nikosdion/phpmicro `sibling-phar`
+// fork via static-php-cli) into build/sfx/<os>-<cpu>.standard.sfx makes the
+// compiled binary able to load its payload from a sibling "<binary>.phar" file
+// once make-macos-app.sh splits it, so the executable can be Developer-ID signed.
+// The key is only injected when the file exists: Boson errors out on a dangling
+// `sfx` path, and machines without a custom SFX must keep building normally.
+$sfxCpu = ['arm64' => 'aarch64', 'amd64' => 'x86_64'][$arch] ?? null;
+
+if ($type !== 'phar' && $sfxCpu !== null)
+{
+    $sfxRelative = "build/sfx/{$type}-{$sfxCpu}.standard.sfx";
+
+    if (\is_file($root . '/' . $sfxRelative))
+    {
+        \fwrite(\STDOUT, "==> Using custom SFX runtime: {$sfxRelative}\n");
+
+        foreach ($json['target'] as $i => $target)
+        {
+            $json['target'][$i]['sfx'] = $sfxRelative;
+        }
+    }
+}
+
 // Pin the root so the filtered config can live in build/.temp without breaking
 // the relative `directories`/`finder` paths (see the header note above).
 $json['root'] = $root;
@@ -143,6 +171,21 @@ foreach (['box.json', 'entrypoint.php', 'grafida.phar'] as $stale)
 // ---------------------------------------------------------------------------
 // Compile just this target
 // ---------------------------------------------------------------------------
+// Pre-clean the target's output directory: Boson's own cleanup task chokes on
+// leftovers it did not create — notably the Grafida.app bundle (which contains
+// symlinks) assembled there by scripts/make-macos-app.sh after a previous
+// build — and then aborts the whole compile.
+if ($type !== 'phar')
+{
+    $archDir   = $arch === 'arm64' ? 'aarch64' : 'amd64';
+    $outputDir = $root . "/build/{$type}/{$archDir}";
+
+    if (\is_dir($outputDir))
+    {
+        \passthru(\sprintf('rm -rf %s', \escapeshellarg($outputDir)));
+    }
+}
+
 $boson = $root . '/vendor/bin/boson';
 
 if (!\is_file($boson))

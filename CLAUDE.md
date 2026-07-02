@@ -335,10 +335,24 @@ same ones the Phing `package-*` targets call — single source of truth). The ve
 `App::VERSION` (override via `GRAFIDA_VERSION`). Per-platform packaging is tolerant (missing binary →
 warn+skip), but a failing compile or a genuine packaging-tool error is fatal. Pieces:
 - macOS (arm64+amd64, macOS host only): `scripts/make-macos-app.sh <arch>` assembles
-  `build/macos/<bosondir>/Grafida.app` (the bare binary + dylib + `assets/`, Info.plist,
-  ad-hoc dylib signature) — Boson names the arm64 dir `aarch64`, amd64 stays `amd64` — then
-  `scripts/make-dmg.sh <arch>` wraps it (via `hdiutil`) into `Grafida-<v>-macos-<arch>.dmg`
-  with an `/Applications` symlink.
+  `build/macos/<bosondir>/Grafida.app` — Boson names the arm64 dir `aarch64`, amd64 stays
+  `amd64` — then `scripts/make-dmg.sh <arch>` wraps it (via `hdiutil`) into
+  `Grafida-<v>-macos-<arch>.dmg` with an `/Applications` symlink. **Code signing works via a
+  patched SFX runtime** (`build/readme/01-macos-signing.md` has the full recipe/analysis): a
+  `micro.sfx` built with static-php-cli from the `nikosdion/phpmicro` fork's `sibling-phar`
+  branch (which adds an additive fallback — no appended payload → load `"<self>.phar"`, then
+  `"../Resources/<self>.phar"`, realpath-canonicalised so the offset stream hooks keep
+  matching) is dropped into the gitignored `build/sfx/<os>-<cpu>.standard.sfx`;
+  `build/tasks/compile-target.php` injects it as the Boson target's `sfx` when present (and
+  pre-cleans the output dir — Boson's cleanup chokes on the previous `Grafida.app`, silently
+  leaving a stale binary). `make-macos-app.sh` detects the patched runtime, splits the
+  compiled binary into a clean Mach-O stub (`Contents/MacOS/grafida`) + payload
+  (`Contents/Resources/grafida.phar`; codesign refuses data files in `Contents/MacOS`, so
+  `assets/` also live in Resources with a dylib symlink for the phar's mounts), and signs the
+  whole bundle — ad-hoc by default, Developer ID + hardened runtime + notarisation when
+  `MACOS_SIGN_IDENTITY`/`MACOS_NOTARY_PROFILE` are set (verified end-to-end: notarisation
+  Accepted, `spctl` "Notarized Developer ID"). Without `build/sfx/` the legacy combined-binary
+  layout is used and Developer-ID signing aborts with a clear error.
 - Linux (amd64+arm64): `scripts/make-linux-tarball.sh <arch>` builds a `.tar.gz` of the per-arch
   output dir (binary + `libboson-linux-*.so` + `assets/`) plus the icon, `grafida.desktop`, and
   `build/linux-install.sh` (renamed `install.sh`) — a per-user XDG desktop-integration installer.
