@@ -36,6 +36,21 @@
 	<property name="macos.notary.profile" value="" />
 
 	<!--
+	Windows code-signing defaults (Azure Artifact Signing + Jsign — see
+	build/readme/04-exe-signing-on-macos.md). windows.sign.op-item empty (the default) leaves
+	grafida.exe / the installer unsigned, exactly like the macOS defaults above. Only set these in
+	build.properties, and only sign from package-win-x86 — never git-win-x86 — Azure's Basic tier is
+	capped at 5,000 signatures/month.
+	-->
+	<property name="windows.sign.op-item" value="" />
+	<property name="windows.sign.op-field-appid" value="appId" />
+	<property name="windows.sign.op-field-password" value="password" />
+	<property name="windows.sign.op-field-tenant" value="tenant" />
+	<property name="windows.sign.keystore" value="weu.codesigning.azure.net" />
+	<property name="windows.sign.alias" value="akeeba-signing/AkeebaPublic" />
+	<property name="windows.sign.tsaurl" value="http://timestamp.acs.microsoft.com" />
+
+	<!--
 	Custom Phing tasks live in build/tasks/ under the `tasks\` namespace; the classpath points at build/
 	so `tasks\Foo` resolves to build/tasks/Foo.php.
 	-->
@@ -364,6 +379,13 @@
 	<target name="package-win-x86" depends="git-win-x86" description="Package the Windows (x64) installer (or portable .zip)">
 		<exec executable="bash" dir="${dirs.root}" passthru="true" checkreturn="true">
 			<arg value="scripts/make-windows-installer.sh" />
+			<env key="WINDOWS_SIGN_OP_ITEM" value="${windows.sign.op-item}" />
+			<env key="WINDOWS_SIGN_OP_FIELD_APPID" value="${windows.sign.op-field-appid}" />
+			<env key="WINDOWS_SIGN_OP_FIELD_PASSWORD" value="${windows.sign.op-field-password}" />
+			<env key="WINDOWS_SIGN_OP_FIELD_TENANT" value="${windows.sign.op-field-tenant}" />
+			<env key="WINDOWS_SIGN_KEYSTORE" value="${windows.sign.keystore}" />
+			<env key="WINDOWS_SIGN_ALIAS" value="${windows.sign.alias}" />
+			<env key="WINDOWS_SIGN_TSAURL" value="${windows.sign.tsaurl}" />
 		</exec>
 	</target>
 

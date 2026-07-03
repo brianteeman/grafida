@@ -51,10 +51,13 @@ Grafida uses the Joomla Web Services (REST) API. It's built with [Boson](https:/
   **Grafida.app** in Finder and choose **Open**, then confirm — or clear the quarantine flag
   with `xattr -dr com.apple.quarantine /Applications/Grafida.app` if macOS reports it as
   “damaged”.
-- **Windows** — the installer is **not signed**; SmartScreen may show a “Windows protected your
-  PC” warning. Click **More info → Run anyway** to proceed. (Authenticode signing is expected to
-  become possible through the same sibling-payload approach used on macOS, but has not been
-  attempted yet.)
+- **Windows** — releases are **Authenticode-signed** with Azure Artifact Signing (via
+  [Jsign](https://ebourg.github.io/jsign/); see
+  [`build/readme/04-exe-signing-on-macos.md`](build/readme/04-exe-signing-on-macos.md)). Signing
+  does not eliminate SmartScreen's "Windows protected your PC" warning for a small install base —
+  reputation accumulates with download volume over time — but it shows our publisher name instead
+  of "Unknown Publisher" and improves behaviour with enterprise AV/EDR and AppLocker. Click **More
+  info → Run anyway** if you still see the warning.
 - **Linux** — no signing is involved; nothing extra is required.
 
 ## Philosophy
@@ -165,9 +168,12 @@ locally on the build machine.
 > the compiled binary into a clean, signable Mach-O stub plus a sibling
 > `Contents/Resources/grafida.phar` the stub loads at run time. Without the patched SFX in
 > `build/sfx/`, builds fall back to the stock combined binary (ad-hoc signature only). Windows
-> `signtool` is expected to have the same structural problem and the same cure, but this has not
-> been attempted yet; Linux is unaffected (no OS-enforced binary-signature gate). Full recipe
-> and technical analysis: [`build/readme/01-macos-signing.md`](build/readme/01-macos-signing.md).
+> doesn't have this structural problem — Authenticode signatures live in a PE certificate table,
+> not trailing file content — so the stock `boson compile` output signs directly; Linux is
+> unaffected too (no OS-enforced binary-signature gate). Full recipe and technical analysis:
+> [`build/readme/01-macos-signing.md`](build/readme/01-macos-signing.md) (macOS) and
+> [`build/readme/04-exe-signing-on-macos.md`](build/readme/04-exe-signing-on-macos.md) (Windows,
+> signed from a macOS/Linux build host via Azure Artifact Signing + Jsign).
 
 ### Application icons
 

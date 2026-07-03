@@ -30,6 +30,12 @@ ICON_DIR="$ROOT/build/icon"
 DIST="$ROOT/build/dist"
 mkdir -p "$DIST"
 
+# Sign the compiled binary itself first, so both the NSIS installer and the
+# portable .zip fallback below carry a signed grafida.exe. A no-op unless
+# WINDOWS_SIGN_OP_ITEM is set (see scripts/sign-windows-exe.sh) — never runs
+# for a local 'phing git-win-x86' compile, only from packaging.
+"$ROOT/scripts/sign-windows-exe.sh" "$WIN_BIN"
+
 MAKENSIS="$(command -v makensis 2>/dev/null || true)"
 
 if [ -n "$MAKENSIS" ]; then
@@ -47,6 +53,8 @@ if [ -n "$MAKENSIS" ]; then
     "-DAPPVERSION=$VERSION" \
     "-DVIVERSION=$VIVERSION" \
     "$ROOT/build/windows-installer.nsi"
+  # Sign the installer executable itself too — it is a PE file end users run directly.
+  "$ROOT/scripts/sign-windows-exe.sh" "$SETUP"
   echo "Done: $SETUP"
   exit 0
 fi
