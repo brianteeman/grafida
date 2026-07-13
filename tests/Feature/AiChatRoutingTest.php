@@ -12,12 +12,10 @@ declare(strict_types=1);
 namespace Grafida\Tests\Feature;
 
 use Boson\Component\Http\Request;
-use Boson\Component\Http\Static\StaticProviderInterface;
-use Boson\Contracts\Http\RequestInterface;
-use Boson\Contracts\Http\ResponseInterface;
 use Grafida\Application\Kernel;
-use Grafida\Storage\Database;
-use Grafida\Storage\Migrator;
+use Grafida\Tests\Support\TestContainer;
+use Grafida\Tests\Support\TestDatabase;
+use Joomla\Database\DatabaseInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -26,7 +24,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class AiChatRoutingTest extends TestCase
 {
-    private ?\PDO $lastPdo = null;
+    private ?DatabaseInterface $lastDb = null;
 
     // ------------------------------------------------------------------
     //  Helpers
@@ -34,29 +32,24 @@ final class AiChatRoutingTest extends TestCase
 
     private function kernel(): Kernel
     {
-        $pdo = Database::connect(':memory:');
-        (new Migrator($pdo))->migrate();
-        $this->lastPdo = $pdo;
+        $container    = TestContainer::create();
+        $this->lastDb = $container->get(DatabaseInterface::class);
 
-        $static = new class implements StaticProviderInterface {
-            public function findFileByRequest(RequestInterface $request): ?ResponseInterface
-            {
-                return null;
-            }
-        };
-
-        return new Kernel($static, $pdo, \dirname(__DIR__, 2));
+        return $container->get(Kernel::class);
     }
 
     /** Inserts a bare site row so drafts have a valid foreign key. */
     private function seedSite(): int
     {
+        \assert($this->lastDb !== null, 'seedSite() must be called after kernel()');
+
         $now = gmdate('Y-m-d H:i:s');
-        $this->lastPdo?->prepare(
+        $pdo = TestDatabase::connection($this->lastDb);
+        $pdo->prepare(
             'INSERT INTO sites (title, base_url, created_at, updated_at) VALUES (?, ?, ?, ?)'
         )->execute(['Test Site', 'https://example.test', $now, $now]);
 
-        return (int) ($this->lastPdo?->lastInsertId() ?? 0);
+        return (int) $pdo->lastInsertId();
     }
 
     /** @return array{0: int, 1: mixed} */
@@ -467,9 +460,10 @@ final class AiChatRoutingTest extends TestCase
         self::assertSame(404, $afterStatus, 'Chat should be removed by cascade when draft is deleted');
 
         // And the chat_messages must also be gone (verify via direct PDO query).
-        $stmt = $this->lastPdo?->prepare('SELECT COUNT(*) FROM ai_chat_messages WHERE chat_id = ?');
-        $stmt?->execute([$chatId]);
-        $count = (int) ($stmt?->fetchColumn() ?? 0);
+        \assert($this->lastDb !== null);
+        $stmt = TestDatabase::connection($this->lastDb)->prepare('SELECT COUNT(*) FROM ai_chat_messages WHERE chat_id = ?');
+        $stmt->execute([$chatId]);
+        $count = (int) $stmt->fetchColumn();
         self::assertSame(0, $count, 'ai_chat_messages should be cleared by ON DELETE CASCADE');
     }
 }

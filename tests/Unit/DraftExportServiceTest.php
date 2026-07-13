@@ -18,13 +18,12 @@ use Grafida\Article\Draft;
 use Grafida\Article\DraftExportService;
 use Grafida\Article\DraftRepository;
 use Grafida\Media\MediaRepository;
-use Grafida\Storage\Database;
-use Grafida\Storage\Migrator;
-use PDO;
+use Grafida\Tests\Support\TestDatabase;
+use Joomla\Database\DatabaseInterface;
 
 final class DraftExportServiceTest extends TestCase
 {
-    private PDO $pdo;
+    private DatabaseInterface $db;
     private DraftRepository $drafts;
     private MediaRepository $media;
     private AiChatRepository $chats;
@@ -32,20 +31,20 @@ final class DraftExportServiceTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->pdo = Database::connect(':memory:');
-        (new Migrator($this->pdo))->migrate();
-        $this->pdo->exec(
+        $this->db = TestDatabase::memory();
+        $connection = TestDatabase::connection($this->db);
+        $connection->exec(
             'INSERT INTO sites (id, title, base_url, created_at, updated_at) '
             . "VALUES (1, 'Site', 'https://example.com', '2026-01-01 00:00:00', '2026-01-01 00:00:00')"
         );
-        $this->pdo->exec(
+        $connection->exec(
             'INSERT INTO sites (id, title, base_url, created_at, updated_at) '
             . "VALUES (2, 'Other', 'https://other.example', '2026-01-01 00:00:00', '2026-01-01 00:00:00')"
         );
 
-        $this->drafts = new DraftRepository($this->pdo);
-        $this->media  = new MediaRepository($this->pdo);
-        $this->chats  = new AiChatRepository($this->pdo);
+        $this->drafts = new DraftRepository($this->db);
+        $this->media  = new MediaRepository($this->db);
+        $this->chats  = new AiChatRepository($this->db);
         $this->export = new DraftExportService($this->drafts, $this->media, $this->chats);
     }
 

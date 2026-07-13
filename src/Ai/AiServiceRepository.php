@@ -11,55 +11,76 @@ declare(strict_types=1);
 
 namespace Grafida\Ai;
 
-use PDO;
+use Grafida\Storage\QueryBuilderSupport;
+use Joomla\Database\DatabaseInterface;
+use Joomla\Database\ParameterType;
 
 /**
  * Data-access for AI service configurations.
  */
 final class AiServiceRepository
 {
+    use QueryBuilderSupport;
+
     public function __construct(
-        private readonly PDO $pdo,
+        private readonly DatabaseInterface $db,
     ) {}
 
     /** @return list<AiService> */
     public function all(): array
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM ai_services ORDER BY id ASC');
-        $stmt->execute([]);
+        $query = $this->db->createQuery()
+            ->select('*')
+            ->from($this->qn('ai_services'))
+            ->order($this->qn('id') . ' ASC');
 
         /** @var list<array{id?: int|string|null, name: string, provider: string, endpoint: string, model: string, params_json: string, secret_ref: string|null, insecure_key: string|null, is_default: int|string}> $rows */
-        $rows = $stmt->fetchAll();
+        $rows = $this->db->setQuery($query)->loadAssocList();
 
         return array_values(array_map(static fn (array $r): AiService => AiService::fromRow($r), $rows));
     }
 
     public function find(int $id): ?AiService
     {
-        $stmt = $this->pdo->prepare('SELECT * FROM ai_services WHERE id = ?');
-        $stmt->execute([$id]);
+        $query = $this->db->createQuery()
+            ->select('*')
+            ->from($this->qn('ai_services'))
+            ->where($this->qn('id') . ' = :id')
+            ->bind(':id', $id, ParameterType::INTEGER);
 
-        /** @var array{id?: int|string|null, name: string, provider: string, endpoint: string, model: string, params_json: string, secret_ref: string|null, insecure_key: string|null, is_default: int|string}|false $row */
-        $row = $stmt->fetch();
+        /** @var array{id?: int|string|null, name: string, provider: string, endpoint: string, model: string, params_json: string, secret_ref: string|null, insecure_key: string|null, is_default: int|string}|null $row */
+        $row = $this->db->setQuery($query)->loadAssoc();
 
-        return $row !== false ? AiService::fromRow($row) : null;
+        return $row !== null ? AiService::fromRow($row) : null;
     }
 
     /** Inserts a new AI service and returns its id. */
     public function insert(AiService $service): int
     {
         $now  = gmdate('Y-m-d H:i:s');
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO ai_services (name, provider, endpoint, model, params_json, secret_ref, insecure_key, '
-            . 'is_default, created_at, updated_at) VALUES '
-            . '(:name, :provider, :endpoint, :model, :params, :secret_ref, :insecure_key, '
-            . ':is_default, :created_at, :updated_at)'
-        );
-        // Distinct placeholders: PDO's native SQLite prepares (emulation off) reject
-        // re-using one named parameter twice with a "column index out of range" error.
-        $stmt->execute($this->bind($service) + [':created_at' => $now, ':updated_at' => $now]);
+        $cols = $this->columns($service);
 
-        return (int) $this->pdo->lastInsertId();
+        $query = $this->db->createQuery()
+            ->insert($this->qn('ai_services'))
+            ->columns([
+                ...array_map(fn (array $c): string => $this->qn($c['column']), $cols),
+                $this->qn('created_at'),
+                $this->qn('updated_at'),
+            ])
+            ->values(
+                implode(', ', array_map(static fn (array $c): string => $c['placeholder'], $cols))
+                . ', :created_at, :updated_at'
+            )
+            ->bind(':created_at', $now, ParameterType::STRING)
+            ->bind(':updated_at', $now, ParameterType::STRING);
+
+        foreach ($cols as $i => $c) {
+            $query->bind($c['placeholder'], $cols[$i]['value'], $c['type']);
+        }
+
+        $this->db->setQuery($query)->execute();
+
+        return $this->lastInsertId();
     }
 
     public function update(AiService $service): void
@@ -68,47 +89,93 @@ final class AiServiceRepository
             throw new \InvalidArgumentException('Cannot update an AI service without an id.');
         }
 
-        $stmt = $this->pdo->prepare(
-            'UPDATE ai_services SET name = :name, provider = :provider, endpoint = :endpoint, '
-            . 'model = :model, params_json = :params, secret_ref = :secret_ref, '
-            . 'insecure_key = :insecure_key, is_default = :is_default, '
-            . 'updated_at = :now WHERE id = :id'
-        );
-        $stmt->execute($this->bind($service) + [':now' => gmdate('Y-m-d H:i:s'), ':id' => $service->id]);
+        $now  = gmdate('Y-m-d H:i:s');
+        $id   = $service->id;
+        $cols = $this->columns($service);
+
+        $query = $this->db->createQuery()->update($this->qn('ai_services'));
+
+        foreach ($cols as $c) {
+            $query->set($this->qn($c['column']) . ' = ' . $c['placeholder']);
+        }
+
+        $query->set($this->qn('updated_at') . ' = :now')
+            ->where($this->qn('id') . ' = :id')
+            ->bind(':now', $now, ParameterType::STRING)
+            ->bind(':id', $id, ParameterType::INTEGER);
+
+        foreach ($cols as $i => $c) {
+            $query->bind($c['placeholder'], $cols[$i]['value'], $c['type']);
+        }
+
+        $this->db->setQuery($query)->execute();
     }
 
     public function delete(int $id): void
     {
-        $stmt = $this->pdo->prepare('DELETE FROM ai_services WHERE id = ?');
-        $stmt->execute([$id]);
+        $query = $this->db->createQuery()
+            ->delete($this->qn('ai_services'))
+            ->where($this->qn('id') . ' = :id')
+            ->bind(':id', $id, ParameterType::INTEGER);
+
+        $this->db->setQuery($query)->execute();
     }
 
     /** Sets is_default = 0 for every AI service. */
     public function clearDefault(): void
     {
-        $this->pdo->exec('UPDATE ai_services SET is_default = 0');
+        $query = $this->db->createQuery()
+            ->update($this->qn('ai_services'))
+            ->set($this->qn('is_default') . ' = 0');
+
+        $this->db->setQuery($query)->execute();
     }
 
-    /** Marks the given service as the sole default (clears all others first). */
+    /**
+     * Marks the given service as the sole default (clears all others first).
+     *
+     * Wrapped in a transaction: a crash between clearing and setting would
+     * otherwise leave the app with zero default services.
+     */
     public function setDefault(int $id): void
     {
-        $this->clearDefault();
-        $stmt = $this->pdo->prepare('UPDATE ai_services SET is_default = 1 WHERE id = ?');
-        $stmt->execute([$id]);
+        $this->db->transactionStart();
+
+        try {
+            $this->clearDefault();
+
+            $query = $this->db->createQuery()
+                ->update($this->qn('ai_services'))
+                ->set($this->qn('is_default') . ' = 1')
+                ->where($this->qn('id') . ' = :id')
+                ->bind(':id', $id, ParameterType::INTEGER);
+
+            $this->db->setQuery($query)->execute();
+
+            $this->db->transactionCommit();
+        } catch (\Throwable $e) {
+            $this->db->transactionRollback();
+
+            throw $e;
+        }
     }
 
-    /** @return array<string, mixed> */
-    private function bind(AiService $service): array
+    /**
+     * @return list<array{column: string, placeholder: string, value: mixed, type: string}>
+     */
+    private function columns(AiService $service): array
     {
+        $paramsJson = json_encode($service->params, \JSON_UNESCAPED_UNICODE);
+
         return [
-            ':name'         => $service->name,
-            ':provider'     => $service->provider,
-            ':endpoint'     => $service->endpoint,
-            ':model'        => $service->model,
-            ':params'       => json_encode($service->params, \JSON_UNESCAPED_UNICODE),
-            ':secret_ref'   => $service->secretRef,
-            ':insecure_key' => $service->insecureKey,
-            ':is_default'   => $service->isDefault ? 1 : 0,
+            ['column' => 'name', 'placeholder' => ':name', 'value' => $service->name, 'type' => ParameterType::STRING],
+            ['column' => 'provider', 'placeholder' => ':provider', 'value' => $service->provider, 'type' => ParameterType::STRING],
+            ['column' => 'endpoint', 'placeholder' => ':endpoint', 'value' => $service->endpoint, 'type' => ParameterType::STRING],
+            ['column' => 'model', 'placeholder' => ':model', 'value' => $service->model, 'type' => ParameterType::STRING],
+            ['column' => 'params_json', 'placeholder' => ':params', 'value' => $paramsJson, 'type' => ParameterType::STRING],
+            ['column' => 'secret_ref', 'placeholder' => ':secret_ref', 'value' => $service->secretRef, 'type' => $service->secretRef === null ? ParameterType::NULL : ParameterType::STRING],
+            ['column' => 'insecure_key', 'placeholder' => ':insecure_key', 'value' => $service->insecureKey, 'type' => $service->insecureKey === null ? ParameterType::NULL : ParameterType::STRING],
+            ['column' => 'is_default', 'placeholder' => ':is_default', 'value' => $service->isDefault ? 1 : 0, 'type' => ParameterType::INTEGER],
         ];
     }
 }

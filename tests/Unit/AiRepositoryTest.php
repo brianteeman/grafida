@@ -20,21 +20,20 @@ use Grafida\Ai\AiTool;
 use Grafida\Ai\AiToolRepository;
 use Grafida\Article\Draft;
 use Grafida\Article\DraftRepository;
-use Grafida\Storage\Database;
-use Grafida\Storage\Migrator;
+use Grafida\Tests\Support\TestDatabase;
+use Joomla\Database\DatabaseInterface;
 use PDO;
 
 final class AiRepositoryTest extends TestCase
 {
-    private PDO $pdo;
+    private DatabaseInterface $db;
 
     protected function setUp(): void
     {
-        $this->pdo = Database::connect(':memory:');
-        (new Migrator($this->pdo))->migrate();
+        $this->db = TestDatabase::memory();
 
         // Seed a site + draft required by ai_chats FK.
-        $this->pdo->exec(
+        TestDatabase::connection($this->db)->exec(
             'INSERT INTO sites (id, title, base_url, created_at, updated_at) '
             . "VALUES (1, 'Test Site', 'https://example.com', '2026-01-01 00:00:00', '2026-01-01 00:00:00')"
         );
@@ -46,22 +45,22 @@ final class AiRepositoryTest extends TestCase
 
     private function serviceRepo(): AiServiceRepository
     {
-        return new AiServiceRepository($this->pdo);
+        return new AiServiceRepository($this->db);
     }
 
     private function toolRepo(): AiToolRepository
     {
-        return new AiToolRepository($this->pdo);
+        return new AiToolRepository($this->db);
     }
 
     private function chatRepo(): AiChatRepository
     {
-        return new AiChatRepository($this->pdo);
+        return new AiChatRepository($this->db);
     }
 
     private function draftRepo(): DraftRepository
     {
-        return new DraftRepository($this->pdo);
+        return new DraftRepository($this->db);
     }
 
     private function sampleService(): AiService
@@ -390,7 +389,7 @@ final class AiRepositoryTest extends TestCase
 
     public function testForeignKeysAreEnabled(): void
     {
-        $result = $this->pdo->query('PRAGMA foreign_keys');
+        $result = TestDatabase::connection($this->db)->query('PRAGMA foreign_keys');
         self::assertNotFalse($result);
         $row = $result->fetch(PDO::FETCH_NUM);
         self::assertIsArray($row);
@@ -412,7 +411,7 @@ final class AiRepositoryTest extends TestCase
         self::assertCount(0, $this->chatRepo()->forDraft($draftId), 'no chats must remain for deleted draft');
 
         // Verify messages are also gone.
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM ai_chat_messages WHERE chat_id = ?');
+        $stmt = TestDatabase::connection($this->db)->prepare('SELECT COUNT(*) FROM ai_chat_messages WHERE chat_id = ?');
         $stmt->execute([$chatId]);
         self::assertSame(0, (int) $stmt->fetchColumn(), 'messages must cascade-delete when draft is deleted');
     }
@@ -423,7 +422,7 @@ final class AiRepositoryTest extends TestCase
         $chatId  = $this->chatRepo()->create($this->sampleChat($draftId));
 
         // Confirm messages are present.
-        $stmt = $this->pdo->prepare('SELECT COUNT(*) FROM ai_chat_messages WHERE chat_id = ?');
+        $stmt = TestDatabase::connection($this->db)->prepare('SELECT COUNT(*) FROM ai_chat_messages WHERE chat_id = ?');
         $stmt->execute([$chatId]);
         self::assertSame(2, (int) $stmt->fetchColumn());
 

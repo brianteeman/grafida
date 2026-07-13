@@ -18,23 +18,21 @@ use Grafida\Ai\AiServiceManager;
 use Grafida\Ai\AiServiceRepository;
 use Grafida\Ai\Defaults;
 use Grafida\Http\HttpResponse;
-use Grafida\Storage\Database;
-use Grafida\Storage\Migrator;
+use Grafida\Tests\Support\TestDatabase;
 use Grafida\Tests\Unit\Support\FakeTransport;
 use Grafida\Tests\Unit\TestCase;
-use PDO;
+use Joomla\Database\DatabaseInterface;
 
 /**
  * Unit tests for AiProxy — uses an in-memory DB and a FakeTransport.
  */
 final class AiProxyTest extends TestCase
 {
-    private PDO $pdo;
+    private DatabaseInterface $db;
 
     protected function setUp(): void
     {
-        $this->pdo = Database::connect(':memory:');
-        (new Migrator($this->pdo))->migrate();
+        $this->db = TestDatabase::memory();
     }
 
     // ------------------------------------------------------------------
@@ -43,7 +41,7 @@ final class AiProxyTest extends TestCase
 
     private function manager(): AiServiceManager
     {
-        return new AiServiceManager(new AiServiceRepository($this->pdo), null);
+        return new AiServiceManager(new AiServiceRepository($this->db), null);
     }
 
     private function proxy(FakeTransport $transport, ?AiServiceManager $manager = null): AiProxy

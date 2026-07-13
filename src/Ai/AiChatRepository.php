@@ -11,15 +11,19 @@ declare(strict_types=1);
 
 namespace Grafida\Ai;
 
-use PDO;
+use Grafida\Storage\QueryBuilderSupport;
+use Joomla\Database\DatabaseInterface;
+use Joomla\Database\ParameterType;
 
 /**
  * Data-access for AI conversations and their message transcripts.
  */
 final class AiChatRepository
 {
+    use QueryBuilderSupport;
+
     public function __construct(
-        private readonly PDO $pdo,
+        private readonly DatabaseInterface $db,
     ) {}
 
     /**
@@ -29,13 +33,15 @@ final class AiChatRepository
      */
     public function forDraft(int $draftId): array
     {
-        $stmt = $this->pdo->prepare(
-            'SELECT * FROM ai_chats WHERE draft_id = ? ORDER BY updated_at DESC'
-        );
-        $stmt->execute([$draftId]);
+        $query = $this->db->createQuery()
+            ->select('*')
+            ->from($this->qn('ai_chats'))
+            ->where($this->qn('draft_id') . ' = :draft')
+            ->order($this->qn('updated_at') . ' DESC')
+            ->bind(':draft', $draftId, ParameterType::INTEGER);
 
         /** @var list<array{id?: int|string|null, draft_id: int|string, service_id: int|string|null, title: string}> $rows */
-        $rows = $stmt->fetchAll();
+        $rows = $this->db->setQuery($query)->loadAssocList();
 
         return array_values(array_map(static fn (array $r): AiChat => AiChat::fromRow($r), $rows));
     }
@@ -45,23 +51,28 @@ final class AiChatRepository
      */
     public function find(int $id): ?AiChat
     {
-        $chatStmt = $this->pdo->prepare('SELECT * FROM ai_chats WHERE id = ?');
-        $chatStmt->execute([$id]);
+        $chatQuery = $this->db->createQuery()
+            ->select('*')
+            ->from($this->qn('ai_chats'))
+            ->where($this->qn('id') . ' = :id')
+            ->bind(':id', $id, ParameterType::INTEGER);
 
-        /** @var array{id?: int|string|null, draft_id: int|string, service_id: int|string|null, title: string}|false $row */
-        $row = $chatStmt->fetch();
+        /** @var array{id?: int|string|null, draft_id: int|string, service_id: int|string|null, title: string}|null $row */
+        $row = $this->db->setQuery($chatQuery)->loadAssoc();
 
-        if ($row === false) {
+        if ($row === null) {
             return null;
         }
 
-        $msgStmt = $this->pdo->prepare(
-            'SELECT * FROM ai_chat_messages WHERE chat_id = ? ORDER BY sort_order ASC'
-        );
-        $msgStmt->execute([$id]);
+        $msgQuery = $this->db->createQuery()
+            ->select('*')
+            ->from($this->qn('ai_chat_messages'))
+            ->where($this->qn('chat_id') . ' = :chat')
+            ->order($this->qn('sort_order') . ' ASC')
+            ->bind(':chat', $id, ParameterType::INTEGER);
 
         /** @var list<array{id?: int|string|null, chat_id: int|string|null, role: string, content: string, tool_key: string|null, sort_order: int|string}> $msgRows */
-        $msgRows  = $msgStmt->fetchAll();
+        $msgRows  = $this->db->setQuery($msgQuery)->loadAssocList();
         $messages = array_values(array_map(static fn (array $r): AiMessage => AiMessage::fromRow($r), $msgRows));
 
         return AiChat::fromRow($row, $messages);
@@ -76,51 +87,74 @@ final class AiChatRepository
     {
         $now = gmdate('Y-m-d H:i:s');
 
-        $this->pdo->beginTransaction();
+        $draftId            = $chat->draftId;
+        $serviceId          = $chat->serviceId;
+        $title              = $chat->title;
+        $previousResponseId = $chat->previousResponseId;
+        $lastResponseAt     = $chat->lastResponseAt;
+
+        $this->db->transactionStart();
 
         try {
-            $chatStmt = $this->pdo->prepare(
-                'INSERT INTO ai_chats '
-                . '(draft_id, service_id, title, created_at, updated_at, previous_response_id, last_response_at) '
-                . 'VALUES (:draft_id, :service_id, :title, :created_at, :updated_at, :previous_response_id, :last_response_at)'
-            );
-            // Distinct placeholders: PDO's native SQLite prepares (emulation off) reject
-            // re-using one named parameter twice with a "column index out of range" error.
-            $chatStmt->execute([
-                ':draft_id'              => $chat->draftId,
-                ':service_id'            => $chat->serviceId,
-                ':title'                 => $chat->title,
-                ':created_at'            => $now,
-                ':updated_at'            => $now,
-                ':previous_response_id'  => $chat->previousResponseId,
-                ':last_response_at'      => $chat->lastResponseAt,
-            ]);
+            $chatQuery = $this->db->createQuery()
+                ->insert($this->qn('ai_chats'))
+                ->columns([
+                    $this->qn('draft_id'),
+                    $this->qn('service_id'),
+                    $this->qn('title'),
+                    $this->qn('created_at'),
+                    $this->qn('updated_at'),
+                    $this->qn('previous_response_id'),
+                    $this->qn('last_response_at'),
+                ])
+                ->values(':draft_id, :service_id, :title, :created_at, :updated_at, :previous_response_id, :last_response_at')
+                ->bind(':draft_id', $draftId, ParameterType::INTEGER)
+                ->bind(':service_id', $serviceId, $serviceId === null ? ParameterType::NULL : ParameterType::INTEGER)
+                ->bind(':title', $title, ParameterType::STRING)
+                ->bind(':created_at', $now, ParameterType::STRING)
+                ->bind(':updated_at', $now, ParameterType::STRING)
+                ->bind(':previous_response_id', $previousResponseId, $previousResponseId === null ? ParameterType::NULL : ParameterType::STRING)
+                ->bind(':last_response_at', $lastResponseAt, $lastResponseAt === null ? ParameterType::NULL : ParameterType::STRING);
 
-            $chatId = (int) $this->pdo->lastInsertId();
+            $this->db->setQuery($chatQuery)->execute();
 
-            if ($chat->messages !== []) {
-                // Use positional params for repeated inserts in a loop to avoid
-                // named-placeholder collisions across iterations.
-                $msgStmt = $this->pdo->prepare(
-                    'INSERT INTO ai_chat_messages (chat_id, role, content, tool_key, sort_order, created_at) '
-                    . 'VALUES (?, ?, ?, ?, ?, ?)'
-                );
+            $chatId = $this->lastInsertId();
 
-                foreach ($chat->messages as $message) {
-                    $msgStmt->execute([
-                        $chatId,
-                        $message->role,
-                        $message->content,
-                        $message->toolKey,
-                        $message->sortOrder,
-                        $now,
-                    ]);
-                }
+            // Bind a throwaway copy, not $chatId itself: bind() takes its value by
+            // reference (typed `mixed`), which would otherwise widen $chatId's type
+            // for the rest of this method — including the `return $chatId;` below.
+            $chatIdForBind = $chatId;
+
+            foreach ($chat->messages as $message) {
+                $role      = $message->role;
+                $content   = $message->content;
+                $toolKey   = $message->toolKey;
+                $sortOrder = $message->sortOrder;
+
+                $msgQuery = $this->db->createQuery()
+                    ->insert($this->qn('ai_chat_messages'))
+                    ->columns([
+                        $this->qn('chat_id'),
+                        $this->qn('role'),
+                        $this->qn('content'),
+                        $this->qn('tool_key'),
+                        $this->qn('sort_order'),
+                        $this->qn('created_at'),
+                    ])
+                    ->values(':chat_id, :role, :content, :tool_key, :sort_order, :created_at')
+                    ->bind(':chat_id', $chatIdForBind, ParameterType::INTEGER)
+                    ->bind(':role', $role, ParameterType::STRING)
+                    ->bind(':content', $content, ParameterType::STRING)
+                    ->bind(':tool_key', $toolKey, $toolKey === null ? ParameterType::NULL : ParameterType::STRING)
+                    ->bind(':sort_order', $sortOrder, ParameterType::INTEGER)
+                    ->bind(':created_at', $now, ParameterType::STRING);
+
+                $this->db->setQuery($msgQuery)->execute();
             }
 
-            $this->pdo->commit();
+            $this->db->transactionCommit();
         } catch (\Throwable $e) {
-            $this->pdo->rollBack();
+            $this->db->transactionRollback();
 
             throw $e;
         }
@@ -131,10 +165,18 @@ final class AiChatRepository
     /** Updates the title of a chat. */
     public function rename(int $id, string $title): void
     {
-        $stmt = $this->pdo->prepare(
-            'UPDATE ai_chats SET title = ?, updated_at = ? WHERE id = ?'
-        );
-        $stmt->execute([$title, gmdate('Y-m-d H:i:s'), $id]);
+        $now = gmdate('Y-m-d H:i:s');
+
+        $query = $this->db->createQuery()
+            ->update($this->qn('ai_chats'))
+            ->set($this->qn('title') . ' = :title')
+            ->set($this->qn('updated_at') . ' = :now')
+            ->where($this->qn('id') . ' = :id')
+            ->bind(':title', $title, ParameterType::STRING)
+            ->bind(':now', $now, ParameterType::STRING)
+            ->bind(':id', $id, ParameterType::INTEGER);
+
+        $this->db->setQuery($query)->execute();
     }
 
     /**
@@ -143,17 +185,33 @@ final class AiChatRepository
      */
     public function setResponseChain(int $id, ?int $serviceId, ?string $responseId, ?string $lastResponseAt): void
     {
-        $stmt = $this->pdo->prepare(
-            'UPDATE ai_chats SET service_id = ?, previous_response_id = ?, last_response_at = ?, updated_at = ? WHERE id = ?'
-        );
-        $stmt->execute([$serviceId, $responseId, $lastResponseAt, gmdate('Y-m-d H:i:s'), $id]);
+        $now = gmdate('Y-m-d H:i:s');
+
+        $query = $this->db->createQuery()
+            ->update($this->qn('ai_chats'))
+            ->set($this->qn('service_id') . ' = :service_id')
+            ->set($this->qn('previous_response_id') . ' = :response_id')
+            ->set($this->qn('last_response_at') . ' = :last_response_at')
+            ->set($this->qn('updated_at') . ' = :now')
+            ->where($this->qn('id') . ' = :id')
+            ->bind(':service_id', $serviceId, $serviceId === null ? ParameterType::NULL : ParameterType::INTEGER)
+            ->bind(':response_id', $responseId, $responseId === null ? ParameterType::NULL : ParameterType::STRING)
+            ->bind(':last_response_at', $lastResponseAt, $lastResponseAt === null ? ParameterType::NULL : ParameterType::STRING)
+            ->bind(':now', $now, ParameterType::STRING)
+            ->bind(':id', $id, ParameterType::INTEGER);
+
+        $this->db->setQuery($query)->execute();
     }
 
     /** Deletes a chat and, via ON DELETE CASCADE, all its messages. */
     public function delete(int $id): void
     {
-        $stmt = $this->pdo->prepare('DELETE FROM ai_chats WHERE id = ?');
-        $stmt->execute([$id]);
+        $query = $this->db->createQuery()
+            ->delete($this->qn('ai_chats'))
+            ->where($this->qn('id') . ' = :id')
+            ->bind(':id', $id, ParameterType::INTEGER);
+
+        $this->db->setQuery($query)->execute();
     }
 
     /**
@@ -167,38 +225,55 @@ final class AiChatRepository
     {
         $now = gmdate('Y-m-d H:i:s');
 
-        $this->pdo->beginTransaction();
+        $this->db->transactionStart();
 
         try {
-            $del = $this->pdo->prepare('DELETE FROM ai_chat_messages WHERE chat_id = ?');
-            $del->execute([$chatId]);
+            $delQuery = $this->db->createQuery()
+                ->delete($this->qn('ai_chat_messages'))
+                ->where($this->qn('chat_id') . ' = :chat')
+                ->bind(':chat', $chatId, ParameterType::INTEGER);
 
-            if ($messages !== []) {
-                $ins = $this->pdo->prepare(
-                    'INSERT INTO ai_chat_messages (chat_id, role, content, tool_key, sort_order, created_at) '
-                    . 'VALUES (?, ?, ?, ?, ?, ?)'
-                );
+            $this->db->setQuery($delQuery)->execute();
 
-                foreach ($messages as $message) {
-                    $ins->execute([
-                        $chatId,
-                        $message->role,
-                        $message->content,
-                        $message->toolKey,
-                        $message->sortOrder,
-                        $now,
-                    ]);
-                }
+            foreach ($messages as $message) {
+                $role      = $message->role;
+                $content   = $message->content;
+                $toolKey   = $message->toolKey;
+                $sortOrder = $message->sortOrder;
+
+                $insQuery = $this->db->createQuery()
+                    ->insert($this->qn('ai_chat_messages'))
+                    ->columns([
+                        $this->qn('chat_id'),
+                        $this->qn('role'),
+                        $this->qn('content'),
+                        $this->qn('tool_key'),
+                        $this->qn('sort_order'),
+                        $this->qn('created_at'),
+                    ])
+                    ->values(':chat_id, :role, :content, :tool_key, :sort_order, :created_at')
+                    ->bind(':chat_id', $chatId, ParameterType::INTEGER)
+                    ->bind(':role', $role, ParameterType::STRING)
+                    ->bind(':content', $content, ParameterType::STRING)
+                    ->bind(':tool_key', $toolKey, $toolKey === null ? ParameterType::NULL : ParameterType::STRING)
+                    ->bind(':sort_order', $sortOrder, ParameterType::INTEGER)
+                    ->bind(':created_at', $now, ParameterType::STRING);
+
+                $this->db->setQuery($insQuery)->execute();
             }
 
-            $upd = $this->pdo->prepare(
-                'UPDATE ai_chats SET updated_at = ? WHERE id = ?'
-            );
-            $upd->execute([$now, $chatId]);
+            $updQuery = $this->db->createQuery()
+                ->update($this->qn('ai_chats'))
+                ->set($this->qn('updated_at') . ' = :now')
+                ->where($this->qn('id') . ' = :id')
+                ->bind(':now', $now, ParameterType::STRING)
+                ->bind(':id', $chatId, ParameterType::INTEGER);
 
-            $this->pdo->commit();
+            $this->db->setQuery($updQuery)->execute();
+
+            $this->db->transactionCommit();
         } catch (\Throwable $e) {
-            $this->pdo->rollBack();
+            $this->db->transactionRollback();
 
             throw $e;
         }

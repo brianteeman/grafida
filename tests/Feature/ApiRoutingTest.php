@@ -12,12 +12,11 @@ declare(strict_types=1);
 namespace Grafida\Tests\Feature;
 
 use Boson\Component\Http\Request;
-use Boson\Component\Http\Static\StaticProviderInterface;
-use Boson\Contracts\Http\RequestInterface;
-use Boson\Contracts\Http\ResponseInterface;
 use Grafida\Application\Kernel;
-use Grafida\Storage\Database;
-use Grafida\Storage\Migrator;
+use Grafida\Tests\Support\StubDialog;
+use Grafida\Tests\Support\TestContainer;
+use Grafida\Tests\Support\TestDatabase;
+use Joomla\Database\DatabaseInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -26,33 +25,28 @@ use PHPUnit\Framework\TestCase;
  */
 final class ApiRoutingTest extends TestCase
 {
-    private ?\PDO $lastPdo = null;
+    private ?DatabaseInterface $lastDb = null;
 
     private function kernel(): Kernel
     {
-        $pdo = Database::connect(':memory:');
-        (new Migrator($pdo))->migrate();
-        $this->lastPdo = $pdo;
+        $container    = TestContainer::create();
+        $this->lastDb = $container->get(DatabaseInterface::class);
 
-        $static = new class implements StaticProviderInterface {
-            public function findFileByRequest(RequestInterface $request): ?ResponseInterface
-            {
-                return null;
-            }
-        };
-
-        return new Kernel($static, $pdo, \dirname(__DIR__, 2));
+        return $container->get(Kernel::class);
     }
 
     /** Inserts a bare site row (drafts reference sites via a foreign key). */
     private function seedSite(string $title = 'Site'): int
     {
+        \assert($this->lastDb !== null, 'seedSite() must be called after kernel()');
+
         $now = gmdate('Y-m-d H:i:s');
-        $this->lastPdo?->prepare(
+        $pdo = TestDatabase::connection($this->lastDb);
+        $pdo->prepare(
             'INSERT INTO sites (title, base_url, created_at, updated_at) VALUES (?, ?, ?, ?)'
         )->execute([$title, 'https://example.test', $now, $now]);
 
-        return (int) ($this->lastPdo?->lastInsertId() ?? 0);
+        return (int) $pdo->lastInsertId();
     }
 
     private function call(Kernel $kernel, string $method, string $path, ?string $body = null): array
@@ -208,7 +202,7 @@ final class ApiRoutingTest extends TestCase
 
         // Reset wipes the site row too, so the site-scoped listing endpoint would now
         // 404 — query the drafts table directly to confirm the wipe reached it.
-        $count = $this->lastPdo?->query('SELECT COUNT(*) FROM drafts')->fetchColumn();
+        $count = TestDatabase::connection($this->lastDb)->query('SELECT COUNT(*) FROM drafts')->fetchColumn();
         self::assertSame(0, (int) $count);
     }
 
@@ -226,7 +220,7 @@ final class ApiRoutingTest extends TestCase
         $tmp = tempnam(sys_get_temp_dir(), 'grafida') . '.png';
         file_put_contents($tmp, 'PNGDATA');
 
-        $kernel = new Kernel($this->kernelStatic(), Database::connect(':memory:'), \dirname(__DIR__, 2), $this->stubDialog($tmp));
+        $kernel = TestContainer::create(dialog: new StubDialog(filePath: $tmp))->get(Kernel::class);
         [$status, $json] = $this->call($kernel, 'POST', '/api/dialog/open-file', json_encode(['filter' => 'image']));
 
         unlink($tmp);
@@ -240,57 +234,12 @@ final class ApiRoutingTest extends TestCase
 
     public function testOpenFileReturnsCancelledWhenDismissed(): void
     {
-        $kernel = new Kernel($this->kernelStatic(), Database::connect(':memory:'), \dirname(__DIR__, 2), $this->stubDialog(null));
+        $kernel = TestContainer::create(dialog: new StubDialog())->get(Kernel::class);
         [$status, $json] = $this->call($kernel, 'POST', '/api/dialog/open-file', json_encode(['filter' => 'image']));
 
         self::assertSame(200, $status);
         self::assertTrue($json['ok']);
         self::assertTrue($json['data']['cancelled']);
-    }
-
-    /** A no-op static provider, shared by the dialog tests. */
-    private function kernelStatic(): StaticProviderInterface
-    {
-        return new class implements StaticProviderInterface {
-            public function findFileByRequest(RequestInterface $request): ?ResponseInterface
-            {
-                return null;
-            }
-        };
-    }
-
-    /** A native Dialog API stub whose file-open returns the given path (or null). */
-    private function stubDialog(?string $path): \Boson\Api\Dialog\DialogApiInterface
-    {
-        return $this->stubDialogWith($path, null);
-    }
-
-    /** A native Dialog API stub whose file-open and directory-select return the given paths. */
-    private function stubDialogWith(?string $filePath, ?string $directoryPath): \Boson\Api\Dialog\DialogApiInterface
-    {
-        return new class($filePath, $directoryPath) implements \Boson\Api\Dialog\DialogApiInterface {
-            public function __construct(
-                private readonly ?string $filePath,
-                private readonly ?string $directoryPath,
-            ) {}
-            public function selectFile(?string $directory = null, iterable $filter = []): ?string
-            {
-                return $this->filePath;
-            }
-            public function selectFiles(?string $directory = null, iterable $filter = []): iterable
-            {
-                return [];
-            }
-            public function selectDirectory(?string $directory = null, iterable $filter = []): ?string
-            {
-                return $this->directoryPath;
-            }
-            public function selectDirectories(?string $directory = null, iterable $filter = []): iterable
-            {
-                return [];
-            }
-            public function open(string|\Stringable $uri): void {}
-        };
     }
 
     public function testSelectDirectoryIsUnavailableWithoutDialog(): void
@@ -303,12 +252,7 @@ final class ApiRoutingTest extends TestCase
 
     public function testSelectDirectoryReturnsChosenPath(): void
     {
-        $kernel = new Kernel(
-            $this->kernelStatic(),
-            Database::connect(':memory:'),
-            \dirname(__DIR__, 2),
-            $this->stubDialogWith(null, '/tmp/somewhere')
-        );
+        $kernel = TestContainer::create(dialog: new StubDialog(directoryPath: '/tmp/somewhere'))->get(Kernel::class);
         [$status, $json] = $this->call($kernel, 'POST', '/api/dialog/select-directory');
 
         self::assertSame(200, $status);
@@ -318,10 +262,7 @@ final class ApiRoutingTest extends TestCase
 
     public function testExportImportAsNewAndReplaceRoundTrip(): void
     {
-        $pdo    = Database::connect(':memory:');
-        (new Migrator($pdo))->migrate();
-        $this->lastPdo = $pdo;
-        $kernel = new Kernel($this->kernelStatic(), $pdo, \dirname(__DIR__, 2));
+        $kernel = $this->kernel();
 
         $siteId    = $this->seedSite('Source');
         $targetId  = $this->seedSite('Target');

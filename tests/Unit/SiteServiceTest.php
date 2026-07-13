@@ -16,20 +16,18 @@ use Grafida\Joomla\ApiClient;
 use Grafida\Site\SecureStoreUnavailableException;
 use Grafida\Site\SiteRepository;
 use Grafida\Site\SiteService;
-use Grafida\Storage\Database;
-use Grafida\Storage\Migrator;
+use Grafida\Tests\Support\TestDatabase;
 use Grafida\Tests\Unit\Support\ArraySecretStore;
 use Grafida\Tests\Unit\Support\FakeTransport;
-use PDO;
+use Joomla\Database\DatabaseInterface;
 
 final class SiteServiceTest extends TestCase
 {
-    private PDO $pdo;
+    private DatabaseInterface $db;
 
     protected function setUp(): void
     {
-        $this->pdo = Database::connect(':memory:');
-        (new Migrator($this->pdo))->migrate();
+        $this->db = TestDatabase::memory();
     }
 
     private function transport(): FakeTransport
@@ -43,7 +41,7 @@ final class SiteServiceTest extends TestCase
     public function testCreateStoresTokenInSecureStore(): void
     {
         $store   = new ArraySecretStore();
-        $service = new SiteService(new SiteRepository($this->pdo), new ApiClient($this->transport()), $store);
+        $service = new SiteService(new SiteRepository($this->db), new ApiClient($this->transport()), $store);
 
         $site = $service->create('My Site', 'https://example.com', 'secret-token');
 
@@ -56,7 +54,7 @@ final class SiteServiceTest extends TestCase
 
     public function testCreateWithoutSecureStoreRequiresOptIn(): void
     {
-        $service = new SiteService(new SiteRepository($this->pdo), new ApiClient($this->transport()), null);
+        $service = new SiteService(new SiteRepository($this->db), new ApiClient($this->transport()), null);
 
         $this->expectException(SecureStoreUnavailableException::class);
         $service->create('My Site', 'https://example.com', 'secret-token');
@@ -64,7 +62,7 @@ final class SiteServiceTest extends TestCase
 
     public function testCreateInsecureFallbackStoresPlaintext(): void
     {
-        $repo    = new SiteRepository($this->pdo);
+        $repo    = new SiteRepository($this->db);
         $service = new SiteService($repo, new ApiClient($this->transport()), null);
 
         $site = $service->create('My Site', 'https://example.com', 'secret-token', allowInsecure: true);
@@ -77,7 +75,7 @@ final class SiteServiceTest extends TestCase
     public function testDeleteRemovesSecret(): void
     {
         $store   = new ArraySecretStore();
-        $service = new SiteService(new SiteRepository($this->pdo), new ApiClient($this->transport()), $store);
+        $service = new SiteService(new SiteRepository($this->db), new ApiClient($this->transport()), $store);
 
         $site = $service->create('My Site', 'https://example.com', 'secret-token');
         $service->delete((int) $site->id);

@@ -11,30 +11,41 @@ declare(strict_types=1);
 
 namespace Grafida\Site;
 
-use PDO;
+use Grafida\Storage\QueryBuilderSupport;
+use Joomla\Database\DatabaseInterface;
+use Joomla\Database\ParameterType;
 
 /**
  * Data-access for the per-site cached favicon (`site_favicons` table).
  */
 final class FaviconRepository
 {
+    use QueryBuilderSupport;
+
     public function __construct(
-        private readonly PDO $pdo,
+        private readonly DatabaseInterface $db,
     ) {}
 
     /** Stores (or replaces) the cached favicon for a site. */
     public function put(int $siteId, string $mime, string $data): void
     {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO site_favicons (site_id, mime, data, fetched_at) '
-            . 'VALUES (:site, :mime, :data, :now) '
-            . 'ON CONFLICT(site_id) DO UPDATE SET mime = :mime, data = :data, fetched_at = :now'
-        );
-        $stmt->bindValue(':site', $siteId, PDO::PARAM_INT);
-        $stmt->bindValue(':mime', $mime);
-        $stmt->bindValue(':data', $data, PDO::PARAM_LOB);
-        $stmt->bindValue(':now', gmdate('Y-m-d H:i:s'));
-        $stmt->execute();
+        $now = gmdate('Y-m-d H:i:s');
+
+        // UPSERT: no builder vocabulary for ON CONFLICT. excluded.* means each
+        // placeholder is bound exactly once.
+        $query = $this->db->createQuery()
+            ->setQuery(
+                'INSERT INTO site_favicons (site_id, mime, data, fetched_at) '
+                . 'VALUES (:site, :mime, :data, :now) '
+                . 'ON CONFLICT(site_id) DO UPDATE SET '
+                . 'mime = excluded.mime, data = excluded.data, fetched_at = excluded.fetched_at'
+            )
+            ->bind(':site', $siteId, ParameterType::INTEGER)
+            ->bind(':mime', $mime, ParameterType::STRING)
+            ->bind(':data', $data, ParameterType::LARGE_OBJECT)
+            ->bind(':now', $now, ParameterType::STRING);
+
+        $this->db->setQuery($query)->execute();
     }
 
     /**
@@ -42,13 +53,19 @@ final class FaviconRepository
      */
     public function find(int $siteId): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT mime, data FROM site_favicons WHERE site_id = ?');
-        $stmt->execute([$siteId]);
+        $query = $this->db->createQuery()
+            ->select([
+                $this->qn('mime'),
+                $this->qn('data'),
+            ])
+            ->from($this->qn('site_favicons'))
+            ->where($this->qn('site_id') . ' = :site')
+            ->bind(':site', $siteId, ParameterType::INTEGER);
 
-        /** @var array{mime: string, data: string}|false $row */
-        $row = $stmt->fetch();
+        /** @var array{mime: string, data: string}|null $row */
+        $row = $this->db->setQuery($query)->loadAssoc();
 
-        if ($row === false) {
+        if ($row === null) {
             return null;
         }
 

@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 namespace Grafida\Storage;
 
+use Joomla\Database\DatabaseInterface;
 use PDO;
 
 /**
@@ -22,20 +23,19 @@ use PDO;
 final class Migrator
 {
     public function __construct(
-        private readonly PDO $pdo,
+        private readonly DatabaseInterface $db,
         private readonly string $migrationsDir = __DIR__ . '/../../storage/migrations',
     ) {}
 
     public function migrate(): void
     {
-        $this->pdo->exec(
+        $this->db->setQuery(
             'CREATE TABLE IF NOT EXISTS schema_migrations ('
             . 'name TEXT PRIMARY KEY, applied_at TEXT NOT NULL)'
-        );
+        )->execute();
 
-        $appliedStmt = $this->pdo->query('SELECT name FROM schema_migrations');
         /** @var list<string> $appliedList */
-        $appliedList = $appliedStmt !== false ? $appliedStmt->fetchAll(PDO::FETCH_COLUMN) : [];
+        $appliedList = $this->db->setQuery('SELECT name FROM schema_migrations')->loadColumn();
         $applied     = array_flip($appliedList);
 
         foreach ($this->migrationFiles() as $file) {
@@ -47,17 +47,36 @@ final class Migrator
 
             $sql = (string) file_get_contents($file);
 
-            $this->pdo->beginTransaction();
+            $this->db->transactionStart();
 
             try {
-                $this->pdo->exec($sql);
-                $stmt = $this->pdo->prepare(
-                    'INSERT INTO schema_migrations (name, applied_at) VALUES (?, ?)'
-                );
-                $stmt->execute([$name, gmdate('Y-m-d H:i:s')]);
-                $this->pdo->commit();
+                // The migration files contain multiple statements *and* `--`
+                // line comments. A prepared statement executes only the first
+                // statement, and DatabaseDriver::splitSql() is a naive `;`
+                // splitter that does not strip comments — either would
+                // silently corrupt the schema. Hand the whole file to PDO
+                // directly, exactly as the old Database-based migrator did.
+                $connection = $this->db->getConnection();
+                \assert($connection instanceof PDO);
+                $connection->exec($sql);
+
+                // bind() takes its value by reference and is typed `mixed`,
+                // which would otherwise widen $name's type for the rest of
+                // this scope (including the catch block below) — bind from
+                // throwaway copies instead.
+                $boundName      = $name;
+                $boundAppliedAt = gmdate('Y-m-d H:i:s');
+
+                $query = $this->db->createQuery()
+                    ->setQuery('INSERT INTO schema_migrations (name, applied_at) VALUES (:name, :applied_at)')
+                    ->bind(':name', $boundName)
+                    ->bind(':applied_at', $boundAppliedAt);
+
+                $this->db->setQuery($query)->execute();
+
+                $this->db->transactionCommit();
             } catch (\Throwable $e) {
-                $this->pdo->rollBack();
+                $this->db->transactionRollback();
 
                 throw new \RuntimeException(
                     sprintf('Migration "%s" failed: %s', $name, $e->getMessage()),

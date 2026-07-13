@@ -2,7 +2,8 @@
 
 Grafida is a cross-platform **desktop application** (macOS, Windows, Linux) for creating
 and editing **Joomla! articles** through the Joomla Web Services (REST) API. It is built in
-**PHP 8.4** with [**Boson**](https://bosonphp.com), uses **SQLite** for all local storage,
+**PHP 8.4** with [**Boson**](https://bosonphp.com), uses **SQLite** for all local storage
+(via **`joomla/database`**'s `SqliteDriver`, wired through a **`joomla/di`** container),
 and **TinyMCE 7** as the HTML editor. Licensed **GNU GPL v3 or later**. Dev happens on macOS.
 
 ## Scope (what we deliberately do NOT support)
@@ -25,26 +26,62 @@ into a PSR-style `Boson\Component\Http\Request` and answered with a `Response`. 
 front-end (a plain HTML/CSS/JS SPA under `assets/private`) talks to PHP by calling
 `fetch('boson://app/api/...')`.
 
-Request flow: `index.php` → `Grafida\FrontController` → `Grafida\Application\Kernel`
-(the composition root) → either `Grafida\Http\ApiController` (paths under `/api/`) or a
-static asset / the SPA shell. **The kernel is a pure `Request → Response` function**, so the
-whole back-end is testable without opening a window (see `tests/Feature/ApiRoutingTest.php`).
+Request flow: `index.php` → `Grafida\FrontController` → `Grafida\Application\Kernel` →
+either `Grafida\Http\ApiController` (paths under `/api/`) or a static asset / the SPA shell.
+**The kernel is a pure `Request → Response` function**, so the whole back-end is testable
+without opening a window (see `tests/Feature/ApiRoutingTest.php`).
+
+**The composition root is a DI container, not the Kernel.** `index.php` builds a
+`Grafida\Application\Container` (a thin `Joomla\DI\Container` subclass — see `src/Application/`)
+via `ContainerFactory::create()` and pulls `FrontController` out of it; `Kernel` is now just
+`(StaticProviderInterface $static, ApiController $api)`. Nothing is `new`ed ad-hoc and there is
+no global/singleton database object — add a service by registering it in a **service provider**
+(`src/Application/Provider/`), not by editing a constructor chain.
 
 **File pickers must go through the native dialog, not `<input type="file">`.** Boson's
 webview does not wire up the HTML file-input open-panel callback (WKWebView on macOS,
 WebKitGTK on Linux), so an in-page `<input type="file">` `.click()` silently does nothing.
-`index.php` therefore passes `$app->dialog` (Boson's `DialogApiInterface`) into the
-`FrontController` → `Kernel` → `ApiController`, and the SPA opens files via `POST
-/api/dialog/open-file` (`api.openFile(filter)`, filter `image`/`markdown`/`any`):
-`ApiController::openFile()` calls `selectFile()`, reads the chosen file and returns
-`{name, mime, dataBase64}` (or `{cancelled:true}`). `uploadLocalImage()` (intro/full-text
-images, the in-editor/media-browser "Choose file…" button) and `importMarkdown()` consume
-it. The dialog dependency is **nullable** so the kernel stays window-free in tests (a null
-dialog makes the endpoint return 503).
+`index.php` therefore passes `$app->dialog` (Boson's `DialogApiInterface`) into the container
+as the **`dialog` parameter**, from where it reaches `SettingsController`, and the SPA opens
+files via `POST /api/dialog/open-file` (`api.openFile(filter)`, filter
+`image`/`markdown`/`any`): `SettingsController::openFile()` calls `selectFile()`, reads the
+chosen file and returns `{name, mime, dataBase64}` (or `{cancelled:true}`). `uploadLocalImage()`
+(intro/full-text images, the in-editor/media-browser "Choose file…" button) and
+`importMarkdown()` consume it. The dialog dependency is **nullable** so the kernel stays
+window-free in tests (a null dialog makes the endpoint return 503).
 
 ## Layout
 
-- `src/Http/` — `HttpClient` (curl/stream transport to Joomla), internal `ApiController`, `Json`.
+- `src/Application/` — the **composition root**. `Container` is a thin `Joomla\DI\Container`
+  subclass whose only job is to give `get()` a generic return type (the parent's is `mixed`,
+  which PHPStan level max cannot use). `ContainerFactory::create(array $parameters = [])`
+  registers the parameters, then the five `Provider/` service providers (`StorageProvider`,
+  `HttpProvider`, `SiteProvider`, `AiProvider`, `AppProvider`, `ControllerProvider`). The
+  parameters are the app's only configuration seams — override them and you get a different
+  app without touching a constructor:
+  `db.path` (default `Paths::databaseFile()`; `':memory:'` in tests), `migrations.dir`,
+  `base.path`, `static.provider`, `dialog` (nullable), and `secret.store` — which is
+  **tri-state**: `null` → `SecretStoreFactory::secureStore()` (production), `false` → no store
+  (forces the insecure-plaintext fallback path), a `SecretStore` instance → used as-is.
+  The `DatabaseInterface` factory **connects *and* migrates**, so every consumer receives a
+  migrated database. `Kernel` is `(StaticProviderInterface, ApiController)`.
+- `src/Http/` — `HttpClient` (curl/stream transport to Joomla), `Json`, and the internal API.
+  `ApiController` is now only a **dispatcher** (~120 lines): it assembles a `Router` from the
+  controllers and maps exceptions to responses (`PublishBlockedException` → 422,
+  `SecureStoreUnavailableException` → 409, `ApiException` → 502, `\Throwable` → 500).
+  `Router` holds a real route table — `{name}` placeholders compile to anchored regexes, and
+  handlers resolve their controller **from the container on match**, so a request builds one
+  controller, not nine. A path that matches with an unregistered method returns **405**; an
+  unmatched path **404**. `RouteContext` carries the matched parameters, the parsed body and
+  the request. The handlers live in `src/Http/Controller/`: `BootstrapController`,
+  `SiteController`, `ArticleController`, `DraftController`, `MediaController`,
+  `AiServiceController`, `AiChatController`, `SettingsController` — each a container service
+  taking **only** the collaborators it uses (3–7 each; the old `ApiController` had 24). The
+  abstract `Controller` base is deliberately **dependency-free** (only the `str()`/`int()` body
+  parsers); the shared site/article helpers (`requireSite`, `connectedSite`, `siteArray`,
+  `withCategoryTitles`, the JSON:API relationship readers) live in `Grafida\Http\SiteContext`,
+  an injected collaborator — composition, not a god base class. Controllers must never call
+  each other; share through the injected services.
 - `src/Joomla/ApiClient.php` — Joomla REST client: base-URL normalisation + probing, JSON:API.
 - `src/Secret/` — OS secret stores (macOS `security`, Linux `secret-tool`, Windows DPAPI) + factory.
 - `src/Site/` — site entity, repository, `SiteService` (token storage + connection test).
@@ -219,10 +256,27 @@ dialog makes the endpoint return 503).
   `<html data-theme="light|dark">`;
   TinyMCE follows the app theme (skin `oxide`/`oxide-dark`); its editing surface switches to
   the dark built-in content CSS only when the site supplies no `editor.css`.
-- `src/Markdown/`, `src/I18n/`, `src/Storage/` — Markdown import, language service, SQLite + migrations.
+- `src/Markdown/`, `src/I18n/` — Markdown import; language service. `I18n\UiStrings::KEYS` is the
+  canonical list of UI string keys shipped to the SPA (used by `BootstrapController` and
+  `SettingsController`).
+- `src/Storage/` — SQLite + migrations, on **`joomla/database`**. There is **no global DB object**:
+  the container owns the single `Joomla\Database\DatabaseInterface` instance. `SqliteDatabase`
+  extends `Joomla\Database\Sqlite\SqliteDriver` and overrides `connect()` to apply the pragmas the
+  app depends on (`journal_mode = WAL`, `foreign_keys = ON` — the AI-chat cascade deletes need it —
+  and `busy_timeout = 5000`); `DatabaseFactory` builds one from a path.
+  `Migrator` applies `storage/migrations/*.sql` in lexicographic order, exactly once each, tracked
+  by file name in `schema_migrations`. **Its bookkeeping runs through the driver but each migration
+  file's body is still handed to the raw `\PDO::exec()`** (via `getConnection()`) — deliberately: the
+  `.sql` files hold multiple statements *and* `--` comments, which a prepared statement cannot run
+  and `DatabaseDriver::splitSql()` (a naive `;` splitter that does not strip comments) would mangle.
+  `04_ai_chat_response_chain.sql` is two bare `ALTER TABLE … ADD COLUMN`s and is **not** re-runnable,
+  which is what makes the `schema_migrations` bookkeeping load-bearing — and why
+  `StorageService::reset()` wipes every table *except* that one.
   `StorageService` reports the DB file path, opens its folder in the OS file browser
   (`open`/`explorer`/`xdg-open`), and resets local storage (deletes tokens + wipes all
   tables, keeping `schema_migrations`). Exposed under `/api/settings/storage[/open|/reset]`.
+  ⚠️ `PRAGMA foreign_keys` is a **no-op inside a transaction**, so `reset()` must never be wrapped
+  in one.
 - `src/Ai/` — the **AI chat assistant** (chat with an LLM about the open article, the document
   supplied as context; modelled on the Joomla AITiny plugin, **text only — no AI images**).
   `AiServiceManager` is CRUD over configured **AI services** (`ai_services`), each a named
@@ -621,8 +675,33 @@ map is for when the update mechanism itself is built.
 
 - Every PHP file starts with the GPLv3 copyright docblock. `declare(strict_types=1)`.
 - `composer test` runs the suite; `composer linter:check` runs PHPStan (level max + strict rules).
-- Add new UI strings to `language/en-GB/en-GB.ini` (canonical) and the `UI_KEYS`
-  list in `ApiController`, then translate. **See the translation flow below.**
+- Add new UI strings to `language/en-GB/en-GB.ini` (canonical) and the `KEYS`
+  list in `Grafida\I18n\UiStrings`, then translate. **See the translation flow below.**
+- **Never `new` a service — register it in a provider** (`src/Application/Provider/`) and let the
+  container inject it. There is no global database object and no singleton to reach for.
+- **Adding an endpoint** = a handler method on the right `src/Http/Controller/` class + one line in
+  that controller's `registerRoutes()`. Nothing else changes — no constructor chain to thread.
+- **Data access goes through `Joomla\Database\DatabaseInterface`, query-builder-first**
+  (`$db->createQuery()->select(…)->from($db->quoteName(…))->where(… . ' = :id')->bind(':id', $id, ParameterType::INTEGER)`).
+  Drop to raw `setQuery('…')` + `bind()` only where the builder has no vocabulary: the `ON CONFLICT`
+  upserts, `PRAGMA`s, and the `sqlite_master` introspection query. Three traps, all of which have
+  already bitten this codebase:
+  - **`bind()` takes its value BY REFERENCE.** Bind from a variable (or an array *element*), never
+    from an expression or literal — and the variable must still hold the right value at
+    `execute()` time, not just at `bind()` time.
+  - **`$query->insert()->set()` emits MySQL-only syntax** (`INSERT INTO t SET a = …`), which SQLite
+    rejects. Always use `insert()->columns([…])->values('…')`.
+  - **`loadAssoc()`/`loadResult()` return `null`** on no rows, not PDO's `false`.
+  Upserts use SQLite's `ON CONFLICT(key) DO UPDATE SET col = excluded.col` so no placeholder is ever
+  bound twice (native prepares reject a re-used named parameter with "column index out of range").
+- Tests build the app from the container: `tests/Support/TestContainer::create()` gives a fully-wired
+  app on an in-memory, already-migrated database (it takes the `secret.store` tri-state and an
+  optional dialog stub); `TestDatabase::memory()` gives a bare `DatabaseInterface` for repository
+  unit tests. The **Feature suite is the API contract** — it drives `Kernel::handle()` over every
+  route and asserts status + JSON shape. Do not edit an assertion to make a refactor pass.
+- ⚠️ `composer phpcs:check` currently fails on **every** `src/` file, including at pristine `HEAD` —
+  the installed php-cs-fixer disagrees with the committed formatting. It is **not** a usable gate;
+  match the surrounding style by eye and rely on `linter:check` + `test`.
 - Never build a localised sentence by concatenating fragments around an injected value — word
   order differs per language. Keep each message a single string with `%s` placeholders and
   interpolate in the SPA with `formatNodes(t('KEY'), node)` (returns text/DOM nodes to spread

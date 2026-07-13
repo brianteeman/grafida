@@ -16,9 +16,8 @@ use Grafida\Ai\AiServiceManager;
 use Grafida\Ai\AiServiceRepository;
 use Grafida\Ai\Defaults;
 use Grafida\Http\HttpClient;
-use Grafida\Storage\Database;
-use Grafida\Storage\Migrator;
-use PDO;
+use Grafida\Tests\Support\TestDatabase;
+use Joomla\Database\DatabaseInterface;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -45,7 +44,7 @@ use PHPUnit\Framework\TestCase;
  */
 final class ResponsesApiLiveTest extends TestCase
 {
-    private PDO $pdo;
+    private DatabaseInterface $db;
 
     private int $serviceId;
 
@@ -62,8 +61,7 @@ final class ResponsesApiLiveTest extends TestCase
             );
         }
 
-        $this->pdo = Database::connect(':memory:');
-        (new Migrator($this->pdo))->migrate();
+        $this->db = TestDatabase::memory();
 
         $provider = self::env('GRAFIDA_TEST_RESPONSES_PROVIDER');
 
@@ -276,7 +274,7 @@ final class ResponsesApiLiveTest extends TestCase
 
     private function manager(): AiServiceManager
     {
-        return new AiServiceManager(new AiServiceRepository($this->pdo), null);
+        return new AiServiceManager(new AiServiceRepository($this->db), null);
     }
 
     private function proxy(): AiProxy

@@ -17,6 +17,8 @@
         "boson-php/http-static-provider": "^0.19",
         "boson-php/runtime": "^0.19",
         "boson-php/webview-ext-web-components": "^0.19",
+        "joomla/database": "^4.0",
+        "joomla/di": "^4.0",
         "joomla/language": "^3.0",
         "league/commonmark": "^2.4",
         "symfony/html-sanitizer": "^8.1"

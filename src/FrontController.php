@@ -11,8 +11,6 @@ declare(strict_types=1);
 
 namespace Grafida;
 
-use Boson\Api\Dialog\DialogApiInterface;
-use Boson\Component\Http\Static\StaticProviderInterface;
 use Boson\Contracts\Http\RequestInterface;
 use Boson\Contracts\Http\ResponseInterface;
 use Grafida\Application\Kernel;
@@ -23,12 +21,7 @@ use Grafida\Application\Kernel;
  */
 final class FrontController
 {
-    private readonly Kernel $kernel;
-
-    public function __construct(StaticProviderInterface $static, ?DialogApiInterface $dialog = null)
-    {
-        $this->kernel = new Kernel($static, dialog: $dialog);
-    }
+    public function __construct(private readonly Kernel $kernel) {}
 
     public function __invoke(RequestInterface $request): ResponseInterface
     {

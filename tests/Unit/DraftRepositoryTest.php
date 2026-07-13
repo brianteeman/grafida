@@ -13,23 +13,22 @@ namespace Grafida\Tests\Unit;
 
 use Grafida\Article\Draft;
 use Grafida\Article\DraftRepository;
-use Grafida\Storage\Database;
-use Grafida\Storage\Migrator;
-use PDO;
+use Grafida\Tests\Support\TestDatabase;
+use Joomla\Database\DatabaseInterface;
 
 final class DraftRepositoryTest extends TestCase
 {
-    private PDO $pdo;
+    private DatabaseInterface $db;
 
     protected function setUp(): void
     {
-        $this->pdo = Database::connect(':memory:');
-        (new Migrator($this->pdo))->migrate();
-        $this->pdo->exec(
+        $this->db = TestDatabase::memory();
+        $connection = TestDatabase::connection($this->db);
+        $connection->exec(
             'INSERT INTO sites (id, title, base_url, created_at, updated_at) '
             . "VALUES (1, 'Site', 'https://example.com', '2026-01-01 00:00:00', '2026-01-01 00:00:00')"
         );
-        $this->pdo->exec(
+        $connection->exec(
             'INSERT INTO sites (id, title, base_url, created_at, updated_at) '
             . "VALUES (2, 'Other', 'https://other.example', '2026-01-01 00:00:00', '2026-01-01 00:00:00')"
         );
@@ -37,7 +36,7 @@ final class DraftRepositoryTest extends TestCase
 
     private function repo(): DraftRepository
     {
-        return new DraftRepository($this->pdo);
+        return new DraftRepository($this->db);
     }
 
     private function sample(): Draft

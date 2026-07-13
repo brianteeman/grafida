@@ -11,12 +11,8 @@ declare(strict_types=1);
 
 namespace Grafida\Tests\Feature;
 
-use Boson\Component\Http\Static\StaticProviderInterface;
-use Boson\Contracts\Http\RequestInterface;
-use Boson\Contracts\Http\ResponseInterface;
 use Grafida\Application\Kernel;
-use Grafida\Storage\Database;
-use Grafida\Storage\Migrator;
+use Grafida\Tests\Support\TestContainer;
 use Grafida\Tests\Unit\Support\ArraySecretStore;
 use PHPUnit\Framework\TestCase;
 
@@ -31,10 +27,7 @@ final class AiServiceRoutingTest extends TestCase
 
     private function kernelWithStore(?ArraySecretStore $store = null): Kernel
     {
-        $pdo = Database::connect(':memory:');
-        (new Migrator($pdo))->migrate();
-
-        return new Kernel($this->noopStatic(), $pdo, \dirname(__DIR__, 2), null, $store ?? false);
+        return TestContainer::create($store ?? false)->get(Kernel::class);
     }
 
     /** A kernel that uses no OS secret store (insecure-fallback path). */
@@ -56,16 +49,6 @@ final class AiServiceRoutingTest extends TestCase
         $response = $kernel->handle($request);
 
         return [(int) (string) $response->status, json_decode((string) $response->body, true)];
-    }
-
-    private function noopStatic(): StaticProviderInterface
-    {
-        return new class implements StaticProviderInterface {
-            public function findFileByRequest(RequestInterface $request): ?ResponseInterface
-            {
-                return null;
-            }
-        };
     }
 
     // ------------------------------------------------------------------

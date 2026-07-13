@@ -14,10 +14,9 @@ namespace Grafida\Tests\Unit\Ai;
 use Grafida\Ai\AiTool;
 use Grafida\Ai\AiToolRepository;
 use Grafida\Ai\Defaults;
-use Grafida\Storage\Database;
-use Grafida\Storage\Migrator;
+use Grafida\Tests\Support\TestDatabase;
 use Grafida\Tests\Unit\TestCase;
-use PDO;
+use Joomla\Database\DatabaseInterface;
 
 /**
  * Verifies that Defaults loads bundled JSON correctly and that effectiveTools()
@@ -25,12 +24,11 @@ use PDO;
  */
 final class DefaultsTest extends TestCase
 {
-    private PDO $pdo;
+    private DatabaseInterface $db;
 
     protected function setUp(): void
     {
-        $this->pdo = Database::connect(':memory:');
-        (new Migrator($this->pdo))->migrate();
+        $this->db = TestDatabase::memory();
     }
 
     // -----------------------------------------------------------------------
@@ -44,7 +42,7 @@ final class DefaultsTest extends TestCase
 
     private function toolRepo(): AiToolRepository
     {
-        return new AiToolRepository($this->pdo);
+        return new AiToolRepository($this->db);
     }
 
     // -----------------------------------------------------------------------

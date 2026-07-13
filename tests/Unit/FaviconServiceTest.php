@@ -15,22 +15,20 @@ use Grafida\Http\HttpResponse;
 use Grafida\Site\FaviconRepository;
 use Grafida\Site\FaviconService;
 use Grafida\Site\Site;
-use Grafida\Storage\Database;
-use Grafida\Storage\Migrator;
+use Grafida\Tests\Support\TestDatabase;
 use Grafida\Tests\Unit\Support\FakeTransport;
-use PDO;
+use Joomla\Database\DatabaseInterface;
 
 final class FaviconServiceTest extends TestCase
 {
-    private PDO $pdo;
+    private DatabaseInterface $db;
 
     protected function setUp(): void
     {
-        $this->pdo = Database::connect(':memory:');
-        (new Migrator($this->pdo))->migrate();
+        $this->db = TestDatabase::memory();
 
         // A site row must exist for the FK-constrained favicon cache.
-        $this->pdo->exec(
+        TestDatabase::connection($this->db)->exec(
             "INSERT INTO sites (id, title, base_url, api_base, created_at, updated_at) "
             . "VALUES (7, 'Example', 'https://example.com', 'https://example.com/index.php/api', '2026-01-01', '2026-01-01')"
         );
@@ -54,7 +52,7 @@ final class FaviconServiceTest extends TestCase
             ->on('https://example.com/', new HttpResponse(200, $html))
             ->on('https://cdn.example.com/big.png', new HttpResponse(200, 'PNGDATA', ['Content-Type' => 'image/png']));
 
-        $repo    = new FaviconRepository($this->pdo);
+        $repo    = new FaviconRepository($this->db);
         $service = new FaviconService($repo, $transport);
         $service->sync($this->site());
 
@@ -71,7 +69,7 @@ final class FaviconServiceTest extends TestCase
             ->on('https://example.com/', new HttpResponse(200, '<html><head></head><body></body></html>'))
             ->on('https://example.com/favicon.ico', new HttpResponse(200, 'ICODATA', ['Content-Type' => 'image/x-icon']));
 
-        $repo    = new FaviconRepository($this->pdo);
+        $repo    = new FaviconRepository($this->db);
         $service = new FaviconService($repo, $transport);
         $service->sync($this->site());
 
@@ -86,7 +84,7 @@ final class FaviconServiceTest extends TestCase
         $transport = (new FakeTransport(new HttpResponse(404, '')))
             ->throwFor('https://example.com/');
 
-        $repo    = new FaviconRepository($this->pdo);
+        $repo    = new FaviconRepository($this->db);
         $service = new FaviconService($repo, $transport);
         $service->sync($this->site());
 

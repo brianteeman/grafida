@@ -11,15 +11,19 @@ declare(strict_types=1);
 
 namespace Grafida\Media;
 
-use PDO;
+use Grafida\Storage\QueryBuilderSupport;
+use Joomla\Database\DatabaseInterface;
+use Joomla\Database\ParameterType;
 
 /**
  * Data-access for offline media blobs (images inserted while editing offline).
  */
 final class MediaRepository
 {
+    use QueryBuilderSupport;
+
     public function __construct(
-        private readonly PDO $pdo,
+        private readonly DatabaseInterface $db,
     ) {}
 
     /**
@@ -27,19 +31,29 @@ final class MediaRepository
      */
     public function store(int $siteId, ?int $draftId, string $filename, string $mime, string $data): int
     {
-        $stmt = $this->pdo->prepare(
-            'INSERT INTO media_blobs (site_id, draft_id, filename, mime, data, created_at) '
-            . 'VALUES (:site, :draft, :name, :mime, :data, :now)'
-        );
-        $stmt->bindValue(':site', $siteId, PDO::PARAM_INT);
-        $stmt->bindValue(':draft', $draftId, $draftId === null ? PDO::PARAM_NULL : PDO::PARAM_INT);
-        $stmt->bindValue(':name', $filename);
-        $stmt->bindValue(':mime', $mime);
-        $stmt->bindValue(':data', $data, PDO::PARAM_LOB);
-        $stmt->bindValue(':now', gmdate('Y-m-d H:i:s'));
-        $stmt->execute();
+        $now = gmdate('Y-m-d H:i:s');
 
-        return (int) $this->pdo->lastInsertId();
+        $query = $this->db->createQuery()
+            ->insert($this->qn('media_blobs'))
+            ->columns([
+                $this->qn('site_id'),
+                $this->qn('draft_id'),
+                $this->qn('filename'),
+                $this->qn('mime'),
+                $this->qn('data'),
+                $this->qn('created_at'),
+            ])
+            ->values(':site, :draft, :name, :mime, :data, :now')
+            ->bind(':site', $siteId, ParameterType::INTEGER)
+            ->bind(':draft', $draftId, $draftId === null ? ParameterType::NULL : ParameterType::INTEGER)
+            ->bind(':name', $filename, ParameterType::STRING)
+            ->bind(':mime', $mime, ParameterType::STRING)
+            ->bind(':data', $data, ParameterType::LARGE_OBJECT)
+            ->bind(':now', $now, ParameterType::STRING);
+
+        $this->db->setQuery($query)->execute();
+
+        return $this->lastInsertId();
     }
 
     /**
@@ -47,13 +61,23 @@ final class MediaRepository
      */
     public function find(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, filename, mime, data, remote_path, remote_url FROM media_blobs WHERE id = ?');
-        $stmt->execute([$id]);
+        $query = $this->db->createQuery()
+            ->select([
+                $this->qn('id'),
+                $this->qn('filename'),
+                $this->qn('mime'),
+                $this->qn('data'),
+                $this->qn('remote_path'),
+                $this->qn('remote_url'),
+            ])
+            ->from($this->qn('media_blobs'))
+            ->where($this->qn('id') . ' = :id')
+            ->bind(':id', $id, ParameterType::INTEGER);
 
-        /** @var array{id: int|string, filename: string, mime: string, data: string, remote_path: string|null, remote_url: string|null}|false $row */
-        $row = $stmt->fetch();
+        /** @var array{id: int|string, filename: string, mime: string, data: string, remote_path: string|null, remote_url: string|null}|null $row */
+        $row = $this->db->setQuery($query)->loadAssoc();
 
-        if ($row === false) {
+        if ($row === null) {
             return null;
         }
 
@@ -70,8 +94,16 @@ final class MediaRepository
     /** Records the remote path/URL after a successful upload. */
     public function markUploaded(int $id, string $remotePath, string $remoteUrl): void
     {
-        $stmt = $this->pdo->prepare('UPDATE media_blobs SET remote_path = ?, remote_url = ? WHERE id = ?');
-        $stmt->execute([$remotePath, $remoteUrl, $id]);
+        $query = $this->db->createQuery()
+            ->update($this->qn('media_blobs'))
+            ->set($this->qn('remote_path') . ' = :path')
+            ->set($this->qn('remote_url') . ' = :url')
+            ->where($this->qn('id') . ' = :id')
+            ->bind(':path', $remotePath, ParameterType::STRING)
+            ->bind(':url', $remoteUrl, ParameterType::STRING)
+            ->bind(':id', $id, ParameterType::INTEGER);
+
+        $this->db->setQuery($query)->execute();
     }
 
     /** Returns the data: URI representation of a stored blob. */

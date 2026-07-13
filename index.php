@@ -16,6 +16,7 @@ use Boson\WebView\Api\Schemes\Event\SchemeRequestReceived;
 use Boson\WebView\WebViewCreateInfo;
 use Boson\Window\WindowCreateInfo;
 use Boson\Window\WindowDecoration;
+use Grafida\Application\ContainerFactory;
 use Grafida\FrontController;
 
 require __DIR__ . '/vendor/autoload.php';
@@ -39,7 +40,12 @@ $static = new FilesystemStaticProvider([
     __DIR__ . '/assets/public',
 ]);
 
-$controller = new FrontController($static, $app->dialog);
+$container = ContainerFactory::create([
+    'static.provider' => $static,
+    'dialog'          => $app->dialog,
+]);
+
+$controller = $container->get(FrontController::class);
 
 $app->on(static function (SchemeRequestReceived $e) use ($controller): void {
     $e->response = $controller($e->request);
