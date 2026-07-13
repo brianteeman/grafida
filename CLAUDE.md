@@ -643,7 +643,14 @@ map is for when the update mechanism itself is built.
   appended to the `toolbar` string from `State.aiServices.length`): with no provider connection there
   is nothing for them to talk to, so they would be a dead end. The buttons are still *registered* in
   `setup` (harmless) — they are merely omitted from the toolbar layout. The gate is read at editor
-  init, so adding a first service then re-opening the editor makes them appear. The panel has
+  init, so adding a first service then re-opening the editor makes them appear.
+  **Every entry point that shows the panel (the toolbar toggle, a tool, "Custom…") leaves TinyMCE's
+  fullscreen mode first** (`_exitEditorFullscreen()` in `panel.js`, via the fullscreen plugin's
+  `isFullscreen()` + the `mceFullScreen` toggle command): the panel is docked in the app layout,
+  *outside* the TinyMCE container, so a fullscreen editor paints its viewport-filling overlay over
+  it and the button looks inert. In fullscreen the toggle therefore always **opens** (never closes)
+  the panel — a panel the user cannot see is not one they meant to close — and an already-open panel
+  is revealed as-is rather than re-opened, since `_openPanel()` resets the conversation. The panel has
   a **header** (`#ai-panel-header`) with the title plus **New chat** (`#ai-btn-new`, offers to remember
   the current chat then resets) and **Close** (`#ai-btn-close`, runs the close/remember flow and hides)
   buttons — the TinyMCE toolbar toggle is no longer the only way to close it. Each reply

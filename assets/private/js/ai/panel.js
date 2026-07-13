@@ -82,6 +82,17 @@
     function toggle() {
         const panel = document.getElementById('ai-panel');
         if (!panel) return;
+
+        // In fullscreen the panel sits behind the editor overlay, so a click on the
+        // toolbar button means "show me the assistant" — never "close it". Leave
+        // fullscreen and make sure the panel ends up open, whatever its state was.
+        // An already-open panel is revealed as-is: _openPanel() resets the
+        // conversation, which would wipe a chat started before going fullscreen.
+        if (_exitEditorFullscreen()) {
+            if (panel.classList.contains('hidden')) _openPanel(null);
+            return;
+        }
+
         if (panel.classList.contains('hidden')) {
             _openPanel(null);
         } else {
@@ -97,6 +108,8 @@
      * @param {Object} tool — entry from State.aiTools
      */
     function openWithTool(tool) {
+        _exitEditorFullscreen();
+
         _activeTool = tool;
         _history = [];
         _docContextEmbedded = false;
@@ -167,6 +180,27 @@
     // -------------------------------------------------------------------------
     //  Internal: open / close helpers
     // -------------------------------------------------------------------------
+
+    /**
+     * Leave TinyMCE's fullscreen mode, if the editor is currently in it.
+     *
+     * The #ai-panel is docked in the app layout, *outside* the TinyMCE container,
+     * while fullscreen paints the editor over the whole viewport at a high z-index.
+     * A panel opened while fullscreen is on is therefore invisible behind the
+     * overlay — the button looks like it does nothing. Every entry point that shows
+     * the panel drops out of fullscreen first.
+     *
+     * @returns {boolean} true if the editor was in fullscreen (and has now left it).
+     */
+    function _exitEditorFullscreen() {
+        const editor = State.tinyMCEEditor;
+        // The plugin API is absent in inline mode and before init: probe defensively.
+        if (!editor || !editor.plugins || !editor.plugins.fullscreen) return false;
+        if (!editor.plugins.fullscreen.isFullscreen()) return false;
+
+        editor.execCommand('mceFullScreen');   // the command is a toggle
+        return true;
+    }
 
     function _openPanel(tool) {
         _activeTool = tool || null;
@@ -1157,6 +1191,8 @@
          * can discover that they may ask anything, not only run a preset tool.
          */
         openCustom() {
+            _exitEditorFullscreen();
+
             const panel = document.getElementById('ai-panel');
             if (!panel) return;
             if (panel.classList.contains('hidden')) {
