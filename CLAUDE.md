@@ -440,6 +440,12 @@ the `package-*` targets. macOS arm64→`git-macos-arm`, macOS x86_64→`git-maco
 Linux aarch64→`git-linux-arm`, Linux x86_64→`git-linux-x86`, Windows→`git-win-x86`; an unrecognised
 host fails with a clear message.
 
+**Tests:** the `tests` target (depends only on `prepare-composer`, not the full `prepare`) runs
+`composer test` — the whole PHPUnit suite (unit + integration + feature). `phpunit.xml` sets
+`failOnEmptyTestSuite="false"` because `tests/Integration/` is currently scaffolding only (a base
+`TestCase` + stubs, no test classes yet); without that flag PHPUnit fails the whole run on that empty
+suite before the feature suite ever executes.
+
 **Release:** `all` is an alias for `package`. `release` (depends on `all`) is the standard release
 process: build+package every platform, then (1) create a **published GitHub release** with the
 installers/DMGs/PHAR as assets and `RELEASENOTES.md` as the description, (2) build `grafida.json` from

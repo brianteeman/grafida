@@ -8,6 +8,7 @@
          bootstrap="vendor/autoload.php"
          cacheDirectory="vendor/.cache.phpunit"
          backupStaticProperties="false"
+         failOnEmptyTestSuite="false"
 >
     <testsuites>
         <testsuite name="unit">

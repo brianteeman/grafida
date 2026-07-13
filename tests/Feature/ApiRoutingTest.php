@@ -206,8 +206,10 @@ final class ApiRoutingTest extends TestCase
         self::assertSame(200, $status);
         self::assertTrue($json['ok']);
 
-        [, $drafts] = $this->call($kernel, 'GET', '/api/sites/' . $siteId . '/drafts');
-        self::assertSame([], $drafts['data']);
+        // Reset wipes the site row too, so the site-scoped listing endpoint would now
+        // 404 — query the drafts table directly to confirm the wipe reached it.
+        $count = $this->lastPdo?->query('SELECT COUNT(*) FROM drafts')->fetchColumn();
+        self::assertSame(0, (int) $count);
     }
 
     public function testOpenFileIsUnavailableWithoutDialog(): void

@@ -177,6 +177,22 @@
 
 	<!--
 	====================================================================================================
+	Tasks - Tests
+
+	Runs the full PHPUnit suite (unit + feature + integration, per composer.json's `test` script).
+	Only needs the Composer dependencies — not the icons or npm-vendored front-end assets — so it
+	depends on prepare-composer directly rather than the full `prepare`.
+	====================================================================================================
+	-->
+
+	<target name="tests" depends="prepare-composer" description="Run the full PHPUnit test suite">
+		<exec executable="composer" dir="${dirs.root}" passthru="true" checkreturn="true">
+			<arg value="test" />
+		</exec>
+	</target>
+
+	<!--
+	====================================================================================================
 	Tasks - Per-platform binaries
 
 	`boson compile` builds every entry in boson.json's `target` array at once. build/tasks/compile-target.php
