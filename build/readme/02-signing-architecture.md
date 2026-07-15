@@ -74,6 +74,22 @@ wrong boundary can never ship. `sign-windows-exe.sh` additionally **refuses** an
 PE that still carries a PHAR overlay (it runs `pe-sfxsize.php` as a tripwire), so
 the combined binary can never be signed by accident again.
 
+**The one Windows-only subtlety (it cost a debugging cycle):** Authenticode does
+not sign in place — it appends a **certificate table at EOF**, *past* the stub's
+last PE section. So a split **and signed** stub has `file size > section end`.
+phpmicro's original `_micro_init_sfxsize()` computed the SFX size from sections
+only, so `filesize <= sfxsize` came out false and the sibling fallback never
+fired — the runtime tried to map the *certificate* as the phar. The fork's
+`_micro_init_sfxsize()` now folds the `IMAGE_DIRECTORY_ENTRY_SECURITY` data
+directory (a raw file offset+size, appended at EOF) into `sfxsize`, so the value
+reflects the true end of the executable image — the direct analogue of macOS's
+`__LINKEDIT` already covering its signature. The fork CI's **signed-sibling smoke
+test** (self-sign the test stub, then assert it still loads its sibling phar)
+guards this exact case; without it the regression is invisible until a real signed
+Windows run. This is why the split stub is signed *before* packaging but the phar
+is a plain sibling: the signature rides on the stub only, and the runtime knows to
+look past it.
+
 Key properties:
 
 * **Everything degrades gracefully.** No `build/sfx/` (offline, fresh machine,
