@@ -84,6 +84,8 @@ window-free in tests (a null dialog makes the endpoint return 503).
   each other; share through the injected services.
 - `src/Joomla/ApiClient.php` — Joomla REST client: base-URL normalisation + probing, JSON:API.
 - `src/Secret/` — OS secret stores (macOS `security`, Linux `secret-tool`, Windows DPAPI) + factory.
+  Windows DPAPI runs through **`WindowsDpapi`** (a direct FFI call into `crypt32.dll`), **not** a
+  `powershell.exe` spawn — see the Windows build note below for why (the multi-second UI stall).
 - `src/Site/` — site entity, repository, `SiteService` (token storage + connection test).
   `FaviconService` (5s fetch) parses the site home page for `<link rel="icon">` / Apple
   touch icons, downloads the largest one (falling back to `/apple-touch-icon.png` then
@@ -477,10 +479,18 @@ warn+skip), but a failing compile or a genuine packaging-tool error is fatal. Pi
   PHP runtime (the phpmicro SFX is a CLI build), so Windows gives it a console. `index.php` hides
   it immediately via FFI (`ShowWindow(GetConsoleWindow(), SW_HIDE)`), which also stops the
   per-click flashing: the console subprocesses the backend spawns (`Grafida\Secret\ProcessRunner`
-  — the registry theme probe and the DPAPI secret store) **inherit** the hidden console instead of
-  each popping a fresh visible one. (A related UI-stall from those synchronous spawns blocking the
-  single-threaded kernel — theme re-probe on window focus, DPAPI decrypt per request — is a
-  separate, still-open perf issue best fixed by caching those hot paths.)
+  — the registry theme probe) **inherit** the hidden console instead of each popping a fresh visible
+  one. **The secret store no longer spawns at all:** the old `WindowsSecretStore` shelled out to a
+  whole `powershell.exe` (~1s cold start) for every DPAPI protect/unprotect, and because the
+  `boson://` kernel is single-threaded that froze the UI on every request needing a stored secret
+  (site token, AI key) — the multi-second stall. `Grafida\Secret\WindowsDpapi` now calls
+  `crypt32.dll`'s `CryptProtectData`/`CryptUnprotectData` **directly via FFI** (sub-millisecond, no
+  subprocess); it is byte-compatible with the .NET `ProtectedData` CurrentUser/no-entropy blob the
+  PowerShell path wrote, so existing secrets keep working, and PowerShell remains a fallback only
+  when FFI is unavailable. `WindowsSecretStore` also memoises decrypted secrets for the session (it
+  is a container singleton) and no longer probes with `where powershell`. The registry theme probe
+  (`DisplayModeService::windowsPrefersDark()`, on window focus) still spawns `reg.exe`, but that is
+  a tiny native binary — tens of ms, not seconds — and now flash-free via the hidden console.
 - PHAR: `scripts/make-phar-dist.sh` copies the compiler's `build/phar/grafida.phar` to `Grafida-<v>.phar`.
 
 **Binaries-only build (no packaging):** `build.xml` (root) is a **Phing** buildfile whose default
