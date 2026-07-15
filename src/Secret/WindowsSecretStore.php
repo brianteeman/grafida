@@ -24,46 +24,82 @@ use Grafida\Support\Paths;
  */
 final class WindowsSecretStore implements SecretStore
 {
+    /** @var array<string, ?string> Decrypted secrets, memoised for this session. */
+    private array $cache = [];
+
     public function __construct(
         private readonly ProcessRunner $runner = new ProcessRunner(),
         private readonly ?string $secretsDir = null,
+        private readonly WindowsDpapi $dpapi = new WindowsDpapi(),
     ) {}
 
     public function isAvailable(): bool
     {
-        return \PHP_OS_FAMILY === 'Windows' && $this->runner->exists('powershell');
+        // DPAPI is present on every Windows install — natively (crypt32.dll, via
+        // WindowsDpapi) and through the built-in PowerShell fallback. Do NOT probe
+        // by spawning `where powershell`: that subprocess would freeze the
+        // single-threaded kernel for no reason (the very stall we are removing).
+        return \PHP_OS_FAMILY === 'Windows';
     }
 
     public function set(string $reference, string $secret): void
     {
-        $script = <<<'PS'
-            $ErrorActionPreference = 'Stop'
-            Add-Type -AssemblyName System.Security
-            $plain = [Console]::In.ReadToEnd()
-            $bytes = [System.Text.Encoding]::UTF8.GetBytes($plain)
-            $enc = [System.Security.Cryptography.ProtectedData]::Protect($bytes, $null, 'CurrentUser')
-            [Console]::Out.Write([Convert]::ToBase64String($enc))
-            PS;
+        // Native DPAPI first (no subprocess); fall back to PowerShell only if FFI
+        // is unavailable. The on-disk format is identical either way:
+        // base64(CurrentUser DPAPI blob).
+        $blob = $this->dpapi->protect($secret);
 
-        [$code, $stdout, $stderr] = $this->runPowerShell($script, $secret);
+        if ($blob !== null) {
+            $encoded = base64_encode($blob);
+        } else {
+            $script = <<<'PS'
+                $ErrorActionPreference = 'Stop'
+                Add-Type -AssemblyName System.Security
+                $plain = [Console]::In.ReadToEnd()
+                $bytes = [System.Text.Encoding]::UTF8.GetBytes($plain)
+                $enc = [System.Security.Cryptography.ProtectedData]::Protect($bytes, $null, 'CurrentUser')
+                [Console]::Out.Write([Convert]::ToBase64String($enc))
+                PS;
 
-        if ($code !== 0) {
-            throw new SecretStoreException('DPAPI protect failed: ' . trim($stderr));
+            [$code, $stdout, $stderr] = $this->runPowerShell($script, $secret);
+
+            if ($code !== 0) {
+                throw new SecretStoreException('DPAPI protect failed: ' . trim($stderr));
+            }
+
+            $encoded = $stdout;
         }
 
-        file_put_contents($this->file($reference), $stdout);
+        file_put_contents($this->file($reference), $encoded);
+        $this->cache[$reference] = $secret;
     }
 
     public function get(string $reference): ?string
     {
+        if (\array_key_exists($reference, $this->cache)) {
+            return $this->cache[$reference];
+        }
+
         $file = $this->file($reference);
 
         if (!is_file($file)) {
-            return null;
+            return $this->cache[$reference] = null;
         }
 
         $cipher = (string) file_get_contents($file);
 
+        // Native DPAPI first (sub-millisecond, no subprocess).
+        $blob = base64_decode($cipher, true);
+
+        if ($blob !== false) {
+            $plain = $this->dpapi->unprotect($blob);
+
+            if ($plain !== null) {
+                return $this->cache[$reference] = $plain;
+            }
+        }
+
+        // Fall back to PowerShell (e.g. FFI disabled).
         $script = <<<'PS'
             $ErrorActionPreference = 'Stop'
             Add-Type -AssemblyName System.Security
@@ -75,7 +111,7 @@ final class WindowsSecretStore implements SecretStore
 
         [$code, $stdout] = $this->runPowerShell($script, $cipher);
 
-        return $code === 0 ? $stdout : null;
+        return $this->cache[$reference] = ($code === 0 ? $stdout : null);
     }
 
     public function delete(string $reference): void
@@ -85,6 +121,8 @@ final class WindowsSecretStore implements SecretStore
         if (is_file($file)) {
             @unlink($file);
         }
+
+        unset($this->cache[$reference]);
     }
 
     public function isSecure(): bool

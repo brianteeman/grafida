@@ -16,3 +16,16 @@ parameters:
     - src
   tmpDir: vendor/.cache.phpstan
   treatPhpDocTypesAsCertain: false
+  ignoreErrors:
+    # WindowsDpapi is pure FFI glue: PHPStan cannot see through FFI\CData magic
+    # properties (the GRAFIDA_DATA_BLOB struct fields) or narrow the nullable
+    # crypt32/kernel32 handles that available() has already proven non-null.
+    -
+      identifier: property.notFound
+      path: src/Secret/WindowsDpapi.php
+    -
+      identifier: method.notFound
+      path: src/Secret/WindowsDpapi.php
+    -
+      identifier: argument.type
+      path: src/Secret/WindowsDpapi.php
