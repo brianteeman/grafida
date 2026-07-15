@@ -463,6 +463,24 @@ warn+skip), but a failing compile or a genuine packaging-tool error is fatal. Pi
   SFX the unsigned combined binary ships (it works); if signing is configured but the SFX is
   missing, the script aborts rather than emit a broken signed binary. Docs:
   `build/readme/04-exe-signing-on-macos.md`, `02-signing-architecture.md`.
+  **The installer bundles the Visual C++ 2015-2022 runtime app-local.** Boson's
+  `libboson-windows-x86_64.dll` imports `MSVCP140*`/`VCRUNTIME140*`, which a clean Windows
+  (especially Server) lacks — without them grafida.exe dies at startup with an FFI *"The
+  specified module could not be found"*. Windows resolves a DLL's imports from the app dir first,
+  so the four CRT DLLs ride next to grafida.exe (no admin, unlike the machine-wide redist). They
+  are collected by the phpmicro `build-windows` CI (the only Windows box with VS) and published as
+  `vc-runtime-x86_64.zip`; `scripts/fetch-sfx.sh` downloads + extracts them to `build/sfx/vc-runtime/`,
+  `make-windows-installer.sh` copies them into the package dir, and NSIS ships every `*.dll` beside
+  the exe (`File "${SRCDIR}/*.dll"` — libboson + the VC runtime). Best-effort: a build without the
+  fetched runtime just omits them.
+  **The flashing CMD window is suppressed at startup.** grafida.exe runs on a console-subsystem
+  PHP runtime (the phpmicro SFX is a CLI build), so Windows gives it a console. `index.php` hides
+  it immediately via FFI (`ShowWindow(GetConsoleWindow(), SW_HIDE)`), which also stops the
+  per-click flashing: the console subprocesses the backend spawns (`Grafida\Secret\ProcessRunner`
+  — the registry theme probe and the DPAPI secret store) **inherit** the hidden console instead of
+  each popping a fresh visible one. (A related UI-stall from those synchronous spawns blocking the
+  single-threaded kernel — theme re-probe on window focus, DPAPI decrypt per request — is a
+  separate, still-open perf issue best fixed by caching those hot paths.)
 - PHAR: `scripts/make-phar-dist.sh` copies the compiler's `build/phar/grafida.phar` to `Grafida-<v>.phar`.
 
 **Binaries-only build (no packaging):** `build.xml` (root) is a **Phing** buildfile whose default

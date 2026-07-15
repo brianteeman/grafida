@@ -29,6 +29,10 @@ ASSETS=(
   macos-aarch64.standard.sfx
   macos-x86_64.standard.sfx
   windows-x86_64.standard.sfx
+  # Visual C++ 2015-2022 runtime DLLs (a zip, extracted below) — Boson's
+  # libboson-windows-x86_64.dll imports them and a clean Windows lacks them, so
+  # Grafida bundles them app-local next to grafida.exe (see make-windows-installer.sh).
+  vc-runtime-x86_64.zip
 )
 
 FORCE=0
@@ -70,5 +74,25 @@ for asset in "${ASSETS[@]}"; do
   chmod 755 "$target"
   echo "  ✓ $target"
 done
+
+# Extract the VC++ runtime zip into build/sfx/vc-runtime/ so make-windows-installer.sh
+# can bundle the loose DLLs app-local. Re-extract whenever the zip is present (cheap;
+# keeps the folder in sync with a freshly downloaded zip).
+VCRT_ZIP="$ROOT/build/sfx/vc-runtime-x86_64.zip"
+if [ -f "$VCRT_ZIP" ]; then
+  if command -v unzip >/dev/null 2>&1; then
+    rm -rf "$ROOT/build/sfx/vc-runtime"
+    mkdir -p "$ROOT/build/sfx/vc-runtime"
+    if unzip -oq "$VCRT_ZIP" -d "$ROOT/build/sfx/vc-runtime"; then
+      echo "  ✓ extracted VC++ runtime → build/sfx/vc-runtime/ ($(ls "$ROOT/build/sfx/vc-runtime" | tr '\n' ' '))"
+    else
+      echo "  ✗ could not extract $VCRT_ZIP" >&2
+      FAILED=1
+    fi
+  else
+    echo "  (unzip not found — leaving vc-runtime-x86_64.zip unextracted; the Windows" >&2
+    echo "   installer will fall back to NOT bundling the VC++ runtime)" >&2
+  fi
+fi
 
 exit $FAILED

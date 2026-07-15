@@ -102,7 +102,10 @@ VIAddVersionKey "ProductVersion"  "${APPVERSION}"
 Section "Install"
     SetOutPath "$INSTDIR"
     File "${SRCDIR}/${APPEXE}"
-    File "${SRCDIR}/${APPDLL}"
+    ; All DLLs staged beside the exe: Boson's libboson-windows-x86_64.dll plus, when
+    ; scripts/fetch-sfx.sh provided them, the app-local Visual C++ runtime DLLs
+    ; (MSVCP140*/VCRUNTIME140*) libboson needs on a clean Windows.
+    File "${SRCDIR}/*.dll"
     File "/oname=${APPICON}" "${ICONFILE}"
 
     ; A code-signed build ships the app payload as a sibling PHAR beside the
@@ -143,7 +146,7 @@ SectionEnd
 Section "Uninstall"
     Delete "$INSTDIR\${APPEXE}"
     Delete "$INSTDIR\${APPPHAR}"
-    Delete "$INSTDIR\${APPDLL}"
+    Delete "$INSTDIR\*.dll"
     Delete "$INSTDIR\${APPICON}"
     RMDir /r "$INSTDIR\assets"
     Delete "$INSTDIR\uninstall.exe"

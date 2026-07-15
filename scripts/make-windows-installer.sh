@@ -88,6 +88,24 @@ else
   echo "      but is not code-signed). Add build/sfx/windows-x86_64.standard.sfx to sign it." >&2
 fi
 
+# Bundle the Visual C++ 2015-2022 runtime app-local (next to grafida.exe). Boson's
+# libboson-windows-x86_64.dll imports MSVCP140*/VCRUNTIME140*, absent on a clean
+# Windows (especially Server), so without these the app dies at startup with an FFI
+# "The specified module could not be found" on libboson. Windows resolves a DLL's
+# imports from the app directory first, so shipping them beside the exe makes the
+# per-user, no-admin installer self-contained. Fetched by scripts/fetch-sfx.sh into
+# build/sfx/vc-runtime/. Best-effort: a build without them just omits them (the user
+# then needs the "Microsoft Visual C++ 2015-2022 Redistributable (x64)" installed).
+VCRT_DIR="$ROOT/build/sfx/vc-runtime"
+if ls "$VCRT_DIR"/*.dll >/dev/null 2>&1; then
+  cp "$VCRT_DIR"/*.dll "$PKG_DIR/"
+  echo "Bundled app-local VC++ runtime: $(cd "$VCRT_DIR" && ls *.dll | tr '\n' ' ')"
+else
+  echo "Warning: build/sfx/vc-runtime/ has no DLLs — NOT bundling the VC++ runtime. A clean" >&2
+  echo "         Windows will need the 'Microsoft Visual C++ 2015-2022 Redistributable (x64)'." >&2
+  echo "         Run scripts/fetch-sfx.sh to fetch it, then repackage." >&2
+fi
+
 MAKENSIS="$(command -v makensis 2>/dev/null || true)"
 
 if [ -n "$MAKENSIS" ]; then
