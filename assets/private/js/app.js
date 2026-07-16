@@ -4487,6 +4487,7 @@ function applyStrings() {
     document.querySelectorAll('[data-i18n-placeholder]').forEach(node => {
         node.placeholder = t(node.dataset.i18nPlaceholder);
     });
+    syncSidebarTooltips();
     renderSiteSelector();
     renderSettingsScreen();
     renderSidebarFooter();
@@ -5334,6 +5335,7 @@ function renderSidebarFooter() {
     if (!label) return;
     const version = State.app.version || '';
     label.textContent = version ? t('GRAFIDA_LBL_VERSION') + ' ' + version : t('GRAFIDA_BTN_ABOUT');
+    syncSidebarTooltips();
 }
 
 /**
@@ -5602,19 +5604,47 @@ const PROPS_COLLAPSED_KEY = 'grafida.propsCollapsed';
 const AI_PANEL_WIDTH_KEY = 'grafida.aiPanelWidth';
 
 /** Toggle a collapsible aside and persist the preference. */
-function setupCollapsible(asideId, toggleId, storageKey) {
+function setupCollapsible(asideId, toggleId, storageKey, onChange) {
     const aside = document.getElementById(asideId);
     const toggle = document.getElementById(toggleId);
     if (!aside) return;
 
     if (localStorage.getItem(storageKey) === '1') aside.classList.add('collapsed');
+    if (onChange) onChange();
 
     if (toggle) {
         toggle.addEventListener('click', () => {
             const collapsed = aside.classList.toggle('collapsed');
             localStorage.setItem(storageKey, collapsed ? '1' : '0');
+            if (onChange) onChange();
         });
     }
+}
+
+/**
+ * Mirror each sidebar item's label into a tooltip while the rail is collapsed: the
+ * labels are hidden then, leaving only an icon. The aria-label is kept either way,
+ * since a collapsed item has no accessible name at all without it.
+ */
+function syncSidebarTooltips() {
+    const sidebar = document.getElementById('sidebar');
+    if (!sidebar) return;
+
+    const collapsed = sidebar.classList.contains('collapsed');
+    const label = (node, text) => {
+        if (!text) return;
+        node.setAttribute('aria-label', text);
+        if (collapsed) node.title = text; else node.removeAttribute('title');
+    };
+
+    sidebar.querySelectorAll('nav#main-nav a[data-screen]').forEach(link => {
+        const span = link.querySelector('span[data-i18n]');
+        if (span) label(link, span.textContent);
+    });
+
+    const footer = document.getElementById('sidebar-footer');
+    const version = document.getElementById('sidebar-version');
+    if (footer && version) label(footer, version.textContent || t('GRAFIDA_BTN_ABOUT'));
 }
 
 /** Make the AI panel resizable by dragging its left-edge handle. */
@@ -5669,7 +5699,7 @@ function setupAiPanelResize() {
 }
 
 function initLayoutControls() {
-    setupCollapsible('sidebar', 'sidebar-toggle', SIDEBAR_COLLAPSED_KEY);
+    setupCollapsible('sidebar', 'sidebar-toggle', SIDEBAR_COLLAPSED_KEY, syncSidebarTooltips);
     setupCollapsible('editor-sidebar', 'editor-sidebar-toggle', PROPS_COLLAPSED_KEY);
     setupAiPanelResize();
 }

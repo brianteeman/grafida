@@ -398,6 +398,12 @@ window-free in tests (a null dialog makes the endpoint return 503).
   (`setupAiPanelResize()`, pointer events, clamped 280px…`min(innerWidth−360, 760)`); the chosen
   width persists in `grafida.aiPanelWidth`. Toggle buttons localise their tooltip/`aria-label` via a
   `data-i18n-title` attribute (`applyStrings()` sets both `title` and `aria-label` from it).
+  The collapsed left rail is icon-only, so `syncSidebarTooltips()` mirrors each nav item's (and the
+  footer's) visible label into a `title` **only while collapsed**, and keeps the `aria-label` set in
+  both states — a collapsed item's label is `display:none`, leaving it with no accessible name at
+  all. It re-runs on toggle, on `applyStrings()` (language switch) and from `renderSidebarFooter()`
+  (the version label is filled in asynchronously by `bootstrap()`), since it copies rendered text
+  rather than looking keys up itself.
 - `language/<tag>/<tag>.ini` — translations, one file per language (e.g. `language/de-DE/de-DE.ini`).
   (There is **no** Joomla `.sys.ini` or `language/grafida.xml` manifest, and the files are **not**
   named `<tag>.com_grafida.ini` — Grafida is a desktop app, not a Joomla component. `LanguageService`

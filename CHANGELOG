@@ -10,6 +10,7 @@ Grafida 0.2
 # [MEDIUM] Windows: multi-second freeze whenever a stored secret was read
 # [LOW] Windows: a command window flashed at startup and on theme detection
 # [LOW] AI tool icons were blank in Settings and the editor's AI Tools menu
+# [LOW] The collapsed sidebar's icons had no tooltip and no accessible name
 # [LOW] Dialogs closed when clicking outside them, discarding your input
 # [LOW] The site selector's "no sites yet" placeholder was truncated
 
