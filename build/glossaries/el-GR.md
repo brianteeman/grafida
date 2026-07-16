@@ -123,3 +123,4 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | alias (URL slug) | Ψευδώνυμο | The article's URL slug; Joomla Greek uses "Ψευδώνυμο". GRAFIDA_LBL_ALIAS. |
 | icon picker | επιλογή εικονιδίου | Searchable dropdown for the AI-tool icon. GRAFIDA_BTN_AI_TOOL_ICON_CHOOSE / GRAFIDA_PLACEHOLDER_AI_TOOL_ICON_SEARCH. Uses «εικονίδιο» per the existing icon entry. |
 | list site articles | Προβολή άρθρων ιστοτόπου | Empty-state action that switches to the Remote Articles tab. GRAFIDA_BTN_LIST_SITE_ARTICLES. |
+| visit site | Επίσκεψη ιστοτόπου | Sidebar button under the site favicon; opens the site in the OS browser. GRAFIDA_BTN_OPEN_SITE. |

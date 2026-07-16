@@ -93,7 +93,10 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `sync()` is best-effort, run when a site is connected/updated (and on the manual metadata
   refresh); the cached icon is sent to the SPA as each site's `favicon` data: URI (in the
   `bootstrap`/sites payloads) and shown as a 64×64 rounded square on the Sites page and below
-  the sidebar site dropdown.
+  the sidebar site dropdown. Under that sidebar favicon sits a **Visit site** button
+  (`GRAFIDA_BTN_OPEN_SITE`, rendered by `renderSidebarFavicon()`) opening the site's `baseUrl` in
+  the OS browser via `api.openUrl()`; like the favicon it only exists while a site is selected,
+  and the collapsed icon rail hides it along with the whole `#site-selector`.
 - `src/Reference/` — cached categories/tags/levels/fields + `EditorCssService` (5s fetch, rebase, cache).
   `ReferenceService` uses a short-timeout (8s) API client; `sync()` warms the cache best-effort
   when a site is connected/updated, and opening the editor falls back to cache per-list (only the

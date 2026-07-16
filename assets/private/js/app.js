@@ -766,7 +766,10 @@ function recallLastSite() {
     }
 }
 
-/** Refresh the favicon shown below the sidebar site dropdown. */
+/**
+ * Refresh the favicon — and the "visit the site" button below it — shown under
+ * the sidebar site dropdown. Both only exist while a site is selected.
+ */
 function renderSidebarFavicon() {
     const box = document.getElementById('sidebar-site-favicon');
     if (!box) return;
@@ -776,7 +779,24 @@ function renderSidebarFavicon() {
         ? State.sites.find(s => s.id === State.currentSiteId)
         : null;
 
-    if (site) box.appendChild(siteFaviconEl(site));
+    if (!site) return;
+
+    box.appendChild(siteFaviconEl(site));
+
+    if (!site.baseUrl) return;
+
+    const visitBtn = iconBtn(
+        'arrow-up-right-from-square', t('GRAFIDA_BTN_OPEN_SITE'),
+        'btn', 'btn-sm', 'btn-secondary'
+    );
+    visitBtn.addEventListener('click', async () => {
+        try {
+            await api.openUrl(site.baseUrl);
+        } catch (err) {
+            showToast(err.message, 'error');
+        }
+    });
+    box.appendChild(visitBtn);
 }
 
 function renderSiteSelector() {

@@ -122,3 +122,4 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | alias (URL slug) | Alias | The article's URL slug; kept as "Alias" (Joomla convention). GRAFIDA_LBL_ALIAS. |
 | icon picker | selettore di icone | Searchable dropdown for the AI-tool icon. GRAFIDA_BTN_AI_TOOL_ICON_CHOOSE / GRAFIDA_PLACEHOLDER_AI_TOOL_ICON_SEARCH. «icona» per GRAFIDA_LBL_AI_TOOL_ICON. |
 | list site articles | elenca gli articoli del sito | Empty-state action that switches to the Remote Articles tab. GRAFIDA_BTN_LIST_SITE_ARTICLES. |
+| visit site | Visita il sito | Sidebar button under the site favicon; opens the site in the OS browser. GRAFIDA_BTN_OPEN_SITE. |

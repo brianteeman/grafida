@@ -225,7 +225,9 @@ html, body {
 
 #sidebar-site-favicon {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
     margin-top: 10px;
 }
 
