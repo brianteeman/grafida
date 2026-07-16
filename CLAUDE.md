@@ -692,6 +692,12 @@ map is for when the update mechanism itself is built.
   always ends with a separated **"Custom…"** item (`GrafidaAIPanel.openCustom()`) — present even when no
   tools are configured — that opens the panel with an empty chat for a free-form prompt, so the
   ask-anything path is discoverable from the tools menu, not only via the AI Assistant toggle.
+  Each tool item shows its FontAwesome icon (matching the Settings AI Tools list): TinyMCE's icon
+  registry cannot use the FA webfont directly, so `addIcon` is fed an **HTML `<span class="fa-solid
+  fa-…">`** (not an SVG) whose FA `font-family`/`font-weight` are harvested once at runtime from
+  `::before` via `getComputedStyle` (`faIconInlineStyle()` in `app.js`) — the SVG-free webfont
+  technique ported from AITiny. Tool `icon` values are stored **prefix-less** (`check`, not
+  `fa-check`) since the render sites prepend `fa-solid fa-`.
   **Both AI toolbar entries (`aitools aiassistant`) are only added to the editor toolbar when at least
   one AI service is configured** (`hasAiService` in `initTinyMCE()` gates the `aiToolbarSegment`
   appended to the `toolbar` string from `State.aiServices.length`): with no provider connection there

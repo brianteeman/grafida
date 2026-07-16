@@ -217,6 +217,36 @@ function iconBtn(iconName, label, ...classes) {
 }
 
 /**
+ * The inline font style needed to render a FontAwesome glyph inside TinyMCE's
+ * toolbar/menu UI, harvested once from the loaded FontAwesome stylesheet.
+ *
+ * TinyMCE's icon registry (`editor.ui.registry.addIcon`) accepts an arbitrary
+ * HTML string, not only an <svg>. We exploit that to render our FA webfont
+ * icons as a bare <span class="fa-solid fa-…"> — but TinyMCE's UI does not
+ * inherit FontAwesome's font-family/weight, so the glyph would not appear.
+ * We read the resolved font properties off a throwaway element's ::before (the
+ * same values the app's own icons already render with) and inline them into the
+ * span. (Technique ported from the AITiny Joomla plugin.)
+ */
+let _faIconStyle = null;
+function faIconInlineStyle() {
+    if (_faIconStyle !== null) return _faIconStyle;
+    const probe = document.createElement('i');
+    probe.className = 'fa-solid fa-check';
+    probe.style.position = 'absolute';
+    probe.style.visibility = 'hidden';
+    document.body.appendChild(probe);
+    const cs = window.getComputedStyle(probe, '::before');
+    let family = (cs.fontFamily || '').replace(/"/g, "'");
+    if (!family || family === 'inherit') family = "'Font Awesome 7 Free'";
+    const weight = cs.fontWeight || '900';
+    probe.remove();
+    _faIconStyle = 'font-family: ' + family + '; font-weight: ' + weight +
+        '; font-style: normal; line-height: 1';
+    return _faIconStyle;
+}
+
+/**
  * Build a 64x64 rounded-square favicon element for a site. Falls back to a
  * globe glyph when the site has no cached favicon.
  */
@@ -2428,15 +2458,32 @@ async function initTinyMCE(draft) {
                         return;
                     }
                     done([
-                        ...State.aiTools.map(tool => ({
-                            type: 'menuitem',
-                            text: tool.title,
-                            onAction: () => {
-                                if (typeof GrafidaAIPanel !== 'undefined') {
-                                    GrafidaAIPanel.openWithTool(tool);
-                                }
-                            },
-                        })),
+                        ...State.aiTools.map(tool => {
+                            // Render each tool's FontAwesome icon by registering a
+                            // TinyMCE icon whose "SVG" is really an <i> carrying the
+                            // FA class (see faIconInlineStyle). Lazy + idempotent so
+                            // it stays correct for custom tools / list changes.
+                            let iconName;
+                            if (tool.icon) {
+                                iconName = 'grafida-fa-' + tool.icon;
+                                editor.ui.registry.addIcon(
+                                    iconName,
+                                    '<span class="fa-solid fa-' + tool.icon +
+                                    '" aria-hidden="true" style="' +
+                                    faIconInlineStyle() + '"></span>'
+                                );
+                            }
+                            return {
+                                type: 'menuitem',
+                                icon: iconName,
+                                text: tool.title,
+                                onAction: () => {
+                                    if (typeof GrafidaAIPanel !== 'undefined') {
+                                        GrafidaAIPanel.openWithTool(tool);
+                                    }
+                                },
+                            };
+                        }),
                         { type: 'separator' },
                         customItem,
                     ]);
