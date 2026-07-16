@@ -1103,9 +1103,6 @@
 
             document.addEventListener('keydown', onKey, true);
             showModal(t('GRAFIDA_MSG_REMEMBER_CHAT'), body, [discardBtn, rememberBtn]);
-            document.getElementById('modal-overlay').onclick = (e) => {
-                if (e.target === e.currentTarget) finish(false);
-            };
             setTimeout(() => input.focus(), 0);
         });
     }

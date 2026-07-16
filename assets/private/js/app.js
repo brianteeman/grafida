@@ -657,7 +657,10 @@ function showModal(titleText, bodyNodes, footerNodes) {
     fNodes.forEach(n => n && footerEl.appendChild(n));
 
     overlay.classList.remove('hidden');
-    overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+    // Static backdrop: a click outside the modal never closes it. Dragging a text
+    // selection out of the body ends its click on the overlay, which used to
+    // discard the dialog mid-edit. Escape and the footer buttons are the ways out.
+    overlay.onclick = null;
     document.addEventListener('keydown', _modalEscHandler);
 }
 
@@ -675,8 +678,8 @@ function closeModal() {
  *
  * Yes is red (danger) and is the default active option; No is blue (info).
  * ENTER or SPACE applies the active option; TAB (or Shift+TAB) cycles which
- * option is active; ESC cancels (No). Clicking either button or the backdrop
- * resolves accordingly.
+ * option is active; ESC cancels (No). Clicking either button resolves
+ * accordingly.
  *
  * @param {string} titleText — modal heading
  * @param {Node|Node[]} bodyNodes — DOM nodes for the body
@@ -722,10 +725,6 @@ function confirmYesNo(titleText, bodyNodes) {
         document.addEventListener('keydown', onKey, true);
 
         showModal(titleText, bodyNodes, buttons);
-        // showModal closes on backdrop click without resolving; route it to "No".
-        document.getElementById('modal-overlay').onclick = (e) => {
-            if (e.target === e.currentTarget) finish(false);
-        };
         setActive(0);
     });
 }
@@ -3047,7 +3046,7 @@ async function browseImageMedia(kind, siteId) {
  * Open the article HTML in a CodeMirror source-code editor (a modal), replacing
  * TinyMCE's stock "code" plugin so raw HTML gets syntax highlighting, line
  * numbers and bracket/tag matching. On Save the edited source is written back
- * into TinyMCE as a single undo step; Cancel (or the backdrop / Escape) discards.
+ * into TinyMCE as a single undo step; Cancel (or Escape) discards.
  */
 function openSourceCodeEditor(editor) {
     const host = el('div', 'cm-source-host');
@@ -3171,8 +3170,6 @@ function openMediaBrowser(siteId, opts = {}) {
 
         document.addEventListener('keydown', escHandler, true);
         showModal(t('GRAFIDA_LBL_MEDIA_BROWSER'), container, footer);
-        const overlay = document.getElementById('modal-overlay');
-        overlay.onclick = (e) => { if (e.target === overlay) finish(null); };
 
         load('');
     });
@@ -3217,7 +3214,7 @@ function formatBytes(bytes) {
 
 /**
  * A small modal prompting for a single line of text. Resolves with the trimmed
- * value, or null if cancelled (Escape / Cancel / backdrop).
+ * value, or null if cancelled (Escape / Cancel).
  */
 function promptText(title, label, initial = '') {
     return new Promise(resolve => {
@@ -3248,7 +3245,6 @@ function promptText(title, label, initial = '') {
 
         document.addEventListener('keydown', onKey, true);
         showModal(title, body, [cancelBtn, okBtn]);
-        document.getElementById('modal-overlay').onclick = (e) => { if (e.target === e.currentTarget) finish(null); };
         setTimeout(() => { input.focus(); input.select(); }, 0);
     });
 }
@@ -3802,9 +3798,6 @@ function buildImageEditor(entry, img) {
     });
 
     showModal(t('GRAFIDA_LBL_IMAGE_EDITOR'), body, [cancelBtn, saveBtn]);
-    document.getElementById('modal-overlay').onclick = (e) => {
-        if (e.target === e.currentTarget) { cleanup(); closeModal(); }
-    };
     render();
 }
 
