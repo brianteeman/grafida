@@ -6,7 +6,7 @@
     "tools": {
         "gen": {
             "title": "Generate",
-            "icon": "fa-laptop-code",
+            "icon": "laptop-code",
             "prompt": "Ignore the previous instructions about the return format. Always return content formatted as Markdown. Do NOT use lists, bullet points, or enumerated steps. Use naturally flowing language, as though someone is narrating the process. Avoid repetitions. If you catch yourself repeating the same text, stop output immediately. Return only the final content, without any commentary before or after the content.",
             "tone": "",
             "override_system": false,
@@ -14,7 +14,7 @@
         },
         "proofread": {
             "title": "Proofread",
-            "icon": "fa-check",
+            "icon": "check",
             "prompt": "# Instructions\n\n- Proof-read the following text and correct any spelling and grammatical errors.\n- Return the corrected text only, without any annotations or commentary.\n- Return valid HTML5 source code.\n- The rewritten text is considered grounded if **all** information in **every** sentence in the rewritten text are **explicitly** mentioned in the document, **no** extra information is added and **no** inferred information is added.\n- Do **not** make speculations or assumptions about the intent of the author, sentiment of the document or purpose of the document.\n- You must **not** mix up the speakers in your answer.\n- Your answer must **not** include any speculation or inference about the background of the document or the people, gender, roles, or positions, etc.\n- Do **not** assume or change dates and times.\n- Write a final rewrite of the document that is **grounded**, **coherent** and **not** assuming gender for the author unless **explicitly** mentioned in the document.",
             "tone": "unchanged",
             "override_system": false,
@@ -22,7 +22,7 @@
         },
         "friendly": {
             "title": "Friendly Rewrite",
-            "icon": "fa-face-grin",
+            "icon": "face-grin",
             "prompt": "# Instructions\n\n- Rewrite the following text in a more friendly form.\n- Return the rewritten text only, without any annotations or commentary.\n- Return valid HTML5 source code.\n- The rewritten text is considered grounded if **all** information in **every** sentence in the rewritten text are **explicitly** mentioned in the document, **no** extra information is added and **no** inferred information is added.\n- Do **not** make speculations or assumptions about the intent of the author, sentiment of the document or purpose of the document.\n- Your answer must **not** include any speculation or inference about the background of the document or the people, gender, roles, or positions, etc.\n- Do **not** assume or change dates and times.\n- Write a final rewrite of the document that is **grounded**, **coherent** and **not** assuming gender for the author unless **explicitly** mentioned in the document.\n",
             "tone": "friendly_inclusive",
             "override_system": false,
@@ -30,7 +30,7 @@
         },
         "professional": {
             "title": "Professional Rewrite",
-            "icon": "fa-user-tie",
+            "icon": "user-tie",
             "prompt": "# Instructions\n\n- Rewrite the following text in a more professional form.\n- Return the rewritten text only, without any annotations or commentary.\n- Return valid HTML5 source code.\n- The rewritten text is considered grounded if **all** information in **every** sentence in the rewritten text are **explicitly** mentioned in the document, **no** extra information is added and **no** inferred information is added.\n- Do **not** make speculations or assumptions about the intent of the author, sentiment of the document or purpose of the document.\n- Your answer must **not** include any speculation or inference about the background of the document or the people, gender, roles, or positions, etc.\n- Do **not** assume or change dates and times.\n- Write a final rewrite of the document that is **grounded**, **coherent** and **not** assuming gender for the author unless **explicitly** mentioned in the document.\n",
             "tone": "sophisticated_refined",
             "override_system": false,
@@ -38,7 +38,7 @@
         },
         "concise": {
             "title": "Summarise",
-            "icon": "fa-down-left-and-up-right-to-center",
+            "icon": "down-left-and-up-right-to-center",
             "prompt": "- Summarize the following text.\n- Return the summary only, without any annotations or commentary.\n- Return valid HTML5 source code.\n- The summary is considered grounded if **all** information in **every** sentence in the summary are **explicitly** mentioned in the document, **no** extra information is added and **no** inferred information is added.\n- Do **not** make speculations or assumptions about the intent of the author, sentiment of the document or purpose of the document.\n- Your answer must **not** include any speculation or inference about the background of the document or the people, gender, roles, or positions, etc.\n- Do **not** assume or change dates and times.\n- Write a final summary of the document that is **grounded**, **coherent** and **not** assuming gender for the author unless **explicitly** mentioned in the document.",
             "tone": "minimalist_crisp",
             "override_system": false,

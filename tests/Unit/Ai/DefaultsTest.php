@@ -191,11 +191,11 @@ final class DefaultsTest extends TestCase
             $byKey[$t['toolKey']] = $t;
         }
 
-        self::assertSame('fa-laptop-code',                         $byKey['gen']['icon']);
-        self::assertSame('fa-check',                               $byKey['proofread']['icon']);
-        self::assertSame('fa-face-grin',                           $byKey['friendly']['icon']);
-        self::assertSame('fa-user-tie',                            $byKey['professional']['icon']);
-        self::assertSame('fa-down-left-and-up-right-to-center',    $byKey['concise']['icon']);
+        self::assertSame('laptop-code',                         $byKey['gen']['icon']);
+        self::assertSame('check',                               $byKey['proofread']['icon']);
+        self::assertSame('face-grin',                           $byKey['friendly']['icon']);
+        self::assertSame('user-tie',                            $byKey['professional']['icon']);
+        self::assertSame('down-left-and-up-right-to-center',    $byKey['concise']['icon']);
     }
 
     public function testBundledToolsAreSortedBySortOrder(): void
@@ -257,7 +257,7 @@ final class DefaultsTest extends TestCase
         self::assertSame(['temperature' => 0.5], $byKey['proofread']['params'],
             'DB override must replace the bundled params');
         // Title and icon stay as bundled values (not in the override set)
-        self::assertSame('fa-check',  $byKey['proofread']['icon']);
+        self::assertSame('check',  $byKey['proofread']['icon']);
         // The DB record id should be present
         self::assertNotNull($byKey['proofread']['id'], 'effectiveTools must carry the DB id for an overridden tool');
     }
