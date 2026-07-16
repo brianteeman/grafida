@@ -2462,6 +2462,16 @@ async function initTinyMCE(draft) {
                 saveDraft();
             });
 
+            // Ctrl/Cmd+, opens Settings. The editor iframe has its own document,
+            // so the app.js document-level listener never fires while it has
+            // focus — this is the editor-focused half of that shortcut. Comma is
+            // awkward for addShortcut, so match the native keydown directly.
+            editor.on('keydown', (e) => {
+                if (!isSettingsShortcut(e)) return;
+                e.preventDefault();
+                navigateToSettings();
+            });
+
             editor.on('init', () => {
                 editor.setContent(draft.html || '');
             });
@@ -3712,8 +3722,12 @@ async function saveDraft() {
 //  Leaving the editor (Back button)
 // --------------------------------------------------------
 
-/** Tear down the editor state and return to the articles list. */
-function leaveEditor() {
+/**
+ * Tear down the editor state and go where `after` says — by default back to the
+ * articles list. `after` lets a caller (e.g. the Cmd/Ctrl+, Settings shortcut)
+ * navigate elsewhere once the editor is safely left.
+ */
+function leaveEditor(after) {
     // A draft may have been re-pointed at (and saved to) another site while
     // editing; surface that site in the list so the saved draft stays visible.
     const savedSiteId = State.editorSavedSiteId;
@@ -3726,24 +3740,31 @@ function leaveEditor() {
     State.editorBaseline = null;
     State.editorForceDirty = false;
     State.editorSavedSiteId = null;
-    showScreen('articles');
-    loadArticlesScreen();
+
+    if (after) {
+        after();
+    } else {
+        showScreen('articles');
+        loadArticlesScreen();
+    }
 }
 
 /**
- * Handle the editor Back button: leave straight away when nothing changed (an
- * untouched new or remote draft was never persisted), or prompt to save / keep
- * editing / discard when there are unsaved changes.
+ * Handle leaving the editor (Back button, or the Settings shortcut): leave
+ * straight away when nothing changed (an untouched new or remote draft was
+ * never persisted), or prompt to save / keep editing / discard when there are
+ * unsaved changes. `after`, when given, is where to go instead of the articles
+ * list once the editor is left.
  */
-async function handleEditorBack() {
+async function handleEditorBack(after) {
     if (isEditorDirty()) {
-        showUnsavedChangesDialog();
+        showUnsavedChangesDialog(after);
         return;
     }
-    leaveEditor();
+    leaveEditor(after);
 }
 
-function showUnsavedChangesDialog() {
+function showUnsavedChangesDialog(after) {
     const msgP = el('p', null, t('GRAFIDA_MSG_UNSAVED_CHANGES'));
 
     const saveBtn = iconBtn('floppy-disk', t('GRAFIDA_BTN_SAVE_AND_BACK'), 'btn', 'btn-success');
@@ -3754,7 +3775,7 @@ function showUnsavedChangesDialog() {
             return; // Save failed — keep the editor open so nothing is lost.
         }
         closeModal();
-        leaveEditor();
+        leaveEditor(after);
     });
 
     const keepBtn = iconBtn('pen', t('GRAFIDA_BTN_KEEP_EDITING'), 'btn', 'btn-info');
@@ -3763,11 +3784,40 @@ function showUnsavedChangesDialog() {
     const discardBtn = iconBtn('trash', t('GRAFIDA_BTN_DISCARD_CHANGES'), 'btn', 'btn-danger');
     discardBtn.addEventListener('click', () => {
         closeModal();
-        leaveEditor();
+        leaveEditor(after);
     });
 
     showModal(t('GRAFIDA_MSG_UNSAVED_TITLE'), [msgP], [saveBtn, keepBtn, discardBtn]);
     saveBtn.focus();
+}
+
+/** Open the Settings screen (mirrors the sidebar nav-link behaviour). */
+function goToSettings() {
+    showScreen('settings');
+    renderSettingsScreen();
+}
+
+/**
+ * Navigate to Settings from anywhere. When an article is open in the editor,
+ * route through the unsaved-changes flow first so nothing is lost; otherwise go
+ * straight there. Backs the Cmd/Ctrl+, keyboard shortcut.
+ */
+function navigateToSettings() {
+    if (State.activeScreen === 'editor') {
+        handleEditorBack(goToSettings);
+        return;
+    }
+    goToSettings();
+}
+
+/**
+ * Recognise the "open Settings" chord: Ctrl/Cmd + comma, with no other
+ * modifiers. Matches on both `key` and `keyCode` so it fires regardless of
+ * keyboard layout (in the editor iframe the native event is what we get).
+ */
+function isSettingsShortcut(e) {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return false;
+    return e.key === ',' || e.keyCode === 188;
 }
 
 // --------------------------------------------------------
@@ -5382,6 +5432,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (State.activeScreen !== 'editor' || !State.currentDraft) return;
         e.preventDefault();
         saveDraft();
+    });
+
+    // Ctrl/Cmd+, opens Settings from anywhere. When editing an article this
+    // routes through the unsaved-changes prompt first (see navigateToSettings).
+    // The editor iframe has its own document and never sees this listener, so
+    // an editor.on('keydown', …) in initTinyMCE handles the editor-focused half.
+    document.addEventListener('keydown', (e) => {
+        if (!isSettingsShortcut(e)) return;
+        e.preventDefault();
+        navigateToSettings();
     });
 
     const btnPublish = document.getElementById('btn-publish');

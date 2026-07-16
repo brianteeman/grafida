@@ -5,6 +5,7 @@ Grafida 0.2
 # [LOW] Windows: a command window no longer flashes (at startup, and when detecting the system light/dark theme)
 + Windows: the installer now bundles the required Visual C++ runtime DLLs, so the app runs on a clean Windows without a separate redistributable
 + The editor now shows the article alias (URL slug) below the title, auto-generated from the title using Joomla's conventions, with a button to regenerate it
++ Ctrl/Cmd+, now opens the Settings page from anywhere (prompting to save first when an article is open with unsaved changes)
 
 Grafida 0.1
 ================================================================================
