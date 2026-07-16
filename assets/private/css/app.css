@@ -1039,6 +1039,21 @@ input[type="color"].form-control {
     text-overflow: ellipsis;
 }
 
+/*
+ * The publish-state icon before the title. Fixed width (fa-fw) so the titles
+ * line up whatever the state, and each state has its own glyph — the colour is
+ * a Joomla-familiar hint, not the only cue.
+ */
+.article-state-icon {
+    margin-right: 6px;
+    font-size: 11px;
+}
+
+.article-state-icon.state-published   { color: var(--color-success); }
+.article-state-icon.state-unpublished { color: var(--color-danger); }
+.article-state-icon.state-archived    { color: var(--color-info); }
+.article-state-icon.state-trashed     { color: var(--color-text-muted); }
+
 .article-item-category {
     font-size: 11px;
     color: var(--color-text-muted);

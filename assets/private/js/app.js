@@ -1720,10 +1720,35 @@ function gotoArticlePage(page) {
     reloadRemoteArticles();
 }
 
+// The publish-state icon shown before an article's title. Colour follows
+// Joomla's semantics (green published, red unpublished); the icon itself is
+// what distinguishes the states for anyone who cannot tell the colours apart.
+const ARTICLE_STATE_ICONS = {
+    1:  { icon: 'check',       cls: 'state-published',   key: 'GRAFIDA_OPT_PUBLISHED' },
+    0:  { icon: 'xmark',       cls: 'state-unpublished', key: 'GRAFIDA_OPT_UNPUBLISHED' },
+    2:  { icon: 'box-archive', cls: 'state-archived',    key: 'GRAFIDA_OPT_ARCHIVED' },
+    '-2': { icon: 'trash',     cls: 'state-trashed',     key: 'GRAFIDA_OPT_TRASHED' },
+};
+
+/** The fixed-width, colour-coded publish-state icon for an article list row. */
+function articleStateIcon(state) {
+    const info = ARTICLE_STATE_ICONS[Number(state ?? 1)] || ARTICLE_STATE_ICONS[0];
+    const label = t(info.key);
+    const glyph = icon(info.icon);
+    glyph.classList.add('fa-fw');
+
+    const wrap = el('span', `article-state-icon ${info.cls}`, glyph);
+    wrap.title = label;
+    wrap.setAttribute('role', 'img');
+    wrap.setAttribute('aria-label', label);
+    return wrap;
+}
+
 function buildArticleItem(article, type) {
     const item = el('div', 'article-item');
 
-    const titleDiv = el('div', 'article-item-title', article.title || '(Untitled)');
+    const titleDiv = el('div', 'article-item-title',
+        articleStateIcon(article.state), article.title || '(Untitled)');
     const infoDiv = el('div', 'article-item-info', titleDiv);
     if (article.catid != null) {
         const label = article.categoryTitle

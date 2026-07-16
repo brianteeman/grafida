@@ -151,7 +151,12 @@ window-free in tests (a null dialog makes the endpoint return 503).
   is already mirrored by a local draft (same site + `remote_id`) **stays** in the remote list
   (it is not hidden), tagged with an extra `GRAFIDA_LBL_HAS_LOCAL_DRAFT` "Local article" badge and
   a left accent; clicking it opens the existing draft rather than re-importing the article
-  (`openEditorFor()` reuses the matching draft). The API only accepts a
+  (`openEditorFor()` reuses the matching draft). Both tabs render each row through the shared
+  `buildArticleItem()`, whose title is preceded by a fixed-width (`fa-fw`) **publish-state icon**
+  (`articleStateIcon()` / the `ARTICLE_STATE_ICONS` map): check/green published, xmark/red
+  unpublished, box-archive/blue archived, trash/muted trashed. The colours follow Joomla's
+  semantics; a distinct glyph per state (plus a `role="img"` + `aria-label`) is what carries the
+  meaning without them. The API only accepts a
   **single** category/tag and an INT `state`, so there is no multi-select or "all states"; an
   author filter is omitted (no local user list).
   `DraftExportService` builds and consumes the portable **`.grafida`** file format (plain JSON

@@ -5,6 +5,7 @@ Grafida 0.2
 + Empty Local Articles tab offers New Article and List Site Articles
 + Ctrl/Cmd+, opens Settings from anywhere
 + Windows: the installer bundles the Visual C++ runtime DLLs
+~ Article lists show the publish state as a colour-coded icon before the title
 # [HIGH] Windows: crash on startup ("broken signature") after Authenticode signing
 # [MEDIUM] Windows: multi-second freeze whenever a stored secret was read
 # [LOW] Windows: a command window flashed at startup and on theme detection
