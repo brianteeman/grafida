@@ -119,3 +119,4 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | collapse or expand | ein- oder ausklappen | Toggling a sidebar's collapsed state. GRAFIDA_BTN_TOGGLE_SIDEBAR / GRAFIDA_BTN_TOGGLE_PROPERTIES. |
 | alias (URL slug) | Alias | The article's URL slug; kept as "Alias" (Joomla convention). GRAFIDA_LBL_ALIAS. |
 | icon picker | Symbolauswahl | Searchable dropdown for the AI-tool icon. GRAFIDA_BTN_AI_TOOL_ICON_CHOOSE / GRAFIDA_PLACEHOLDER_AI_TOOL_ICON_SEARCH. „Symbol“ per the existing tool-icon entry. |
+| list site articles | Beiträge der Website anzeigen | Empty-state action that switches to the Remote Articles tab. GRAFIDA_BTN_LIST_SITE_ARTICLES. |

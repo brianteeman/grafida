@@ -853,6 +853,13 @@ input[type="color"].form-control {
     margin: 0 0 16px;
 }
 
+.empty-state-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Articles screen                                                    */
 /* ------------------------------------------------------------------ */

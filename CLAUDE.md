@@ -142,7 +142,12 @@ window-free in tests (a null dialog makes the endpoint return 503).
   is the subset of fields a draft actually carries (search over title+alias; sort by id/title/
   category/language/state; category/tag/language/state filters; per-page limit) — no
   featured/checked-out/hits/author/date controls. Because drafts store tag *titles* (not ids),
-  the drafts tab's tag filter matches on title. A remote article that
+  the drafts tab's tag filter matches on title. The drafts tab's **empty state**
+  (`buildDraftsEmptyState()`) is two-way: when the filters merely exclude everything it is the
+  plain `GRAFIDA_MSG_NO_DRAFTS` line, but when there are **no drafts at all** it shows
+  `GRAFIDA_MSG_NO_DRAFTS_YET` plus the two ways out — a primary **New article** button
+  (`openNewArticle()`) and a secondary **List site articles** button
+  (`GRAFIDA_BTN_LIST_SITE_ARTICLES`, switches to the Remote Articles tab). A remote article that
   is already mirrored by a local draft (same site + `remote_id`) **stays** in the remote list
   (it is not hidden), tagged with an extra `GRAFIDA_LBL_HAS_LOCAL_DRAFT` "Local article" badge and
   a left accent; clicking it opens the existing draft rather than re-importing the article

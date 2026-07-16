@@ -1455,7 +1455,7 @@ function renderDraftsTab() {
     State.draftPaging = { page, totalPages };
 
     if (!all.length) {
-        list.appendChild(el('div', 'empty-state', el('p', null, t('GRAFIDA_MSG_NO_DRAFTS'))));
+        list.appendChild(buildDraftsEmptyState());
         return;
     }
 
@@ -1478,6 +1478,30 @@ function renderDraftsTab() {
     pager.appendChild(prev);
     pager.appendChild(info);
     pager.appendChild(next);
+}
+
+/**
+ * The empty local-articles list. An empty result because of the filters only
+ * needs the "nothing matches" line; a genuinely empty list is a dead end, so it
+ * points at the two ways out (write one, or look at what the site already has).
+ */
+function buildDraftsEmptyState() {
+    if (State.drafts.length) {
+        return el('div', 'empty-state', el('p', null, t('GRAFIDA_MSG_NO_DRAFTS')));
+    }
+
+    const newBtn = iconBtn('file-circle-plus', t('GRAFIDA_BTN_NEW_ARTICLE'), 'btn', 'btn-primary');
+    newBtn.addEventListener('click', openNewArticle);
+
+    const remoteBtn = iconBtn('cloud-arrow-down', t('GRAFIDA_BTN_LIST_SITE_ARTICLES'), 'btn', 'btn-secondary');
+    remoteBtn.addEventListener('click', () => {
+        State.articlesTab = 'remote';
+        applyArticlesTab();
+    });
+
+    return el('div', 'empty-state',
+        el('p', null, t('GRAFIDA_MSG_NO_DRAFTS_YET')),
+        el('div', 'empty-state-actions', newBtn, remoteBtn));
 }
 
 /** Applies a patch to the draft query (resetting to page 1) and re-renders. */
