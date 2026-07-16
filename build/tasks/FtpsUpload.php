@@ -160,7 +160,7 @@ class FtpsUpload extends Task
         // The remote path is absolute (leading slash), so the URL is ftp://host:port/<remotePath>.
         $url = sprintf('ftp://%s:%d/%s', $this->host, $this->port, ltrim($remotePath, '/'));
 
-        $this->log(sprintf('Uploading %s → ftps://%s:%d/%s', basename($file), $this->host, $this->port, ltrim($remotePath, '/')));
+        $this->log(sprintf('Uploading %s to ftps://%s:%d/%s', basename($file), $this->host, $this->port, ltrim($remotePath, '/')));
 
         $ch = curl_init($url);
         curl_setopt($ch, CURLOPT_UPLOAD, true);

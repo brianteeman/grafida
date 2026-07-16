@@ -110,7 +110,7 @@ function clampTier(int $value, int $min, int $max, string $kind): int
 {
     if ($value < $min || $value > $max)
     {
-        \fwrite(\STDERR, "WARNING: {$kind} number out of the supported range — clamping VIProductVersion tier {$value} to [{$min}, {$max}].\n");
+        \fwrite(\STDERR, "WARNING: {$kind} number out of the supported range; clamping VIProductVersion tier {$value} to [{$min}, {$max}].\n");
 
         return \max($min, \min($max, $value));
     }

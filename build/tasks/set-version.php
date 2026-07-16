@@ -66,7 +66,7 @@ if (!\preg_match($pattern, $source, $m))
 
 if ($m[2] === $version)
 {
-    \fwrite(\STDOUT, "Application version already {$version} — nothing to do.\n");
+    \fwrite(\STDOUT, "Application version already {$version}; nothing to do.\n");
     exit(0);
 }
 

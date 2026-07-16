@@ -111,7 +111,7 @@ $sizeOfOptionalHeader = \unpack('v', \substr($fileHeader, 16, 2))[1];
 
 if ($numberOfSections < 1 || $numberOfSections > 96)
 {
-    fail("implausible NumberOfSections ({$numberOfSections}) — corrupt PE");
+    fail("implausible NumberOfSections ({$numberOfSections}); corrupt PE");
 }
 
 // --- Section table ---------------------------------------------------------
@@ -137,7 +137,7 @@ for ($i = 0; $i < $numberOfSections; $i++)
 
 if ($sfxSize <= 0)
 {
-    fail('computed a zero SFX size — corrupt PE');
+    fail('computed a zero SFX size; corrupt PE');
 }
 
 if ($sfxSize >= $fileSize)
@@ -157,7 +157,7 @@ if ($marker !== EXT_INI_MAGIC)
 {
     fail(\sprintf(
         "computed split offset %d does not point at Boson's extra-ini magic "
-        . '(got %s, expected fd f6 69 e6). Refusing to split — the stub/phar '
+        . '(got %s, expected fd f6 69 e6). Refusing to split: the stub/phar '
         . 'boundary is not where phpmicro will look for it.',
         $sfxSize,
         \bin2hex($marker)
