@@ -1927,7 +1927,11 @@ body.resizing-col {
 }
 
 /* Rendered (formatted) output: normalise whitespace and tame the margins of the
-   HTML so both the model's reply and the user's Markdown prompt read as prose. */
+   HTML so the model's reply, its thinking and the user's Markdown prompt all read
+   as prose. `ai-rich` is only ever set by the render pipeline (_renderRichText /
+   _createStreamRenderer), so it means "sanitised rendered prose" — the typography
+   rules below are keyed on it alone and apply wherever it lands; only the rules
+   that depend on a specific bubble's background stay scoped to that bubble. */
 .ai-bubble-assistant .ai-bubble-text.ai-rich,
 .ai-bubble-instructions .ai-bubble-text.ai-rich,
 .ai-bubble-user .ai-bubble-text.ai-rich {
@@ -1940,38 +1944,38 @@ body.resizing-col {
     text-decoration: underline;
 }
 
-.ai-bubble-text.ai-rich > :first-child { margin-top: 0; }
-.ai-bubble-text.ai-rich > :last-child  { margin-bottom: 0; }
+.ai-rich > :first-child { margin-top: 0; }
+.ai-rich > :last-child  { margin-bottom: 0; }
 
-.ai-bubble-text.ai-rich p,
-.ai-bubble-text.ai-rich ul,
-.ai-bubble-text.ai-rich ol,
-.ai-bubble-text.ai-rich pre,
-.ai-bubble-text.ai-rich blockquote {
+.ai-rich p,
+.ai-rich ul,
+.ai-rich ol,
+.ai-rich pre,
+.ai-rich blockquote {
     margin: 0 0 8px;
 }
 
-.ai-bubble-text.ai-rich h1,
-.ai-bubble-text.ai-rich h2,
-.ai-bubble-text.ai-rich h3,
-.ai-bubble-text.ai-rich h4,
-.ai-bubble-text.ai-rich h5,
-.ai-bubble-text.ai-rich h6 {
+.ai-rich h1,
+.ai-rich h2,
+.ai-rich h3,
+.ai-rich h4,
+.ai-rich h5,
+.ai-rich h6 {
     margin: 10px 0 6px;
     line-height: 1.3;
 }
 
-.ai-bubble-text.ai-rich ul,
-.ai-bubble-text.ai-rich ol {
+.ai-rich ul,
+.ai-rich ol {
     padding-left: 20px;
 }
 
-.ai-bubble-text.ai-rich img {
+.ai-rich img {
     max-width: 100%;
     height: auto;
 }
 
-.ai-bubble-text.ai-rich pre {
+.ai-rich pre {
     background: var(--color-surface);
     border: 1px solid var(--color-border);
     border-radius: var(--radius);
@@ -1979,28 +1983,28 @@ body.resizing-col {
     overflow-x: auto;
 }
 
-.ai-bubble-text.ai-rich code {
+.ai-rich code {
     font-family: var(--font-mono, monospace);
     font-size: 0.92em;
 }
 
-.ai-bubble-text.ai-rich blockquote {
+.ai-rich blockquote {
     padding-left: 10px;
     border-left: 3px solid var(--color-border);
     color: var(--color-text-muted);
 }
 
-.ai-bubble-text.ai-rich a {
+.ai-rich a {
     color: var(--color-accent);
 }
 
-.ai-bubble-text.ai-rich table {
+.ai-rich table {
     border-collapse: collapse;
     max-width: 100%;
 }
 
-.ai-bubble-text.ai-rich th,
-.ai-bubble-text.ai-rich td {
+.ai-rich th,
+.ai-rich td {
     border: 1px solid var(--color-border);
     padding: 4px 6px;
 }
@@ -2015,6 +2019,84 @@ body.resizing-col {
 @keyframes ai-blink {
     0%, 100% { opacity: 0.6; }
     50%       { opacity: 0; }
+}
+
+/* Reasoning scratchpad, above the reply inside an assistant bubble. Muted and
+   collapsed by default: while the model thinks it is a sign of life, and once
+   the reply starts it is a footnote the reader can unfold to inspect. */
+.ai-thinking {
+    margin-bottom: 6px;
+}
+
+.ai-thinking-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+    padding: 0;
+    background: none;
+    border: 0;
+    cursor: pointer;
+    font: inherit;
+    font-size: 11px;
+    font-style: italic;
+    text-align: left;
+    color: var(--color-text-muted);
+}
+
+.ai-thinking-toggle:hover {
+    color: var(--color-text);
+}
+
+.ai-thinking-toggle .fa-solid {
+    font-size: 11px;
+    font-style: normal;
+}
+
+/* Only the "Thinking…" state pulses; once settled the line goes quiet. */
+.ai-thinking-active .ai-thinking-toggle {
+    animation: ai-thinking-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes ai-thinking-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ai-thinking-active .ai-thinking-toggle { animation: none; }
+}
+
+.ai-thinking-text {
+    margin-top: 6px;
+    padding: 6px 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    background: var(--color-surface);
+    border-left: 2px solid var(--color-border);
+    border-radius: 2px;
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--color-text-muted);
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* Once rendered, the HTML carries its own structure (the .ai-rich rules above
+   supply the prose typography), so the raw-text whitespace handling goes. */
+.ai-thinking-text.ai-rich {
+    white-space: normal;
+}
+
+/* The scratchpad is a footnote to the reply, so its headings must not shout
+   louder than the reply's prose — cap them at the block's own size. */
+.ai-thinking-text.ai-rich h1,
+.ai-thinking-text.ai-rich h2,
+.ai-thinking-text.ai-rich h3,
+.ai-thinking-text.ai-rich h4,
+.ai-thinking-text.ai-rich h5,
+.ai-thinking-text.ai-rich h6 {
+    font-size: inherit;
 }
 
 .ai-bubble-error {

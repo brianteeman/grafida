@@ -102,6 +102,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | API key | κλειδί API | Authentication key for an AI service. "API" kept in English. |
 | prompt (AI) | εντολή | The instruction sent to an AI model. System prompt = «εντολή συστήματος»; tool prompt = «εντολή εργαλείου». |
 | instructions (AI panel) | Οδηγίες | Επικεφαλίδα της φυσαλίδας που περιέχει την εντολή ενός εργαλείου ΤΝ. Σκόπιμα το απλό «Οδηγίες», όχι «εντολή». GRAFIDA_LBL_AI_INSTRUCTIONS. |
+| thinking (AI panel) | Σκέφτεται… / Συλλογισμός | Ρηματικός τύπος όσο σκέφτεται το μοντέλο· ουσιαστικό μόλις ολοκληρωθεί και το κείμενο μένει μόνο για επιθεώρηση. GRAFIDA_LBL_AI_THINKING / GRAFIDA_LBL_AI_THOUGHT_PROCESS. |
 | temperature | θερμοκρασία | AI sampling temperature parameter. |
 | Top P | Top P | AI nucleus-sampling parameter; kept verbatim (like «Top P» in most localised UIs). |
 | max tokens | μέγιστα tokens | Maximum output token count; «token» kept as English loanword per technical convention. |

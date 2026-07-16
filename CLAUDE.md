@@ -768,6 +768,32 @@ map is for when the update mechanism itself is built.
   `_createStreamRenderer()` re-renders the accumulating reply through the same `/api/ai/render` pipeline,
   throttled to ~200 ms, with sequenced results so a slow/stale render can never roll the view backwards;
   `finish()` does the authoritative final render. Reflow jumps as blocks resolve are expected/acceptable.
+  **A reasoning model's "thinking" is shown live and kept out of the reply.** A reasoning model can
+  spend a long time on its scratchpad before the first word arrives, which reads as a stuck panel, so
+  `readSseStream()` surfaces reasoning deltas through a **separate `onThinking`** callback (never
+  accumulating them into the returned `text`) and `panel.js`'s `_createThinkingBlock()` lazily prepends
+  a collapsible block to the streaming bubble: a brain icon + a pulsing italic muted
+  `GRAFIDA_LBL_AI_THINKING` line, click-to-toggle the scratchpad itself, relabelled
+  `GRAFIDA_LBL_AI_THOUGHT_PROCESS` (pulse off) on the first reply token. The field is per-dialect and
+  there is **no Chat Completions standard**: `openai_responses` → `response.reasoning_summary_text.delta`
+  *and* `response.reasoning_text.delta` (which one you get depends on the model and on whether a summary
+  was requested); `anthropic` → the `thinking_delta` variant of `content_block_delta`;
+  `openai_completions` → `delta.reasoning_content` (DeepSeek, and LM Studio which follows it) **or**
+  `delta.reasoning` (OpenRouter). A provider emitting none simply never fires the callback and no block
+  appears. The scratchpad is Markdown as often as the reply is, so it gets its **own**
+  `_createStreamRenderer()` and is formatted through the same `/api/ai/render` (CommonMark + sanitiser)
+  pipeline — but **only while unfolded**: each render is a round-trip through the single-threaded
+  `boson://` kernel, so formatting text nobody is looking at would compete with the reply's own renders.
+  The accumulated text is kept as a `textContent` placeholder meanwhile, so unfolding is instant and the
+  formatting lands a moment later. That renderer is created with `scrollConversation: false` (its
+  `onApply` scrolls the block's own capped-height box instead) — the block can be unfolded long after
+  its message scrolled away, and re-rendering it must not yank the conversation to the bottom. The
+  typography comes free because the prose rules in `app.css` are keyed on **`.ai-rich` alone**, not
+  `.ai-bubble-text.ai-rich`: that class is only ever set by the render pipeline, so it *means*
+  "sanitised rendered prose"; only rules that depend on a bubble's background stay bubble-scoped.
+  The thinking lives **outside `.ai-bubble-text`**, so the reply's own renderer never touches it, and it
+  is deliberately **not** in `_history`: Insert/Copy operate on the reply string alone, and the
+  scratchpad is neither resent to the provider nor saved with a remembered chat.
   **Copy** uses the **raw** model output; **Insert** re-renders it through the same
   `/api/ai/render` pipeline (Markdown→HTML + sanitise) before dropping it into TinyMCE — the reply is
   frequently Markdown (the Generate tool) or loose HTML, and `editor.insertContent()` needs real HTML,

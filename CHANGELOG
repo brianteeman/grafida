@@ -5,6 +5,7 @@ Grafida 0.2
 + Empty Local Articles tab offers New Article and List Site Articles
 + Ctrl/Cmd+, opens Settings from anywhere
 + Windows: the installer bundles the Visual C++ runtime DLLs
++ AI panel: live "Thinking…" indicator for reasoning models, click it to inspect the thinking
 ~ Article lists show the publish state as a colour-coded icon before the title
 ~ AI panel: a tool's prompt is muted "Instructions" instead of a red bubble
 # [HIGH] Windows: crash on startup ("broken signature") after Authenticode signing

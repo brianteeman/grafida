@@ -366,6 +366,9 @@
         _abortCtrl = GrafidaAI.newAbort();
 
         let fullText = '';
+        // Created on the first reasoning delta — a non-reasoning model never
+        // emits one, and then no thinking block ever appears.
+        let thinkingBlock = null;
 
         try {
             const result = await GrafidaAI.sendChat(serviceId, messages, {
@@ -373,8 +376,18 @@
                 signal:   _abortCtrl.signal,
                 toolKey:  tool ? (tool.toolKey || '') : '',
                 previousResponseId,
+                onThinking: (delta) => {
+                    if (!_streamingBubble) return;
+                    if (!thinkingBlock) thinkingBlock = _createThinkingBlock(_streamingBubble);
+                    thinkingBlock.push(delta);
+                    const conv = document.getElementById('ai-conversation');
+                    if (conv) conv.scrollTop = conv.scrollHeight;
+                },
                 onToken:  (delta) => {
                     fullText += delta;
+                    // The reply has begun, so the model is no longer thinking —
+                    // settle the block before the first word lands. Idempotent.
+                    if (thinkingBlock) thinkingBlock.finish();
                     if (_streamingBubble) {
                         const textEl = _streamingBubble.querySelector('.ai-bubble-text');
                         // Show raw text as an instant placeholder only until the
@@ -460,6 +473,9 @@
                 }
             }
         } finally {
+            // Covers a response that ended (or was aborted) while still thinking,
+            // i.e. with no reply token to settle the block.
+            if (thinkingBlock) thinkingBlock.finish();
             _abortCtrl = null;
             _streamingBubble = null;
             _setStreaming(false);
@@ -589,6 +605,105 @@
         conv.appendChild(bubble);
         conv.scrollTop = conv.scrollHeight;
         return bubble;
+    }
+
+    /**
+     * Create the collapsible "thinking" block at the top of a streaming bubble.
+     *
+     * A reasoning model can spend a long time on its scratchpad before the first
+     * word of the reply arrives, which reads as a stuck panel. The block is the
+     * visible sign of life: a brain icon + a pulsing "Thinking…" line, which the
+     * user can click to unfold the scratchpad itself and inspect it.
+     *
+     * The thinking text lives OUTSIDE `.ai-bubble-text`, so the reply's own
+     * streaming renderer never touches it and — because it is also never
+     * accumulated into the reply string — Insert and Copy cannot pick it up. It
+     * is likewise not pushed to `_history`, so it is neither resent to the
+     * provider nor saved with a remembered chat: it is a transient view of the
+     * current response.
+     *
+     * The scratchpad is Markdown as often as the reply is, so it gets its OWN
+     * stream renderer and is formatted through the same `POST /api/ai/render`
+     * (CommonMark + sanitiser) pipeline as a bubble — raw `**bold**` and `#`
+     * headings in the panel are noise, not information.
+     *
+     * Rendering is deferred while the block is collapsed: each render is a
+     * round-trip through the single-threaded `boson://` kernel, and formatting
+     * text nobody is looking at would compete with the reply's own renders. The
+     * accumulated text is kept as an always-safe `textContent` placeholder, so
+     * unfolding shows it instantly and the formatting lands a moment later.
+     *
+     * @param {HTMLElement} bubble
+     * @returns {{push: function(string): void, finish: function(): void}}
+     */
+    function _createThinkingBlock(bubble) {
+        const label  = el('span', 'ai-thinking-label', txt(t('GRAFIDA_LBL_AI_THINKING')));
+        const toggle = el('button', 'ai-thinking-toggle', icon('brain'), label);
+        toggle.type = 'button';
+        toggle.setAttribute('aria-expanded', 'false');
+
+        const textEl = el('div', 'ai-thinking-text');
+        textEl.hidden = true;
+
+        const block = el('div', 'ai-thinking ai-thinking-active', toggle, textEl);
+        bubble.insertBefore(block, bubble.firstChild);
+
+        let thoughts      = '';
+        let expanded      = false;
+        let done          = false;
+        let finalRendered = false;
+
+        // The block scrolls internally (it is capped in height), and it can be
+        // unfolded long after its message scrolled up the conversation — so it
+        // must never drag the conversation view with it.
+        const renderer = _createStreamRenderer(textEl, {
+            scrollConversation: false,
+            onApply: () => { if (expanded) textEl.scrollTop = textEl.scrollHeight; },
+        });
+
+        /** Format what we have so far — only worth doing while it is on screen. */
+        function render() {
+            if (!expanded || !thoughts) return;
+            if (!done) {
+                renderer.push(thoughts);
+                return;
+            }
+            // finish() ends the renderer's throttle loop, so it is only correct
+            // once nothing more can arrive — and only useful once.
+            if (finalRendered) return;
+            finalRendered = true;
+            renderer.finish(thoughts);
+        }
+
+        toggle.addEventListener('click', () => {
+            expanded      = !expanded;
+            textEl.hidden = !expanded;
+            toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            if (!expanded) return;
+            render();  // first unfold: nothing has been formatted yet
+            textEl.scrollTop = textEl.scrollHeight;
+        });
+
+        return {
+            push(delta) {
+                thoughts += delta;
+                // Always-safe placeholder, until the first formatted render owns
+                // the element (mirrors how a reply bubble streams).
+                if (!renderer.hasApplied()) textEl.textContent = thoughts;
+                render();
+                if (expanded) textEl.scrollTop = textEl.scrollHeight;
+            },
+            finish() {
+                // The reply has started (or the response ended): stop the pulse and
+                // relabel — it is a record of how the answer was reached, not
+                // something still happening.
+                if (done) return;
+                done = true;
+                block.classList.remove('ai-thinking-active');
+                label.textContent = t('GRAFIDA_LBL_AI_THOUGHT_PROCESS');
+                render();  // authoritative final render, if anyone is looking
+            },
+        };
     }
 
     /**
@@ -732,9 +847,17 @@
      * render that supersedes any still-in-flight streaming render.
      *
      * @param {HTMLElement} textEl
+     * @param {Object}      [opts]
+     * @param {boolean}     [opts.scrollConversation=true] keep the conversation pinned to
+     *                                                     the bottom as the text grows. Off
+     *                                                     for a block the user may unfold
+     *                                                     long after the fact — re-rendering
+     *                                                     it must not yank the view.
+     * @param {Function}    [opts.onApply]                 called after each applied render
      * @returns {{push: function(string): void, finish: function(string): void, hasApplied: function(): boolean}}
      */
-    function _createStreamRenderer(textEl) {
+    function _createStreamRenderer(textEl, opts) {
+        const { scrollConversation = true, onApply = null } = opts || {};
         let seq     = 0;      // id of the most recent render REQUEST issued
         let applied = 0;      // id of the most recent render RESULT applied
         let timer   = null;   // throttle timer handle, or null when idle
@@ -747,8 +870,11 @@
             applied = mySeq;
             textEl.classList.add('ai-rich');
             textEl.innerHTML = html;
-            const conv = document.getElementById('ai-conversation');
-            if (conv) conv.scrollTop = conv.scrollHeight;
+            if (scrollConversation) {
+                const conv = document.getElementById('ai-conversation');
+                if (conv) conv.scrollTop = conv.scrollHeight;
+            }
+            if (onApply) onApply();
         }
 
         function fire() {

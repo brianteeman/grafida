@@ -99,6 +99,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | prompt (system/tool) | prompt | AI system or tool prompt text. Kept as-is («prompt») — a technical term universally used in Spanish AI contexts. |
 | system prompt | Prompt del sistema | The top-level system instruction for the AI. |
 | instructions (AI panel) | Instrucciones | Encabezado de la burbuja que contiene el prompt de una herramienta de IA. Deliberadamente la palabra llana, no «prompt». GRAFIDA_LBL_AI_INSTRUCTIONS. |
+| thinking (AI panel) | Pensando… / Razonamiento | Gerundio mientras el modelo piensa; sustantivo una vez terminado, cuando el texto solo queda para inspección. GRAFIDA_LBL_AI_THINKING / GRAFIDA_LBL_AI_THOUGHT_PROCESS. |
 | tool prompt | Prompt de la herramienta | The AI prompt text specific to a tool. |
 | temperature | Temperatura | AI sampling temperature parameter. |
 | Top P | Top P | AI nucleus-sampling parameter. Kept as-is. |

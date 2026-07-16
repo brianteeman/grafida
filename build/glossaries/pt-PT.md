@@ -95,6 +95,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | temperature | temperatura | AI sampling temperature parameter. |
 | system prompt | prompt de sistema | The LLM system-level instruction. «Prompt» kept as loanword; not translated. |
 | instructions (AI panel) | Instruções | Cabeçalho do balão que contém o prompt de uma ferramenta de IA. Deliberadamente a palavra comum, não «prompt». GRAFIDA_LBL_AI_INSTRUCTIONS. |
+| thinking (AI panel) | A pensar… / Raciocínio | Forma verbal enquanto o modelo pensa; substantivo depois de concluído, quando o texto fica apenas para inspeção. GRAFIDA_LBL_AI_THINKING / GRAFIDA_LBL_AI_THOUGHT_PROCESS. |
 | tool prompt | prompt da ferramenta | The per-tool instruction injected as context. |
 | tone | tom | Writing tone setting for an AI tool. |
 | endpoint | endpoint | API endpoint URL. Technical loanword; not translated. |

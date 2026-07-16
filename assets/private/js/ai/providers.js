@@ -18,6 +18,10 @@
  *                        Any unknown/legacy dialect value (including a stale "openai")
  *                        also degrades to this path — that is the whole back-compat story.
  *   anthropic          — "event:"/"data:" pairs, content_block_delta/text_delta, message_stop.
+ *
+ * Reasoning ("thinking") deltas are surfaced separately from the reply text via
+ * the onThinking callback; they are NEVER accumulated into the returned text —
+ * the reply the user inserts/copies must not carry the model's scratchpad.
  *   openai_responses   — OpenAI's Responses API. "event:"/"data:" pairs; every data payload
  *                        carries a "type", so dispatch on that and ignore the "event:" lines.
  *                        No "[DONE]" sentinel; response.completed is terminal. Non-streaming
@@ -156,12 +160,18 @@
      * Buffers partial lines across read() calls so chunks split mid-line are
      * handled correctly.
      *
-     * @param {ReadableStream} body     - response body from a streaming fetch
-     * @param {string}         dialect  - 'openai_completions' | 'anthropic' | 'openai_responses'
-     * @param {Function|null}  onToken  - called with each incremental delta string
+     * A reasoning model emits its scratchpad as its own kind of delta, on a
+     * separate field per dialect. Those go to onThinking and are deliberately
+     * kept out of the accumulated `text`: the reply is what gets inserted into
+     * the article, and the thinking is only ever shown for inspection.
+     *
+     * @param {ReadableStream} body       - response body from a streaming fetch
+     * @param {string}         dialect    - 'openai_completions' | 'anthropic' | 'openai_responses'
+     * @param {Function|null}  onToken    - called with each incremental reply delta string
+     * @param {Function|null}  [onThinking] - called with each incremental reasoning delta string
      * @returns {Promise<{text:string, responseId:string|null}>} full accumulated text + chain id
      */
-    async function readSseStream(body, dialect, onToken) {
+    async function readSseStream(body, dialect, onToken, onThinking) {
         const reader  = body.getReader();
         const decoder = new TextDecoder();
         let buf        = '';  // partial-line buffer across read() calls
@@ -201,6 +211,15 @@
                         if (onToken && delta) onToken(delta);
                         continue;
                     }
+                    // Reasoning scratchpad. Which of the two a provider emits
+                    // depends on the model and on whether a reasoning summary
+                    // was requested, so accept both.
+                    if (json.type === 'response.reasoning_summary_text.delta'
+                        || json.type === 'response.reasoning_text.delta') {
+                        const delta = json.delta || '';
+                        if (onThinking && delta) onThinking(delta);
+                        continue;
+                    }
                     if (json.type === 'response.completed') {
                         responseId = json.response?.id || responseId;
                         done = true; break;
@@ -227,7 +246,16 @@
                         throw new Error('Provider error: ' + (json.error?.message || JSON.stringify(json)));
                     }
                     if (json.type !== 'content_block_delta') continue;
-                    if (json.delta?.type !== 'text_delta')   continue;
+
+                    // Extended thinking: the scratchpad arrives as its own delta
+                    // type on the same content_block_delta event.
+                    if (json.delta?.type === 'thinking_delta') {
+                        const thought = json.delta.thinking || '';
+                        if (onThinking && thought) onThinking(thought);
+                        continue;
+                    }
+
+                    if (json.delta?.type !== 'text_delta') continue;
 
                     const delta = json.delta.text || '';
                     text += delta;
@@ -248,10 +276,19 @@
                         throw new Error('Provider error: ' + (json.error.message || JSON.stringify(json.error)));
                     }
 
-                    let delta = '';
-                    (json.choices || []).forEach(c => { delta += c.delta?.content ?? ''; });
+                    let delta    = '';
+                    let thinking = '';
+                    (json.choices || []).forEach(c => {
+                        delta += c.delta?.content ?? '';
+                        // Chat Completions has no standard reasoning field. DeepSeek
+                        // (and LM Studio, which follows it) use reasoning_content;
+                        // OpenRouter uses reasoning. A provider that emits neither
+                        // simply never calls onThinking.
+                        thinking += c.delta?.reasoning_content ?? c.delta?.reasoning ?? '';
+                    });
                     text += delta;
                     if (onToken && delta) onToken(delta);
+                    if (onThinking && thinking) onThinking(thinking);
                 }
             }
         }
@@ -339,12 +376,13 @@
      * @param {Object}      attemptOpts
      * @param {boolean}     attemptOpts.stream
      * @param {Function}    [attemptOpts.onToken]
+     * @param {Function}    [attemptOpts.onThinking]
      * @param {AbortSignal} [attemptOpts.signal]
      * @param {string|null} [attemptOpts.previousResponseId]
      * @returns {Promise<{text:string, usedFallback:boolean, responseId:string|null}>}
      */
     async function _attemptChat(serviceId, resolved, messages, attemptOpts) {
-        const { stream, onToken, signal, previousResponseId } = attemptOpts;
+        const { stream, onToken, onThinking, signal, previousResponseId } = attemptOpts;
 
         if (stream) {
             const req = buildRequest(resolved, messages, true, { previousResponseId });
@@ -363,7 +401,7 @@
                     } catch {}
                     throw new Error('Provider error: ' + errMsg);
                 }
-                const { text, responseId } = await readSseStream(res.body, resolved.sseDialect, onToken);
+                const { text, responseId } = await readSseStream(res.body, resolved.sseDialect, onToken, onThinking);
                 return { text, usedFallback: false, responseId };
             } catch (err) {
                 if (err.name === 'AbortError') throw err;    // propagate user cancel
@@ -419,13 +457,16 @@
      * @param {Object}         [opts]
      * @param {boolean}        [opts.stream=false]     request SSE streaming
      * @param {Function}       [opts.onToken]          called with each incremental delta string
+     * @param {Function}       [opts.onThinking]       called with each incremental reasoning delta
+     *                                                 string (streaming path only; never part of
+     *                                                 the returned text)
      * @param {AbortSignal}    [opts.signal]           AbortSignal from newAbort().signal
      * @param {string}         [opts.toolKey]          tool key for per-tool param overrides
      * @param {string|null}    [opts.previousResponseId] Responses-API chain id from a prior turn
      * @returns {Promise<{text:string, usedFallback:boolean, responseId:string|null}>}
      */
     async function sendChat(serviceId, messages, opts) {
-        const { stream = false, onToken, signal, toolKey, previousResponseId = null } = opts || {};
+        const { stream = false, onToken, onThinking, signal, toolKey, previousResponseId = null } = opts || {};
         // api is declared as `const` in app.js; both scripts share the browser's
         // global lexical scope, so `api` is in scope here at call time.
         /* global api */
@@ -443,12 +484,12 @@
 
         try {
             return await _attemptChat(serviceId, resolved, messages, {
-                stream, onToken: trackedOnToken, signal, previousResponseId,
+                stream, onToken: trackedOnToken, onThinking, signal, previousResponseId,
             });
         } catch (err) {
             if (previousResponseId && !emittedToken && _looksLikeStaleChainError(err)) {
                 return await _attemptChat(serviceId, resolved, messages, {
-                    stream, onToken, signal, previousResponseId: null,
+                    stream, onToken, onThinking, signal, previousResponseId: null,
                 });
             }
             throw err;

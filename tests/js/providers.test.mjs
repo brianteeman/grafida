@@ -286,6 +286,108 @@ test('Chat Completions streaming: still honours the [DONE] sentinel', async () =
 });
 
 // -----------------------------------------------------------------------------
+//  Reasoning ("thinking") deltas
+//
+//  The scratchpad must reach onThinking and NOTHING else: it is never part of
+//  result.text, because that text is what the panel's Insert/Copy buttons put
+//  into the article.
+// -----------------------------------------------------------------------------
+
+test('Responses streaming: reasoning deltas go to onThinking, never into the text', async () => {
+    const sse = [
+        'event: response.created',
+        'data: {"type":"response.created","response":{"id":"resp_1"}}',
+        '',
+        'event: response.reasoning_summary_text.delta',
+        'data: {"type":"response.reasoning_summary_text.delta","delta":"Let me "}',
+        '',
+        'event: response.reasoning_text.delta',
+        'data: {"type":"response.reasoning_text.delta","delta":"weigh it up."}',
+        '',
+        'event: response.output_text.delta',
+        'data: {"type":"response.output_text.delta","delta":"The answer"}',
+        '',
+        'event: response.completed',
+        'data: {"type":"response.completed","response":{"id":"resp_1"}}',
+        '',
+    ].join('\n');
+
+    const { AI } = load({ resolved: RESPONSES, fetch: async () => ({ ok: true, body: sseBody(sse, 4) }) });
+
+    const tokens = [], thoughts = [];
+    const result = await AI.sendChat(1, MESSAGES, {
+        stream: true,
+        onToken:    (d) => tokens.push(d),
+        onThinking: (d) => thoughts.push(d),
+    });
+
+    assert.deepEqual(thoughts, ['Let me ', 'weigh it up.'], 'both reasoning event types are accepted');
+    assert.deepEqual(tokens, ['The answer']);
+    assert.equal(result.text, 'The answer', 'the scratchpad stays out of the reply');
+});
+
+test('Anthropic streaming: thinking_delta goes to onThinking, never into the text', async () => {
+    const sse = [
+        'event: content_block_delta',
+        'data: {"type":"content_block_delta","delta":{"type":"thinking_delta","thinking":"Hmm."}}',
+        '',
+        'event: content_block_delta',
+        'data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Done."}}',
+        '',
+        'event: message_stop',
+        'data: {"type":"message_stop"}',
+        '',
+    ].join('\n');
+
+    const { AI } = load({ resolved: ANTHROPIC, fetch: async () => ({ ok: true, body: sseBody(sse, 3) }) });
+
+    const thoughts = [];
+    const result = await AI.sendChat(1, MESSAGES, { stream: true, onThinking: (d) => thoughts.push(d) });
+
+    assert.deepEqual(thoughts, ['Hmm.']);
+    assert.equal(result.text, 'Done.');
+});
+
+test('Chat Completions streaming: reasoning_content and reasoning both feed onThinking', async () => {
+    const sse = [
+        // DeepSeek / LM Studio spelling…
+        'data: {"choices":[{"delta":{"reasoning_content":"Weighing"}}]}',
+        '',
+        // …and OpenRouter's.
+        'data: {"choices":[{"delta":{"reasoning":" options"}}]}',
+        '',
+        'data: {"choices":[{"delta":{"content":"Answer"}}]}',
+        '',
+        'data: [DONE]',
+        '',
+    ].join('\n');
+
+    const { AI } = load({ resolved: COMPLETIONS, fetch: async () => ({ ok: true, body: sseBody(sse, 3) }) });
+
+    const thoughts = [];
+    const result = await AI.sendChat(1, MESSAGES, { stream: true, onThinking: (d) => thoughts.push(d) });
+
+    assert.deepEqual(thoughts, ['Weighing', ' options']);
+    assert.equal(result.text, 'Answer');
+});
+
+test('A reasoning-free provider never calls onThinking', async () => {
+    const sse = [
+        'data: {"choices":[{"delta":{"content":"Plain"}}]}',
+        '',
+        'data: [DONE]',
+        '',
+    ].join('\n');
+
+    const { AI } = load({ resolved: COMPLETIONS, fetch: async () => ({ ok: true, body: sseBody(sse, 2) }) });
+
+    let called = false;
+    await AI.sendChat(1, MESSAGES, { stream: true, onThinking: () => { called = true; } });
+
+    assert.equal(called, false);
+});
+
+// -----------------------------------------------------------------------------
 //  Non-streaming (the proxy path)
 // -----------------------------------------------------------------------------
 

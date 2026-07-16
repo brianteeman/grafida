@@ -101,6 +101,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | streaming | streaming | AI streamed response — keep in English. |
 | system prompt | prompt système | The system-level instruction given to the AI. |
 | instructions (AI panel) | Instructions | En-tête de la bulle contenant le prompt d'un outil IA. Le mot courant, délibérément pas « prompt ». GRAFIDA_LBL_AI_INSTRUCTIONS. |
+| thinking (AI panel) | Réflexion en cours… / Raisonnement | Forme en cours tant que le modèle réfléchit ; substantif une fois terminé, le texte ne servant plus qu'à l'inspection. GRAFIDA_LBL_AI_THINKING / GRAFIDA_LBL_AI_THOUGHT_PROCESS. |
 | prompt (AI) | prompt | AI prompt (tool prompt, system prompt) — « prompt » is the accepted French term in AI contexts. |
 | tone | ton | Writing tone for an AI tool. |
 | tool key | identifiant de l'outil | The unique key/slug identifying an AI tool. |
