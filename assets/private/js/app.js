@@ -4286,11 +4286,18 @@ function buildAiServiceFormBody(svc) {
     endpIn.placeholder = 'https://api.example.com';
     if (svc) endpIn.value = svc.endpoint || '';
 
-    // Pre-fill endpoint from provider preset when the endpoint field is blank,
-    // and show/hide the Responses-API-only Store/retention fields (see below).
+    // Pre-fill endpoint from provider preset when the endpoint field is blank
+    // or still holds the previously-selected provider's preset (so switching
+    // providers re-fills it) — but never clobber a hand-edited endpoint — and
+    // show/hide the Responses-API-only Store/retention fields (see below).
+    let lastPresetEndpoint = (svc && svc.provider) ? (State.aiProviders[svc.provider]?.endpoint || '') : '';
     provSel.addEventListener('change', () => {
         const preset = State.aiProviders[provSel.value];
-        if (preset && endpIn.value.trim() === '') endpIn.value = preset.endpoint || '';
+        const current = endpIn.value.trim();
+        if (preset && (current === '' || current === lastPresetEndpoint)) {
+            endpIn.value = preset.endpoint || '';
+        }
+        lastPresetEndpoint = preset ? (preset.endpoint || '') : '';
         updateResponsesParamsVisibility();
     });
 
