@@ -1,0 +1,3 @@
+# Local Claude Code settings (machine-specific permissions etc.) — everything
+# else under .claude/ (skills, agents, commands) is shared and committed.
+settings*
