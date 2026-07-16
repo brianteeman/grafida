@@ -179,6 +179,52 @@ final class ApiRoutingTest extends TestCase
         self::assertSame('right', $fetched['data']['images']['float_intro']);
     }
 
+    public function testDraftRoundTripsCreatedByAlias(): void
+    {
+        $kernel = $this->kernel();
+        $siteId = $this->seedSite();
+
+        [$status, $created] = $this->call(
+            $kernel,
+            'POST',
+            '/api/sites/' . $siteId . '/drafts',
+            json_encode(['title' => 'Ghostwritten', 'createdByAlias' => 'Guest Author'])
+        );
+
+        self::assertSame(200, $status);
+        self::assertSame('Guest Author', $created['data']['createdByAlias']);
+
+        [, $fetched] = $this->call($kernel, 'GET', '/api/drafts/' . $created['data']['id']);
+        self::assertSame('Guest Author', $fetched['data']['createdByAlias']);
+
+        // Clearing it must stick: an empty alias means "credit the real author",
+        // and PublishService relies on the draft carrying that as a real value.
+        [, $updated] = $this->call(
+            $kernel,
+            'PUT',
+            '/api/drafts/' . $created['data']['id'],
+            json_encode(['title' => 'Ghostwritten', 'createdByAlias' => ''])
+        );
+
+        self::assertSame('', $updated['data']['createdByAlias']);
+    }
+
+    public function testDraftOmittingCreatedByAliasDefaultsToEmpty(): void
+    {
+        $kernel = $this->kernel();
+        $siteId = $this->seedSite();
+
+        [$status, $created] = $this->call(
+            $kernel,
+            'POST',
+            '/api/sites/' . $siteId . '/drafts',
+            json_encode(['title' => 'No alias'])
+        );
+
+        self::assertSame(200, $status);
+        self::assertSame('', $created['data']['createdByAlias']);
+    }
+
     public function testMediaBlobMissingIs404(): void
     {
         [$status, $json] = $this->call($this->kernel(), 'GET', '/api/media/999');

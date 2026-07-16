@@ -173,21 +173,22 @@ final class ArticleController extends Controller
         $catId = $this->siteContext->firstRelationshipId($article, 'category');
 
         return [
-            'id'       => null,
-            'siteId'   => $siteId,
-            'remoteId' => $articleId,
-            'title'    => $this->str($article, 'title'),
-            'alias'    => $this->str($article, 'alias'),
-            'catid'    => $catId,
-            'access'   => isset($article['access']) && is_numeric($article['access']) ? (int) $article['access'] : 1,
-            'language' => $language !== '' ? $language : '*',
-            'state'    => isset($article['state']) && is_numeric($article['state']) ? (int) $article['state'] : 1,
-            'html'     => $html,
-            'fields'   => [],
-            'tags'     => $this->remoteTagTitles($article, $site),
-            'images'   => $this->remoteImages($article),
-            'metadesc' => $this->str($article, 'metadesc'),
-            'metakey'  => $this->str($article, 'metakey'),
+            'id'             => null,
+            'siteId'         => $siteId,
+            'remoteId'       => $articleId,
+            'title'          => $this->str($article, 'title'),
+            'alias'          => $this->str($article, 'alias'),
+            'catid'          => $catId,
+            'access'         => isset($article['access']) && is_numeric($article['access']) ? (int) $article['access'] : 1,
+            'language'       => $language !== '' ? $language : '*',
+            'state'          => isset($article['state']) && is_numeric($article['state']) ? (int) $article['state'] : 1,
+            'html'           => $html,
+            'fields'         => [],
+            'tags'           => $this->remoteTagTitles($article, $site),
+            'images'         => $this->remoteImages($article),
+            'metadesc'       => $this->str($article, 'metadesc'),
+            'metakey'        => $this->str($article, 'metakey'),
+            'createdByAlias' => $this->str($article, 'created_by_alias'),
         ];
     }
 

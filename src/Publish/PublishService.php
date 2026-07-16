@@ -101,14 +101,21 @@ final class PublishService
         // update (a create has no backfill, so it appeared to work). Sending the two
         // columns directly keeps them present in the data, so they are never
         // backfilled and bind writes our new values for both POST and PATCH.
+        // `created_by_alias` is sent unconditionally, unlike the optional attributes
+        // below: an empty value is a meaningful one (it means "credit the real
+        // author"), and on a PATCH an omitted column is backfilled from the existing
+        // record — so an alias the user cleared here could never be cleared on the
+        // site. The draft is authoritative because importing a remote article reads
+        // the site's current value back into it (see ArticleController).
         $attributes = [
-            'title'     => $draft->title,
-            'catid'     => $draft->catid,
-            'access'    => $draft->access,
-            'state'     => $draft->state,
-            'language'  => $draft->language,
-            'introtext' => $split['introtext'],
-            'fulltext'  => $split['fulltext'],
+            'title'            => $draft->title,
+            'catid'            => $draft->catid,
+            'access'           => $draft->access,
+            'state'            => $draft->state,
+            'language'         => $draft->language,
+            'introtext'        => $split['introtext'],
+            'fulltext'         => $split['fulltext'],
+            'created_by_alias' => $draft->createdByAlias,
         ];
 
         // Optional attributes, included only when they carry a value.

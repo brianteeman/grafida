@@ -1943,6 +1943,7 @@ async function openNewArticle() {
         images: {},
         metadesc: '',
         metakey: '',
+        createdByAlias: '',
     });
 }
 
@@ -2056,6 +2057,15 @@ function renderEditorSidebar(draft) {
         );
         sidebar.appendChild(notice);
     }
+
+    // Created by Alias — the by-line Joomla shows instead of the real author's
+    // name. Empty (the default) credits the account the article is published under.
+    const createdByAliasEl = document.createElement('input');
+    createdByAliasEl.id = 'editor-created-by-alias';
+    createdByAliasEl.type = 'text';
+    createdByAliasEl.className = 'form-control';
+    createdByAliasEl.value = draft.createdByAlias || '';
+    sidebar.appendChild(formGroup(t('GRAFIDA_LBL_CREATED_BY_ALIAS'), createdByAliasEl));
 
     // Meta description
     const metadescEl = document.createElement('textarea');
@@ -4089,6 +4099,7 @@ function collectDraftFormData() {
     const stateEl = document.getElementById('editor-state');
     const metadescEl = document.getElementById('editor-metadesc');
     const metakeyEl = document.getElementById('editor-metakey');
+    const createdByAliasEl = document.getElementById('editor-created-by-alias');
     const titleInputEl = document.getElementById('editor-title-input');
     const aliasInputEl = document.getElementById('editor-alias-input');
 
@@ -4105,6 +4116,7 @@ function collectDraftFormData() {
         images: collectImages(),
         metadesc: metadescEl ? metadescEl.value : '',
         metakey: metakeyEl ? metakeyEl.value : '',
+        createdByAlias: createdByAliasEl ? createdByAliasEl.value.trim() : '',
     };
 }
 

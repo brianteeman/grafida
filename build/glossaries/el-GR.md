@@ -121,6 +121,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | sidebar | πλαϊνή στήλη | Collapsible navigation/metadata columns. GRAFIDA_BTN_TOGGLE_SIDEBAR. |
 | collapse or expand | σύμπτυξη ή ανάπτυξη | Toggling a sidebar's collapsed state. GRAFIDA_BTN_TOGGLE_SIDEBAR / GRAFIDA_BTN_TOGGLE_PROPERTIES. |
 | alias (URL slug) | Ψευδώνυμο | The article's URL slug; Joomla Greek uses "Ψευδώνυμο". GRAFIDA_LBL_ALIAS. |
+| created by alias (author) | Ψευδώνυμο συντάκτη | The by-line shown instead of the real author's name (Joomla `created_by_alias`). A person's alias — NOT the URL slug above. GRAFIDA_LBL_CREATED_BY_ALIAS. |
 | icon picker | επιλογή εικονιδίου | Searchable dropdown for the AI-tool icon. GRAFIDA_BTN_AI_TOOL_ICON_CHOOSE / GRAFIDA_PLACEHOLDER_AI_TOOL_ICON_SEARCH. Uses «εικονίδιο» per the existing icon entry. |
 | list site articles | Προβολή άρθρων ιστοτόπου | Empty-state action that switches to the Remote Articles tab. GRAFIDA_BTN_LIST_SITE_ARTICLES. |
 | visit site | Επίσκεψη ιστοτόπου | Sidebar button under the site favicon; opens the site in the OS browser. GRAFIDA_BTN_OPEN_SITE. |

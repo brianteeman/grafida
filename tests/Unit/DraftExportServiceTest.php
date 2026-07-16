@@ -68,6 +68,7 @@ final class DraftExportServiceTest extends TestCase
             images: ['image_intro' => 'grafida-media://' . $mediaId, 'image_fulltext' => ''],
             metadesc: 'desc',
             metakey: 'key',
+            createdByAlias: 'Guest Author',
         );
 
         $draftId = $this->drafts->insert($draft);
@@ -97,6 +98,7 @@ final class DraftExportServiceTest extends TestCase
         self::assertArrayNotHasKey('remoteId', $payload['draft']);
         self::assertArrayNotHasKey('id', $payload['draft']);
         self::assertSame('Hello', $payload['draft']['title']);
+        self::assertSame('Guest Author', $payload['draft']['createdByAlias']);
 
         self::assertCount(1, $payload['offlineMedia']);
         $ref = array_key_first($payload['offlineMedia']);
@@ -120,6 +122,7 @@ final class DraftExportServiceTest extends TestCase
         self::assertSame(2, $imported->siteId);
         self::assertNull($imported->remoteId);
         self::assertSame('Hello', $imported->title);
+        self::assertSame('Guest Author', $imported->createdByAlias);
 
         $newRef = $imported->images['image_intro'];
         self::assertStringStartsWith('grafida-media://', $newRef);
@@ -169,9 +172,25 @@ final class DraftExportServiceTest extends TestCase
         self::assertSame(77, $replaced->remoteId, 'remote id must be preserved');
         self::assertSame('Hello', $replaced->title);
         self::assertSame('<p>Body</p>', $replaced->html);
+        self::assertSame('Guest Author', $replaced->createdByAlias);
 
         $chats = $this->chats->forDraft($targetId);
         self::assertCount(1, $chats);
         self::assertSame('Chat about intro', $chats[0]->title, 'old chats must be replaced by imported ones');
+    }
+
+    /**
+     * A .grafida file written before created_by_alias existed carries no such key.
+     * It must still import, crediting the real author (an empty alias) — which is
+     * why adding the field needed no format-version bump.
+     */
+    public function testImportOfAPayloadWithoutCreatedByAliasDefaultsToEmpty(): void
+    {
+        $payload = $this->export->export($this->draftWithMediaAndChat());
+        unset($payload['draft']['createdByAlias']);
+
+        $imported = $this->export->importAsNewDraft(2, $payload);
+
+        self::assertSame('', $imported->createdByAlias);
     }
 }

@@ -154,6 +154,16 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `καλημέρα-κόσμε` on a Unicode-alias site but nothing at all on a transliterating one; either way
   an empty result (Joomla counts an all-dashes alias as empty, as `Table\Content::check()` does)
   falls back to a `Y-m-d-H-i-s` timestamp.
+  Distinct from that URL slug, the **Created by Alias** (`created_by_alias`, a person's by-line —
+  Joomla shows it instead of the publishing account's name) is a plain sidebar text input
+  (`#editor-created-by-alias`, gh-8). It is the one article attribute `PublishService` sends
+  **unconditionally**, where `metadesc`/`metakey` are sent only when non-empty: an empty value is
+  meaningful ("credit the real author"), and a PATCH backfills every column we omit from the
+  *existing* record, so an alias the user cleared could otherwise never be cleared on the site. The
+  draft is authoritative because importing a remote article reads the site's value back into it.
+  ⚠️ The write survives because `ApiController::save()` filters the body through com_content's
+  `article.xml` form — a field absent from that form is silently dropped, so *any* new article
+  attribute must be checked against it first.
   `regenerateAlias(force)` fills the alias from the title on the title's **blur** only when the
   alias is empty (never clobbering a hand-edited one), while the button always regenerates.
   Joomla re-slugifies whatever alias we send on publish, so this is a faithful preview.
@@ -713,6 +723,13 @@ map is for when the update mechanism itself is built.
   Sending `introtext`/`fulltext` keeps them present in the data, never backfilled.
   Custom field values go under `com_fields`. Tags
   are an array of IDs. (`ApiClient::send()` posts the flat body; only responses are unwrapped.)
+  ⚠️ **A write is filtered through the component's edit form, so only fields declared there survive.**
+  `ApiController::save()` runs `$model->validate($form, $data)` and saves the *returned* `$validData`
+  — an attribute with no matching field in `administrator/components/com_content/forms/article.xml`
+  is dropped **silently** (no error, the API returns a resource that just ignored it). So before
+  adding any article attribute, confirm it is in that form; likewise it is only readable back if it
+  is listed in the API's `JsonapiView` (`$fieldsToRenderItem`/`List`). `created_by_alias` satisfies
+  both.
 - Media upload: `POST /v1/media/files` with `{path, content:<base64>}`; the response `url` is public.
 - Template styles: `GET /v1/templates/styles/site` (the `webservices/templates` plugin, **enabled out of
   the box** — `base.sql`'s `plg_webservices_templates` row has `enabled = 1`). Needs `core.manage` on

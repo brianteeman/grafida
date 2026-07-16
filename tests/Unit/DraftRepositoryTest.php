@@ -57,6 +57,7 @@ final class DraftRepositoryTest extends TestCase
             images: ['image_intro' => 'images/a.png'],
             metadesc: 'desc',
             metakey: 'key',
+            createdByAlias: 'Guest Author',
         );
     }
 
@@ -73,6 +74,7 @@ final class DraftRepositoryTest extends TestCase
         self::assertSame(['colour' => 'blue'], $back->fields);
         self::assertSame(['news'], $back->tags);
         self::assertSame(['image_intro' => 'images/a.png'], $back->images);
+        self::assertSame('Guest Author', $back->createdByAlias);
     }
 
     public function testUpdateChangesStoredValues(): void

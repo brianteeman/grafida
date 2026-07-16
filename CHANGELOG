@@ -1,6 +1,7 @@
 Grafida 0.2
 ================================================================================
 + Editable article alias (URL slug) in the editor, auto-generated from the title
++ Created by Alias in the editor, to credit an author other than the publishing account (gh-8)
 + Searchable icon picker for AI tools
 + Empty Local Articles tab offers New Article and List Site Articles
 + Ctrl/Cmd+, opens Settings from anywhere

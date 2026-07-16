@@ -60,18 +60,19 @@ final class DraftExportService
             'exportedAt'    => gmdate('c'),
             'appVersion'    => App::VERSION,
             'draft'         => [
-                'title'    => $draft->title,
-                'alias'    => $draft->alias,
-                'catid'    => $draft->catid,
-                'access'   => $draft->access,
-                'language' => $draft->language,
-                'state'    => $draft->state,
-                'html'     => $draft->html,
-                'fields'   => $draft->fields,
-                'tags'     => $draft->tags,
-                'images'   => $images,
-                'metadesc' => $draft->metadesc,
-                'metakey'  => $draft->metakey,
+                'title'          => $draft->title,
+                'alias'          => $draft->alias,
+                'catid'          => $draft->catid,
+                'access'         => $draft->access,
+                'language'       => $draft->language,
+                'state'          => $draft->state,
+                'html'           => $draft->html,
+                'fields'         => $draft->fields,
+                'tags'           => $draft->tags,
+                'images'         => $images,
+                'metadesc'       => $draft->metadesc,
+                'metakey'        => $draft->metakey,
+                'createdByAlias' => $draft->createdByAlias,
             ],
             'offlineMedia'  => $offlineMedia,
             'aiChats'       => $this->exportChats($draftId),
@@ -103,6 +104,7 @@ final class DraftExportService
             images: $data['images'],
             metadesc: $data['metadesc'],
             metakey: $data['metakey'],
+            createdByAlias: $data['createdByAlias'],
         );
 
         $newId = $this->drafts->insert($draft);
@@ -145,6 +147,7 @@ final class DraftExportService
             images: $data['images'],
             metadesc: $data['metadesc'],
             metakey: $data['metakey'],
+            createdByAlias: $data['createdByAlias'],
         );
 
         $this->drafts->update($draft);
@@ -240,7 +243,8 @@ final class DraftExportService
      * @param array<string, mixed> $payload
      * @return array{title: string, alias: string, catid: ?int, access: int, language: string,
      *               state: int, html: string, fields: array<string, mixed>, tags: list<string>,
-     *               images: array<string, mixed>, metadesc: string, metakey: string}
+     *               images: array<string, mixed>, metadesc: string, metakey: string,
+     *               createdByAlias: string}
      */
     private function draftDataFromPayload(array $payload): array
     {
@@ -257,18 +261,21 @@ final class DraftExportService
         $images = is_array($imagesRaw) ? $imagesRaw : [];
 
         return [
-            'title'    => is_string($draftRaw['title'] ?? null) ? $draftRaw['title'] : '',
-            'alias'    => is_string($draftRaw['alias'] ?? null) ? $draftRaw['alias'] : '',
-            'catid'    => is_numeric($draftRaw['catid'] ?? null) ? (int) $draftRaw['catid'] : null,
-            'access'   => is_numeric($draftRaw['access'] ?? null) ? (int) $draftRaw['access'] : 1,
-            'language' => is_string($draftRaw['language'] ?? null) ? $draftRaw['language'] : '*',
-            'state'    => is_numeric($draftRaw['state'] ?? null) ? (int) $draftRaw['state'] : 1,
-            'html'     => is_string($draftRaw['html'] ?? null) ? $draftRaw['html'] : '',
-            'fields'   => $fields,
-            'tags'     => is_array($tagsRaw) ? array_values(array_filter($tagsRaw, 'is_string')) : [],
-            'images'   => $images,
-            'metadesc' => is_string($draftRaw['metadesc'] ?? null) ? $draftRaw['metadesc'] : '',
-            'metakey'  => is_string($draftRaw['metakey'] ?? null) ? $draftRaw['metakey'] : '',
+            'title'          => is_string($draftRaw['title'] ?? null) ? $draftRaw['title'] : '',
+            'alias'          => is_string($draftRaw['alias'] ?? null) ? $draftRaw['alias'] : '',
+            'catid'          => is_numeric($draftRaw['catid'] ?? null) ? (int) $draftRaw['catid'] : null,
+            'access'         => is_numeric($draftRaw['access'] ?? null) ? (int) $draftRaw['access'] : 1,
+            'language'       => is_string($draftRaw['language'] ?? null) ? $draftRaw['language'] : '*',
+            'state'          => is_numeric($draftRaw['state'] ?? null) ? (int) $draftRaw['state'] : 1,
+            'html'           => is_string($draftRaw['html'] ?? null) ? $draftRaw['html'] : '',
+            'fields'         => $fields,
+            'tags'           => is_array($tagsRaw) ? array_values(array_filter($tagsRaw, 'is_string')) : [],
+            'images'         => $images,
+            'metadesc'       => is_string($draftRaw['metadesc'] ?? null) ? $draftRaw['metadesc'] : '',
+            'metakey'        => is_string($draftRaw['metakey'] ?? null) ? $draftRaw['metakey'] : '',
+            // Absent from files written before this field existed, hence the ''
+            // default — which is why the format version does not need a bump.
+            'createdByAlias' => is_string($draftRaw['createdByAlias'] ?? null) ? $draftRaw['createdByAlias'] : '',
         ];
     }
 

@@ -36,7 +36,7 @@ final class DraftRepository
             ->order($this->qn('updated_at') . ' DESC')
             ->bind(':site', $siteId, ParameterType::INTEGER);
 
-        /** @var list<array{id?: int|string|null, site_id: int|string, remote_id: int|string|null, title: string, alias: string, catid: int|string|null, access: int|string, language: string, state: int|string, html: string, fields_json: string, tags_json: string, images_json: string, metadesc?: string, metakey?: string}> $rows */
+        /** @var list<array{id?: int|string|null, site_id: int|string, remote_id: int|string|null, title: string, alias: string, catid: int|string|null, access: int|string, language: string, state: int|string, html: string, fields_json: string, tags_json: string, images_json: string, metadesc?: string, metakey?: string, created_by_alias?: string}> $rows */
         $rows = $this->db->setQuery($query)->loadAssocList();
 
         return array_values(array_map(static fn (array $r): Draft => Draft::fromRow($r), $rows));
@@ -54,7 +54,7 @@ final class DraftRepository
             ->bind(':site', $siteId, ParameterType::INTEGER)
             ->bind(':remote', $remoteId, ParameterType::INTEGER);
 
-        /** @var array{id?: int|string|null, site_id: int|string, remote_id: int|string|null, title: string, alias: string, catid: int|string|null, access: int|string, language: string, state: int|string, html: string, fields_json: string, tags_json: string, images_json: string, metadesc?: string, metakey?: string}|null $row */
+        /** @var array{id?: int|string|null, site_id: int|string, remote_id: int|string|null, title: string, alias: string, catid: int|string|null, access: int|string, language: string, state: int|string, html: string, fields_json: string, tags_json: string, images_json: string, metadesc?: string, metakey?: string, created_by_alias?: string}|null $row */
         $row = $this->db->setQuery($query)->loadAssoc();
 
         return $row !== null ? Draft::fromRow($row) : null;
@@ -68,7 +68,7 @@ final class DraftRepository
             ->where($this->qn('id') . ' = :id')
             ->bind(':id', $id, ParameterType::INTEGER);
 
-        /** @var array{id?: int|string|null, site_id: int|string, remote_id: int|string|null, title: string, alias: string, catid: int|string|null, access: int|string, language: string, state: int|string, html: string, fields_json: string, tags_json: string, images_json: string, metadesc?: string, metakey?: string}|null $row */
+        /** @var array{id?: int|string|null, site_id: int|string, remote_id: int|string|null, title: string, alias: string, catid: int|string|null, access: int|string, language: string, state: int|string, html: string, fields_json: string, tags_json: string, images_json: string, metadesc?: string, metakey?: string, created_by_alias?: string}|null $row */
         $row = $this->db->setQuery($query)->loadAssoc();
 
         return $row !== null ? Draft::fromRow($row) : null;
@@ -183,6 +183,7 @@ final class DraftRepository
             ['column' => 'images_json', 'placeholder' => ':images', 'value' => $imagesJson, 'type' => ParameterType::STRING],
             ['column' => 'metadesc', 'placeholder' => ':metadesc', 'value' => $draft->metadesc, 'type' => ParameterType::STRING],
             ['column' => 'metakey', 'placeholder' => ':metakey', 'value' => $draft->metakey, 'type' => ParameterType::STRING],
+            ['column' => 'created_by_alias', 'placeholder' => ':created_by_alias', 'value' => $draft->createdByAlias, 'type' => ParameterType::STRING],
         ];
     }
 }

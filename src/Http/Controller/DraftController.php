@@ -111,6 +111,7 @@ final class DraftController extends Controller
             images: $images,
             metadesc: $this->str($body, 'metadesc'),
             metakey: $this->str($body, 'metakey'),
+            createdByAlias: $this->str($body, 'createdByAlias'),
         );
 
         if ($draftId === null) {
