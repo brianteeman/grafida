@@ -1,15 +1,15 @@
 Grafida 0.2
 ================================================================================
-# [HIGH] Windows: the app crashed immediately on startup ("broken signature") because Authenticode signing corrupted the Boson-appended PHAR payload
-# [MEDIUM] Windows: the interface froze for several seconds whenever a stored secret was read, because the secret store spawned PowerShell; it now uses the DPAPI system call directly
-# [LOW] Windows: a command window no longer flashes (at startup, and when detecting the system light/dark theme)
-# [LOW] AI Tools now show their icons again, both in Settings and in the editor's AI Tools menu (a double FontAwesome prefix, and missing menu icons, left them blank)
-# [LOW] Dialogs no longer close when you click outside them, so selecting text inside a dialog can no longer discard it by accident
-+ Windows: the installer now bundles the required Visual C++ runtime DLLs, so the app runs on a clean Windows without a separate redistributable
-+ The editor now shows the article alias (URL slug) below the title, auto-generated from the title using Joomla's conventions, with a button to regenerate it
-+ Ctrl/Cmd+, now opens the Settings page from anywhere (prompting to save first when an article is open with unsaved changes)
-+ An AI tool's icon is now chosen from a searchable drop-down showing each icon, instead of having to know and type its FontAwesome name
-+ With no local articles yet, the Local Articles tab now explains what to do next and offers buttons to create an article or list the site's own articles
++ Editable article alias (URL slug) in the editor, auto-generated from the title
++ Searchable icon picker for AI tools
++ Empty Local Articles tab offers New Article and List Site Articles
++ Ctrl/Cmd+, opens Settings from anywhere
++ Windows: the installer bundles the Visual C++ runtime DLLs
+# [HIGH] Windows: crash on startup ("broken signature") after Authenticode signing
+# [MEDIUM] Windows: multi-second freeze whenever a stored secret was read
+# [LOW] Windows: a command window flashed at startup and on theme detection
+# [LOW] AI tool icons were blank in Settings and the editor's AI Tools menu
+# [LOW] Dialogs closed when clicking outside them, discarding your input
 
 Grafida 0.1
 ================================================================================
