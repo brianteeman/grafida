@@ -219,4 +219,46 @@ final class ApiClientTest extends TestCase
         self::assertSame('3', $article['relationships']['tags']['data'][0]['id']);
         self::assertSame('5', $article['relationships']['tags']['data'][1]['id']);
     }
+
+    public function testGetConfigValueScansThePaginatedOneKeyItems(): void
+    {
+        // com_config's application view serves each config key as its own
+        // single-attribute resource, all sharing the same id, and paginates
+        // them (20 at a time by default) — hence the explicit page vars.
+        $body = json_encode([
+            'data' => [
+                ['type' => 'application', 'id' => '800', 'attributes' => ['sitename' => 'Example']],
+                ['type' => 'application', 'id' => '800', 'attributes' => ['unicodeslugs' => true]],
+            ],
+        ]);
+
+        $transport = new FakeTransport();
+        $transport->on(
+            'https://example.com/index.php/api/v1/config/application?page%5Boffset%5D=0&page%5Blimit%5D=500',
+            new HttpResponse(200, (string) $body)
+        );
+
+        $client = new ApiClient($transport);
+
+        self::assertTrue($client->getConfigValue('https://example.com/index.php/api', 'tok', 'unicodeslugs'));
+    }
+
+    public function testGetConfigValueReturnsNullForAnAbsentKey(): void
+    {
+        $body = json_encode([
+            'data' => [
+                ['type' => 'application', 'id' => '800', 'attributes' => ['sitename' => 'Example']],
+            ],
+        ]);
+
+        $transport = new FakeTransport();
+        $transport->on(
+            'https://example.com/index.php/api/v1/config/application?page%5Boffset%5D=0&page%5Blimit%5D=500',
+            new HttpResponse(200, (string) $body)
+        );
+
+        $client = new ApiClient($transport);
+
+        self::assertNull($client->getConfigValue('https://example.com/index.php/api', 'tok', 'unicodeslugs'));
+    }
 }

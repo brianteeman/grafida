@@ -131,6 +131,9 @@ final class SiteController extends Controller
             'levels'     => $this->references->accessLevels($site, $refresh, $bestEffort),
             'languages'  => $this->references->contentLanguages($site, $refresh, $bestEffort),
             'fields'     => $this->fields->partition($fieldDefs),
+            // Drives the SPA's alias preview: with Unicode Aliases on, a Greek
+            // title stays Greek instead of being transliterated away.
+            'unicodeSlugs' => $this->references->unicodeSlugs($site, $refresh),
             'favicon'    => $refresh && $site->id !== null ? $this->favicons->dataUri($site->id) : null,
         ]);
     }

@@ -34,6 +34,7 @@ final class ReferenceService
     public const KIND_LEVELS     = 'levels';
     public const KIND_FIELDS     = 'fields';
     public const KIND_LANGUAGES  = 'languages';
+    public const KIND_CONFIG     = 'config';
 
     public function __construct(
         private readonly ReferenceRepository $repository,
@@ -76,6 +77,68 @@ final class ReferenceService
     }
 
     /**
+     * Whether the site has the Global Configuration "Unicode Aliases" option
+     * (`unicodeslugs`) turned on, i.e. whether an alias keeps its non-ASCII
+     * letters instead of being transliterated.
+     *
+     * Unlike the reference lists this is **never** strict, whatever the caller
+     * asks: the route it comes from needs `core.admin`, which a Grafida user
+     * publishing articles usually will not have, so a 403 is the normal case
+     * for a perfectly healthy site and must not turn the manual refresh into an
+     * error. An unreadable value falls back to the cached answer, then to false
+     * — Joomla's own default, and the mode Grafida has always assumed.
+     */
+    public function unicodeSlugs(Site $site, bool $refresh = false): bool
+    {
+        if ($site->id === null) {
+            return false;
+        }
+
+        if (!$refresh) {
+            $cached = $this->repository->get($site->id, self::KIND_CONFIG);
+
+            if ($cached !== null) {
+                return (bool) ($cached['payload']['unicodeslugs'] ?? false);
+            }
+        }
+
+        $token = $this->sites->tokenFor($site);
+
+        if ($token === null || $site->apiBase === null) {
+            return $this->cachedUnicodeSlugs($site->id);
+        }
+
+        try {
+            $value = $this->api->getConfigValue($site->apiBase, $token, 'unicodeslugs');
+        } catch (ApiException | HttpException) {
+            return $this->cachedUnicodeSlugs($site->id);
+        }
+
+        // A site whose token lacks core.admin answers 403 (handled above); a
+        // successful read that simply has no such key is a site we cannot know
+        // about either, so leave any cached answer alone rather than write a
+        // guess over it.
+        if ($value === null) {
+            return $this->cachedUnicodeSlugs($site->id);
+        }
+
+        // Joomla itself asks `unicodeslugs == 1`, and configuration.php may hold
+        // a bool, an int or a numeric string depending on how it was written.
+        $enabled = in_array($value, [true, 1, '1'], true);
+
+        $this->repository->put($site->id, self::KIND_CONFIG, ['unicodeslugs' => $enabled]);
+
+        return $enabled;
+    }
+
+    private function cachedUnicodeSlugs(int $siteId): bool
+    {
+        $cached = $this->repository->get($siteId, self::KIND_CONFIG);
+
+        return (bool) ($cached['payload']['unicodeslugs'] ?? false);
+    }
+
+    /**
      * Refreshes every reference list for a site from the network, best-effort.
      *
      * Used when connecting a site (and as a short-timeout attempt when opening
@@ -90,6 +153,7 @@ final class ReferenceService
         $this->accessLevels($site, true, true);
         $this->fields($site, true, true);
         $this->contentLanguages($site, true, true);
+        $this->unicodeSlugs($site, true);
     }
 
     /**

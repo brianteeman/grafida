@@ -3937,33 +3937,66 @@ function blobToBase64(blob) {
 
 /**
  * Turn a string into a URL-safe alias, mirroring Joomla's
- * ApplicationHelper::stringUrlSafe(): dashes become spaces, accented Latin
- * letters are transliterated to ASCII (via Unicode NFKD decomposition +
- * combining-mark stripping — a close approximation of Joomla's default
- * transliterator), the result is lower-cased, every run of whitespace becomes a
- * single dash, any remaining non-[a-z0-9-] character is dropped and leading /
- * trailing dashes are trimmed. When nothing usable survives (e.g. an all
- * non-Latin title), Joomla falls back to a timestamp — so do we, keeping the
- * same Y-m-d-H-i-s shape. The published article is re-slugified by Joomla
- * anyway, so this only needs to be a faithful preview of the result.
+ * ApplicationHelper::stringUrlSafe(), which picks one of two algorithms based
+ * on the site's "Unicode Aliases" Global Configuration option (`unicodeslugs`)
+ * — hence the flag, read from the site's cached configuration. When nothing
+ * usable survives either algorithm, Joomla falls back to a timestamp — so do
+ * we, keeping the same Y-m-d-H-i-s shape. The published article is re-slugified
+ * by Joomla anyway, so this only needs to be a faithful preview of the result.
  */
 function makeAlias(text) {
-    let str = String(text || '').replace(/-/g, ' ');
+    const str = aliasSlug(text, !!(State.references && State.references.unicodeSlugs));
+
+    // Joomla considers an alias of nothing but dashes as empty too.
+    if (str.replace(/-/g, '').trim() !== '') return str;
+
+    const d = new Date();
+    const p = (n) => String(n).padStart(2, '0');
+
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+        + `-${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
+}
+
+/**
+ * The slug itself, without Joomla's empty-result timestamp fallback.
+ *
+ * Transliterating (`unicodeslugs` off, Joomla's default — OutputFilter::
+ * stringURLSafe): dashes become spaces, accented Latin letters are
+ * transliterated to ASCII (via Unicode NFKD decomposition + combining-mark
+ * stripping, a close approximation of Joomla's default transliterator), the
+ * result is lower-cased, every run of whitespace becomes a single dash and any
+ * remaining non-[a-z0-9-] character is dropped. A title with no Latin letters
+ * at all — "Καλημέρα κόσμε" — survives this as nothing.
+ *
+ * Unicode (`unicodeslugs` on — OutputFilter::stringUrlUnicodeSlug): the letters
+ * are kept as they are, so that title becomes "καλημέρα-κόσμε". Only the
+ * characters that would break a URL are replaced by spaces (question marks are
+ * dropped outright), the result is lower-cased and each run of spaces becomes a
+ * single dash. Note it is *spaces* Joomla collapses here, not whitespace at
+ * large, and that it never trims leading/trailing dashes.
+ */
+function aliasSlug(text, unicodeSlugs) {
+    let str = String(text || '');
+
+    if (unicodeSlugs) {
+        // Ideographic space (East Asian languages) to a plain one.
+        str = str.replace(/　/g, ' ');
+        str = str.replace(/-/g, ' ');
+        str = str.replace(/[:#*"@+=;!><&.%()\]\/'\\|\[]/g, ' ');
+        str = str.replace(/\?/g, '');
+        str = str.trim().toLowerCase();
+
+        return str.replace(/ +/g, '-');
+    }
+
+    str = str.replace(/-/g, ' ');
     // Transliterate: decompose accented characters and strip the combining
     // diacritical marks (Unicode U+0300–U+036F) that decomposition leaves behind.
     str = str.normalize('NFKD').replace(/[̀-ͯ]/g, '');
     str = str.trim().toLowerCase();
     str = str.replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
-    str = str.replace(/^-+|-+$/g, '');
 
-    if (str === '') {
-        const d = new Date();
-        const p = (n) => String(n).padStart(2, '0');
-        str = `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-            + `-${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
-    }
-
-    return str;
+    return str.replace(/^-+|-+$/g, '');
 }
 
 /**

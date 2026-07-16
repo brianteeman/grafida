@@ -29,6 +29,7 @@ use Grafida\Http\Transport;
  *   GET    tags                        POST tags
  *   GET    users/levels
  *   GET    fields/content/articles
+ *   GET    config/application
  *   GET    media/files                 POST media/files
  */
 final class ApiClient
@@ -254,6 +255,38 @@ final class ApiClient
     public function listArticleFields(string $base, string $token): array
     {
         return $this->collection($base, $token, 'fields/content/articles', ['page[limit]' => 0]);
+    }
+
+    /**
+     * Reads one key of the site's Global Configuration.
+     *
+     * `GET v1/config/application` serves `configuration.php` — including the
+     * database password and the site secret — so this deliberately returns a
+     * single named value rather than the whole map: nothing we do not ask for
+     * can end up cached on disk. The route also needs `core.admin`, which an
+     * article author will not have, so a caller must treat a thrown
+     * {@see ApiException} (403) as "unknown", not as a failure.
+     *
+     * The view paginates (defaulting to 20 items) and reads the `offset` and
+     * `limit` page variables without defaulting them individually, so both are
+     * always sent — and `limit = 0` would divide by zero server-side, unlike
+     * every other collection route here. Each item is a one-key object, hence
+     * the scan.
+     */
+    public function getConfigValue(string $base, string $token, string $key): mixed
+    {
+        $items = $this->collection($base, $token, 'config/application', [
+            'page[offset]' => 0,
+            'page[limit]'  => 500,
+        ]);
+
+        foreach ($items as $item) {
+            if (array_key_exists($key, $item)) {
+                return $item[$key];
+            }
+        }
+
+        return null;
     }
 
     /**

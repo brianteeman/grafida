@@ -101,6 +101,14 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `ReferenceService` uses a short-timeout (8s) API client; `sync()` warms the cache best-effort
   when a site is connected/updated, and opening the editor falls back to cache per-list (only the
   manual refresh button surfaces fetch errors).
+  `unicodeSlugs()` caches one Global Configuration value under the `config` kind — `unicodeslugs`,
+  the "Unicode Aliases" option, which the alias preview needs (see `src/Article/`). It is the one
+  thing here that is **never strict**, whatever the caller asks: `GET v1/config/application` needs
+  `core.admin`, which an article author normally lacks, so a 403 is the healthy case for most sites
+  and must not fail the manual refresh — an unreadable value degrades to the cached answer, then to
+  `false` (Joomla's default). `ApiClient::getConfigValue()` returns a **single named** value, not
+  the map: that route serves `configuration.php`, secret and database password included, so nothing
+  unasked-for can reach the cache.
 - `src/Field/FieldSupport.php` — supported field-type subset + required-unsupported guard.
 - `src/Article/` — `Draft` entity + repository (local drafts). A draft remembers the
   `site_id` + `remote_id` it mirrors; `findByRemote()` locates an existing draft for a
@@ -108,8 +116,16 @@ window-free in tests (a null dialog makes the endpoint return 503).
   The **alias (URL slug)** is an editable field in the editor, shown as an input with an
   attached "regenerate" add-on button (`#editor-alias-input` / `#btn-regenerate-alias`)
   directly below the title. The SPA's `makeAlias()` mirrors Joomla's
-  `ApplicationHelper::stringUrlSafe()` (NFKD transliteration → lowercase → whitespace-to-dash →
-  strip non-`[a-z0-9-]` → trim dashes; empty result falls back to a `Y-m-d-H-i-s` timestamp);
+  `ApplicationHelper::stringUrlSafe()`, which is **two** algorithms picked by the site's
+  `unicodeslugs` Global Configuration option (the references payload's `unicodeSlugs` flag, see
+  `src/Reference/`), so `aliasSlug(text, unicodeSlugs)` mirrors both: off (Joomla's default) →
+  `OutputFilter::stringURLSafe` (NFKD transliteration → lowercase → whitespace-to-dash → strip
+  non-`[a-z0-9-]` → trim dashes), on → `OutputFilter::stringUrlUnicodeSlug` (letters kept as they
+  are: only URL-breaking punctuation becomes a space, `?` is dropped, lowercase, runs of **spaces**
+  — not whitespace at large — to a dash, no dash trimming). This is why a Greek title yields
+  `καλημέρα-κόσμε` on a Unicode-alias site but nothing at all on a transliterating one; either way
+  an empty result (Joomla counts an all-dashes alias as empty, as `Table\Content::check()` does)
+  falls back to a `Y-m-d-H-i-s` timestamp.
   `regenerateAlias(force)` fills the alias from the title on the title's **blur** only when the
   alias is empty (never clobbering a hand-edited one), while the button always regenerates.
   Joomla re-slugifies whatever alias we send on publish, so this is a faithful preview.
@@ -650,6 +666,14 @@ map is for when the update mechanism itself is built.
   Custom field values go under `com_fields`. Tags
   are an array of IDs. (`ApiClient::send()` posts the flat body; only responses are unwrapped.)
 - Media upload: `POST /v1/media/files` with `{path, content:<base64>}`; the response `url` is public.
+- Global Configuration: `GET /v1/config/application` (the `webservices/config` plugin) needs
+  **`core.admin`** — a plain author's token gets a 403, so treat it as optional. Its view does not
+  serve one resource with all the settings: it emits **one single-attribute resource per key**, all
+  sharing the same id, and **paginates** them (default limit 20) — so a caller must send
+  `page[offset]` *and* `page[limit]` (it reads both without individual defaults) and scan the items.
+  `page[limit]=0`, which every other collection route here uses to mean "all", **divides by zero**
+  server-side. The payload is `configuration.php` verbatim, `secret` and `password` included — read
+  what you need, never cache the lot.
 
 ## Key AI assistant facts
 
