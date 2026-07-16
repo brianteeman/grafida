@@ -187,6 +187,36 @@ final class ApiRoutingTest extends TestCase
         self::assertFalse($json['ok']);
     }
 
+    /**
+     * The multimodal image fetch refuses an off-site URL before it makes any
+     * request, so this asserts the guard without touching the network.
+     */
+    public function testSiteImageRefusesAnOffSiteUrl(): void
+    {
+        $kernel = $this->kernel();
+        $siteId = $this->seedSite();
+
+        [$status, $json] = $this->call(
+            $kernel,
+            'GET',
+            '/api/sites/' . $siteId . '/image?url=' . urlencode('https://evil.example.net/a.png'),
+        );
+
+        self::assertSame(403, $status);
+        self::assertFalse($json['ok']);
+    }
+
+    public function testSiteImageRequiresAUrl(): void
+    {
+        $kernel = $this->kernel();
+        $siteId = $this->seedSite();
+
+        [$status, $json] = $this->call($kernel, 'GET', '/api/sites/' . $siteId . '/image');
+
+        self::assertSame(400, $status);
+        self::assertFalse($json['ok']);
+    }
+
     public function testResetStorageWipesData(): void
     {
         $kernel = $this->kernel();

@@ -100,6 +100,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | tone | tom | Writing tone setting for an AI tool. |
 | endpoint | endpoint | API endpoint URL. Technical loanword; not translated. |
 | streaming | Streaming | Token-by-token response streaming. Kept as-is (technical term). |
+| multimodal (model) | O modelo consegue ver imagens | Per-service option: send the article's images too. Phrased as a statement rather than the jargon «multimodal». GRAFIDA_LBL_AI_MULTIMODAL. |
 | conversation (chat) | conversa | A saved AI chat thread. Plural: conversas. |
 | remember (save chat) | memorizar | Store a chat conversation for later retrieval. Distinct from «guardar» (save file). |
 | clipboard | área de transferência | System clipboard. «Copiar para a área de transferência». |

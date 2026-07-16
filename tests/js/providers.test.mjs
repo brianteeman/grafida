@@ -222,6 +222,85 @@ test('a legacy/unknown dialect degrades to Chat Completions', () => {
 });
 
 // -----------------------------------------------------------------------------
+//  buildRequest — multimodal turns
+// -----------------------------------------------------------------------------
+
+/** A 1x1 PNG, as the panel would hand it over. */
+const PNG = 'data:image/png;base64,iVBORw0KGgo=';
+
+/** The same conversation as MESSAGES, with images on the first user turn. */
+const WITH_IMAGES = MESSAGES.map(m => (
+    m.content === 'First question' ? { ...m, images: [PNG] } : m
+));
+
+test('Responses: images become input_image parts beside an input_text part', () => {
+    const { AI } = load();
+    const body = JSON.parse(AI.buildRequest(RESPONSES, WITH_IMAGES, false).body);
+    const turn = body.input[0];
+
+    assert.deepEqual(turn.content, [
+        { type: 'input_text', text: 'First question' },
+        { type: 'input_image', image_url: PNG },
+    ]);
+    assert.equal(turn.images, undefined, '`images` must not leak onto the wire');
+});
+
+test('Chat Completions: images become image_url parts beside a text part', () => {
+    const { AI } = load();
+    const body = JSON.parse(AI.buildRequest(COMPLETIONS, WITH_IMAGES, false).body);
+    const turn = body.messages[1];
+
+    assert.deepEqual(turn.content, [
+        { type: 'text', text: 'First question' },
+        { type: 'image_url', image_url: { url: PNG } },
+    ]);
+});
+
+test('Anthropic: images are split into base64 payload + media_type', () => {
+    const { AI } = load();
+    const body = JSON.parse(AI.buildRequest(ANTHROPIC, WITH_IMAGES, false).body);
+    const turn = body.messages[0];
+
+    assert.deepEqual(turn.content, [
+        { type: 'text', text: 'First question' },
+        {
+            type:   'image',
+            source: { type: 'base64', media_type: 'image/png', data: 'iVBORw0KGgo=' },
+        },
+    ]);
+});
+
+test('a turn without images keeps its plain-string content in every dialect', () => {
+    const { AI } = load();
+
+    for (const resolved of [RESPONSES, COMPLETIONS, ANTHROPIC]) {
+        const body  = JSON.parse(AI.buildRequest(resolved, MESSAGES, false).body);
+        const turns = body.input || body.messages;
+
+        turns.forEach(m => assert.equal(
+            typeof m.content, 'string',
+            `${resolved.sseDialect} must not wrap a text-only turn in parts`,
+        ));
+    }
+});
+
+test('a turn with an empty images array stays a plain string', () => {
+    const { AI } = load();
+    const msgs = [{ role: 'user', content: 'Hi', images: [] }];
+    const body = JSON.parse(AI.buildRequest(COMPLETIONS, msgs, false).body);
+
+    assert.equal(typeof body.messages[0].content, 'string');
+});
+
+test('Anthropic: a non-base64 image URI is dropped, not sent malformed', () => {
+    const { AI } = load();
+    const msgs = [{ role: 'user', content: 'Hi', images: ['https://example.com/a.png'] }];
+    const body = JSON.parse(AI.buildRequest(ANTHROPIC, msgs, false).body);
+
+    assert.deepEqual(body.messages[0].content, [{ type: 'text', text: 'Hi' }]);
+});
+
+// -----------------------------------------------------------------------------
 //  Streaming
 // -----------------------------------------------------------------------------
 

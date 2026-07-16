@@ -6,11 +6,13 @@ Grafida 0.2
 + Ctrl/Cmd+, opens Settings from anywhere
 + Windows: the installer bundles the Visual C++ runtime DLLs
 + AI panel: live "Thinking…" indicator for reasoning models, click it to inspect the thinking
++ AI services: tell Grafida the model can see images, and the article's pictures are sent with its text
 ~ Article lists show the publish state as a colour-coded icon before the title
 ~ AI panel: a tool's prompt is muted "Instructions" instead of a red bubble
 # [HIGH] Windows: crash on startup ("broken signature") after Authenticode signing
 # [MEDIUM] Windows: multi-second freeze whenever a stored secret was read
 # [LOW] Windows: a command window flashed at startup and on theme detection
+# [LOW] AI panel: a second click on Send could fire a duplicate request
 # [LOW] AI tool icons were blank in Settings and the editor's AI Tools menu
 # [LOW] The collapsed sidebar's icons had no tooltip and no accessible name
 # [LOW] Dialogs closed when clicking outside them, discarding your input

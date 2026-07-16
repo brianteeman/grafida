@@ -105,6 +105,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | Top P | Top P | AI nucleus-sampling parameter. Kept as-is. |
 | max tokens | Tokens máximos | Maximum token limit for an AI response. |
 | streaming | Streaming | Streaming response mode. Kept as-is. |
+| multimodal (model) | El modelo puede ver imágenes | Per-service option: send the article's images too. Phrased as a statement rather than the jargon «multimodal». GRAFIDA_LBL_AI_MULTIMODAL. |
 | default (adj/option) | Predeterminado | Default setting or option. («Predeterminado», not «Por defecto».) |
 | set as default | Establecer como predeterminado | Action to mark an AI service as the default. |
 | restore default | Restaurar predeterminado | Reset a setting to its factory default. |

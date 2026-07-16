@@ -574,6 +574,7 @@ const api = {
     getMediaBlob: (id) => apiFetch('GET', `/api/media/${id}`),
     getMediaAdapters: (siteId) => apiFetch('GET', `/api/sites/${siteId}/media/adapters`),
     getMediaFile: (siteId, path) => apiFetch('GET', `/api/sites/${siteId}/media/file?path=${encodeURIComponent(path)}`),
+    getSiteImage: (siteId, url) => apiFetch('GET', `/api/sites/${siteId}/image?url=${encodeURIComponent(url)}`),
     uploadSiteMedia: (siteId, body) => apiFetch('POST', `/api/sites/${siteId}/media/files`, body),
     createMediaFolder: (siteId, body) => apiFetch('POST', `/api/sites/${siteId}/media/folder`, body),
     renameMedia: (siteId, body) => apiFetch('POST', `/api/sites/${siteId}/media/rename`, body),
@@ -4677,6 +4678,22 @@ function buildAiServiceFormBody(svc) {
     });
     if (existParams.stream !== undefined) streamSel.value = existParams.stream ? '1' : '0';
 
+    // Multimodal. Unlike `stream`/`store` this defaults OFF: most models are
+    // text-only and reject an image part outright, so it cannot be inferred —
+    // the user tells us their model can see.
+    const multimodalSel = document.createElement('select');
+    multimodalSel.id = 'modal-ai-param-multimodal';
+    multimodalSel.className = 'form-control';
+    [['0', t('GRAFIDA_BTN_NO')], ['1', t('GRAFIDA_BTN_YES')]].forEach(([v, l]) => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = l;
+        multimodalSel.appendChild(o);
+    });
+    multimodalSel.value = existParams.multimodal ? '1' : '0';
+
+    const multimodalGroup = formGroup(t('GRAFIDA_LBL_AI_MULTIMODAL'), multimodalSel);
+    multimodalGroup.appendChild(el('p', 'form-hint', t('GRAFIDA_MSG_AI_MULTIMODAL_HINT')));
+
     // Store + retention (Responses-API providers only: unset store means ON,
     // unset store_retention_days means 15 — see app-level docs).
     const storeSel = document.createElement('select');
@@ -4728,6 +4745,7 @@ function buildAiServiceFormBody(svc) {
         formGroup(t('GRAFIDA_LBL_AI_TOP_P'), topPIn),
         formGroup(t('GRAFIDA_LBL_AI_MAX_TOKENS'), maxTokIn),
         formGroup(t('GRAFIDA_LBL_AI_STREAM'), streamSel),
+        multimodalGroup,
         storeGroup,
         retentionGroup,
     );
@@ -4767,6 +4785,7 @@ async function saveAiServiceHandler(id) {
     const topPEl = document.getElementById('modal-ai-param-topp');
     const maxTokEl = document.getElementById('modal-ai-param-maxtok');
     const streamEl = document.getElementById('modal-ai-param-stream');
+    const multimodalEl = document.getElementById('modal-ai-param-multimodal');
     const storeEl = document.getElementById('modal-ai-param-store');
     const retentionEl = document.getElementById('modal-ai-param-store-days');
 
@@ -4781,6 +4800,8 @@ async function saveAiServiceHandler(id) {
     if (topPEl && topPEl.value !== '') params.top_p = parseFloat(topPEl.value);
     if (maxTokEl && maxTokEl.value !== '') params.max_completion_tokens = parseInt(maxTokEl.value, 10);
     if (streamEl && streamEl.value !== '') params.stream = streamEl.value === '1';
+    // Only stored when on: an absent param already means "text only".
+    if (multimodalEl && multimodalEl.value === '1') params.multimodal = true;
     if (storeEl && storeEl.value !== '') params.store = storeEl.value === '1';
     if (retentionEl && retentionEl.value !== '') params.store_retention_days = parseInt(retentionEl.value, 10);
 

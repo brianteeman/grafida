@@ -94,6 +94,7 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | Top P | Top P | Mantenuto invariato; parametro di campionamento nucleus. |
 | max tokens | Token massimi | Numero massimo di token in risposta. |
 | streaming | Streaming | Mantenuto in inglese; risposta IA in flusso continuo. |
+| multimodal (model) | Il modello può vedere le immagini | Opzione per servizio: invia anche le immagini dell'articolo. Formulata come affermazione anziché con il tecnicismo «multimodale». GRAFIDA_LBL_AI_MULTIMODAL. |
 | system prompt | Prompt di sistema | Istruzione di sistema per l'IA. |
 | instructions (AI panel) | Istruzioni | Intestazione del fumetto che contiene il prompt di uno strumento IA. Deliberatamente la parola comune, non «prompt». GRAFIDA_LBL_AI_INSTRUCTIONS. |
 | thinking (AI panel) | Sta pensando… / Ragionamento | Forma verbale finché il modello pensa; sostantivo a processo concluso, quando il testo resta solo da ispezionare. GRAFIDA_LBL_AI_THINKING / GRAFIDA_LBL_AI_THOUGHT_PROCESS. |

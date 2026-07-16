@@ -23,14 +23,149 @@
     //  Panel state
     // -------------------------------------------------------------------------
 
+    // -------------------------------------------------------------------------
+    //  Multimodal document images
+    // -------------------------------------------------------------------------
+
+    /**
+     * Most images we send per request. Each one costs tokens and request size,
+     * and an illustrated article can carry dozens; the first few carry nearly
+     * all the meaning, so the tail is dropped rather than sent.
+     */
+    const MAX_DOC_IMAGES = 8;
+
+    /** Longest edge, in pixels, an image is downscaled to before sending. */
+    const MAX_IMAGE_EDGE = 1024;
+
+    /** Downscaled JPEG quality. */
+    const IMAGE_QUALITY = 0.85;
+
+    /**
+     * Downscale a data: URI to at most MAX_IMAGE_EDGE on its longest side.
+     *
+     * Joomla bakes a photo's full intrinsic size into the tag, so an article
+     * image is routinely 4000px wide — several megabytes of base64 per turn,
+     * for a picture every vision model downsamples on arrival anyway.
+     *
+     * Falls back to the original URI if anything goes wrong (a decode failure,
+     * a tainted canvas): sending an oversized image beats sending none.
+     *
+     * @param {string} dataUri
+     * @returns {Promise<string>}
+     */
+    function _downscaleImage(dataUri) {
+        return new Promise((resolve) => {
+            const img = new Image();
+
+            img.onload = () => {
+                const longest = Math.max(img.naturalWidth, img.naturalHeight);
+
+                if (!longest) { resolve(dataUri); return; }
+                if (longest <= MAX_IMAGE_EDGE) { resolve(dataUri); return; }
+
+                const scale  = MAX_IMAGE_EDGE / longest;
+                const canvas = document.createElement('canvas');
+                canvas.width  = Math.round(img.naturalWidth * scale);
+                canvas.height = Math.round(img.naturalHeight * scale);
+
+                try {
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', IMAGE_QUALITY));
+                } catch (e) {
+                    resolve(dataUri);
+                }
+            };
+            img.onerror = () => resolve(dataUri);
+            img.src = dataUri;
+        });
+    }
+
+    /**
+     * Resolve one <img> in the article body to a base64 data: URI, or null when
+     * its bytes cannot be reached.
+     *
+     * An article image comes in three flavours and only the first arrives with
+     * its bytes in hand:
+     *   - a data: URI          — pasted, or picked from a local file; use as-is;
+     *   - data-grafida-media-id — an offline blob; GET /api/media/{id};
+     *   - a plain URL           — already published; the webview cannot fetch it
+     *                             (CORS / macOS ATS), so PHP does it for us.
+     *
+     * @param {HTMLImageElement} img
+     * @param {number|null} siteId
+     * @returns {Promise<string|null>}
+     */
+    async function _resolveImageSource(img, siteId) {
+        const src = img.getAttribute('src') || '';
+
+        if (src.startsWith('data:')) {
+            return src.startsWith('data:image/') ? src : null;
+        }
+
+        const mediaId = img.getAttribute('data-grafida-media-id');
+
+        if (mediaId) {
+            try {
+                const res = await api.getMediaBlob(parseInt(mediaId, 10));
+                return res.dataUri || null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        if (!src || siteId == null) return null;
+
+        try {
+            const res = await api.getSiteImage(siteId, src);
+            return res.dataUri || null;
+        } catch (e) {
+            // Off-site, deleted, or not an image. One unreachable picture must
+            // never fail the whole message — the rest still go.
+            return null;
+        }
+    }
+
+    /**
+     * Collect the article body's images as downscaled base64 data: URIs, in
+     * document order, for a multimodal request.
+     *
+     * @returns {Promise<Array<string>>} possibly empty; never rejects
+     */
+    async function _collectDocumentImages() {
+        const editor = State.tinyMCEEditor;
+        const body   = editor ? editor.getBody() : null;
+
+        if (!body) return [];
+
+        const imgs   = Array.from(body.querySelectorAll('img')).slice(0, MAX_DOC_IMAGES);
+        const siteId = State.currentSiteId;
+        const out    = [];
+
+        for (const img of imgs) {
+            const uri = await _resolveImageSource(img, siteId);
+            if (uri) out.push(await _downscaleImage(uri));
+        }
+
+        return out;
+    }
+
     /**
      * In-memory conversation history.
-     * Entries: { role: 'user' | 'assistant', content: string, tool?: boolean }
+     * Entries: { role: 'user' | 'assistant', content: string, tool?: boolean,
+     *            images?: string[] }
      * The document context is embedded inside the first user message's content
      * so it persists automatically across follow-up turns.
      *
      * `tool` marks a user turn that carries a writing tool's prompt rather than
      * something the user typed; it is display-only and never sent to a provider.
+     *
+     * `images` carries the article's pictures as base64 data: URIs on the first
+     * user turn, for a service with the `multimodal` param on. It rides
+     * alongside `content` — which stays a plain string — so nothing else that
+     * reads a turn (rendering, saved chats, .grafida export) has to know about
+     * it; providers.js folds it into the wire format. It is NOT persisted with
+     * a remembered chat: the images belong to the article, which is re-read on
+     * every fresh conversation anyway.
      */
     let _history = [];
 
@@ -273,6 +408,13 @@
             return;
         }
 
+        // Claim the conversation NOW, before the first await. Everything below —
+        // loading the tools, and especially fetching the article's images — is
+        // asynchronous, so leaving the panel idle-looking until the request goes
+        // out lets a second Send re-enter this function and fire a duplicate
+        // request. `_streaming` is the flag `_onSendClick` and this guard read.
+        _setStreaming(true);
+
         // Lazily load the system prompt if it hasn't been fetched yet (the
         // Settings screen's AI Tools card fetches it on first open; here we
         // fetch it proactively so the panel can work without opening Settings).
@@ -303,8 +445,11 @@
         // (article HTML + title) as a preamble before the actual query, mirroring
         // the [prompt, documentContent] pattern used in AITiny. All subsequent
         // messages go in as-is (the document is already in the history).
-        let userContent = userText;
-        if (!_docContextEmbedded) {
+        const svc = State.aiServices.find(s => s.id === serviceId);
+
+        let userContent  = userText;
+        const firstTurn  = !_docContextEmbedded;
+        if (firstTurn) {
             const editor = State.tinyMCEEditor;
             const docHtml  = editor ? editor.getContent() : '';
             const titleEl  = document.getElementById('editor-title-input');
@@ -317,11 +462,16 @@
             if (preamble.length) {
                 userContent = preamble.join('\n\n') + '\n\n' + userText;
             }
+
             _docContextEmbedded = true;
         }
 
-        // Add the user turn and re-render so it appears immediately.
-        _history.push({ role: 'user', content: userContent, tool: !!tool });
+        // Add the user turn and re-render so it appears immediately. This must
+        // happen BEFORE the images are gathered: that walks the article and can
+        // spend seconds fetching published pictures back off the site, and a
+        // panel that shows nothing while it runs reads as a dropped click.
+        const userTurn = { role: 'user', content: userContent, tool: !!tool };
+        _history.push(userTurn);
         _renderConversation();
 
         // Clear the textarea for manual (non-tool) messages.
@@ -330,16 +480,28 @@
             if (inputEl) inputEl.value = '';
         }
 
+        // A model that can see gets the article's pictures alongside its HTML; a
+        // text-only one would reject the request outright, which is why this is
+        // opt-in per service rather than inferred.
+        if (firstTurn && svc && svc.params && svc.params.multimodal) {
+            const docImages = await _collectDocumentImages();
+            if (docImages.length) userTurn.images = docImages;
+        }
+
         // Assemble the full messages array.
         const messages = [];
         if (systemContent) {
             messages.push({ role: 'system', content: systemContent });
         }
-        // Only role + content go on the wire; `tool` is a display-only marker.
-        messages.push(..._history.map(m => ({ role: m.role, content: m.content })));
+        // `tool` is a display-only marker and never goes on the wire; `images`
+        // does, and providers.js folds it into the dialect's content shape.
+        messages.push(..._history.map((m) => {
+            const wire = { role: m.role, content: m.content };
+            if (m.images && m.images.length) wire.images = m.images;
+            return wire;
+        }));
 
         // Respect the service's `stream` param (default: true).
-        const svc = State.aiServices.find(s => s.id === serviceId);
         const wantStream = !(svc && svc.params && svc.params.stream === false);
 
         // Chain onto the prior response (Responses-API optimisation only —
@@ -358,7 +520,8 @@
             && withinRetention;
         const previousResponseId = useChain ? _previousResponseId : null;
 
-        _setStreaming(true);
+        // Already flagged before the awaits above; this is where the reply
+        // itself starts.
         _streamingBubble = _appendStreamingBubble();
         const streamRenderer = _streamingBubble
             ? _createStreamRenderer(_streamingBubble.querySelector('.ai-bubble-text'))

@@ -515,6 +515,15 @@ nav#main-nav a .nav-icon {
     letter-spacing: 0.5px;
 }
 
+/* Explanatory line under a form field, for a setting whose label cannot carry
+   the whole story (e.g. the AI Services multimodal toggle). */
+.form-hint {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--color-text-muted);
+}
+
 .form-control {
     background: var(--color-input-bg);
     color: var(--color-text);

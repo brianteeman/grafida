@@ -19,6 +19,7 @@ use Grafida\Html\CssRebaser;
 use Grafida\Http\SiteContext;
 use Grafida\Joomla\ApiClient;
 use Grafida\Media\MediaRepository;
+use Grafida\Media\SiteImageFetcher;
 use Grafida\Publish\PublishService;
 use Grafida\Reference\EditorCssService;
 use Grafida\Reference\ReferenceRepository;
@@ -70,6 +71,13 @@ final class SiteProvider implements ServiceProviderInterface
             $http = $c->get('http.short');
 
             return new FaviconService($c->get(FaviconRepository::class), $http);
+        });
+
+        $container->share(SiteImageFetcher::class, static function (Container $c): SiteImageFetcher {
+            /** @var Transport $http */
+            $http = $c->get('http.reference');
+
+            return new SiteImageFetcher($http);
         });
 
         $container->share(ReferenceService::class, static function (Container $c): ReferenceService {

@@ -107,6 +107,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | Top P | Top P | AI nucleus-sampling parameter; kept verbatim (like «Top P» in most localised UIs). |
 | max tokens | μέγιστα tokens | Maximum output token count; «token» kept as English loanword per technical convention. |
 | streaming | ροή | Token-by-token streaming output mode. Form label: «Ροή». |
+| multimodal (model) | Το μοντέλο μπορεί να δει εικόνες | Per-service option: send the article's images too. Phrased as a statement rather than the loanword «πολυτροπικό». GRAFIDA_LBL_AI_MULTIMODAL. |
 | tone | τόνος | Writing tone for AI-generated text. |
 | conversation (AI chat) | συνομιλία | A saved AI chat session. Plural: συνομιλίες. |
 | clipboard | πρόχειρο | The OS clipboard (copy/paste buffer). |

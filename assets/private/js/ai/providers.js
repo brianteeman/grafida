@@ -11,7 +11,12 @@
  * loaded BEFORE app.js so that app.js may reference window.GrafidaAI
  * immediately on startup.
  *
- * Message shape:  { role: 'system' | 'user' | 'assistant', content: string }
+ * Message shape:  { role: 'system' | 'user' | 'assistant', content: string,
+ *                   images?: string[] }
+ *
+ * `content` is always a plain string; `images` (base64 data: URIs, present only
+ * on a multimodal service's first user turn) is folded into the dialect's own
+ * array-of-parts content shape by toWireTurn, on the wire only.
  *
  * SSE dialect reference:
  *   openai_completions — "data: {json}" lines, choices[].delta.content, "[DONE]" sentinel.
@@ -36,6 +41,65 @@
 
     /** Default max_tokens sent to Anthropic when params omit it. */
     const ANTHROPIC_MAX_TOKENS = 4096;
+
+    // -------------------------------------------------------------------------
+    //  Multimodal content
+    // -------------------------------------------------------------------------
+
+    /**
+     * Split a data: URI into its MIME type and bare base64 payload.
+     *
+     * @returns {{mime:string, data:string}|null} null when the string is not a base64 data: URI
+     */
+    function parseDataUri(uri) {
+        const m = /^data:([^;,]+);base64,(.*)$/.exec(uri || '');
+        return m ? { mime: m[1], data: m[2] } : null;
+    }
+
+    /**
+     * Convert one {role, content, images} turn into the dialect's multimodal shape.
+     *
+     * A turn's `content` stays a plain string everywhere else in the app — in
+     * _history, in ai_chat_messages, in a .grafida export — and the images ride
+     * alongside it as a separate field. The array-of-parts shape a vision API
+     * wants therefore exists only here, on the wire.
+     *
+     * A turn with no images passes through untouched, so a service with
+     * multimodal off (or a text-only turn) produces byte-identical requests to
+     * before.
+     *
+     * @param {{role:string, content:string, images?:Array<string>}} turn
+     * @param {string} dialect
+     */
+    function toWireTurn(turn, dialect) {
+        const images = turn.images || [];
+        if (!images.length) return { role: turn.role, content: turn.content };
+
+        const parts = [];
+
+        if (dialect === 'openai_responses') {
+            parts.push({ type: 'input_text', text: turn.content });
+            images.forEach((uri) => parts.push({ type: 'input_image', image_url: uri }));
+        } else if (dialect === 'anthropic') {
+            // Anthropic wants the base64 payload and its media type as discrete
+            // fields, not a data: URI.
+            parts.push({ type: 'text', text: turn.content });
+            images.forEach((uri) => {
+                const parsed = parseDataUri(uri);
+                if (!parsed) return;
+                parts.push({
+                    type:   'image',
+                    source: { type: 'base64', media_type: parsed.mime, data: parsed.data },
+                });
+            });
+        } else {
+            // Chat Completions (and every unknown/legacy dialect).
+            parts.push({ type: 'text', text: turn.content });
+            images.forEach((uri) => parts.push({ type: 'image_url', image_url: { url: uri } }));
+        }
+
+        return { role: turn.role, content: parts };
+    }
 
     // -------------------------------------------------------------------------
     //  Request builder
@@ -76,7 +140,7 @@
 
             const body = {
                 model,
-                input: useChain ? [lastTurn] : turns,
+                input: (useChain ? [lastTurn] : turns).map(m => toWireTurn(m, sseDialect)),
                 store,
             };
             if (sysParts.length) body.instructions = sysParts.join('\n\n');
@@ -104,7 +168,7 @@
 
             const body = {
                 model,
-                messages:   turns,
+                messages:   turns.map(m => toWireTurn(m, sseDialect)),
                 max_tokens: p.max_completion_tokens || ANTHROPIC_MAX_TOKENS,
             };
             if (stream) body.stream = true;
@@ -134,7 +198,7 @@
         // OpenAI Chat Completions dialect (the default fallback for any unknown/legacy
         // dialect value, including a stale "openai"): messages array includes
         // system-role entries.
-        const body = { model, messages };
+        const body = { model, messages: messages.map(m => toWireTurn(m, sseDialect)) };
         if (stream) body.stream = true;
         if (p.temperature        != null) body.temperature = p.temperature;
         if (p.top_p              != null) body.top_p       = p.top_p;

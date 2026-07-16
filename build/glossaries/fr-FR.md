@@ -99,6 +99,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | Top P | Top P | AI nucleus-sampling parameter — keep as-is (technical). |
 | tokens | tokens | AI token count (Max tokens = « Tokens max ») — keep in English as conventional in French software UIs. |
 | streaming | streaming | AI streamed response — keep in English. |
+| multimodal (model) | Le modèle peut voir les images | Per-service option: send the article's images too. Phrased as a statement rather than the jargon « multimodal ». GRAFIDA_LBL_AI_MULTIMODAL. |
 | system prompt | prompt système | The system-level instruction given to the AI. |
 | instructions (AI panel) | Instructions | En-tête de la bulle contenant le prompt d'un outil IA. Le mot courant, délibérément pas « prompt ». GRAFIDA_LBL_AI_INSTRUCTIONS. |
 | thinking (AI panel) | Réflexion en cours… / Raisonnement | Forme en cours tant que le modèle réfléchit ; substantif une fois terminé, le texte ne servant plus qu'à l'inspection. GRAFIDA_LBL_AI_THINKING / GRAFIDA_LBL_AI_THOUGHT_PROCESS. |

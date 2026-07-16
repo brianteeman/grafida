@@ -177,7 +177,8 @@ window-free in tests (a null dialog makes the endpoint return 503).
   **already-open, just-saved** draft's content and saved AI chats while explicitly preserving
   its own id/`site_id`/`remote_id`, so a replaced draft stays linked to the same site and
   (if any) the same remote article.
-- `src/Media/` — offline image blobs (`media_blobs`). `ApiClient::listMedia()` browses the
+- `src/Media/` — offline image blobs (`media_blobs`) + `SiteImageFetcher` (fetches a published
+  article image for a multimodal AI request — see the AI facts). `ApiClient::listMedia()` browses the
   site's Media Manager (`GET /v1/media/files`); `ApiController` exposes it as
   `GET /api/sites/{id}/media?path=…` and serves an offline blob's data: URI back to the SPA
   via `GET /api/media/{id}` (to preview a not-yet-published intro/full-text image).
@@ -701,6 +702,40 @@ map is for when the update mechanism itself is built.
 - **The API key is handed to local JS per call.** This is a deliberate desktop-only trade-off (JS and
   PHP are equally-trusted local code; the SPA loads no remote content) and the price of streaming —
   do not "fix" it by moving the call back to PHP (that kills streaming).
+- **Multimodal is a per-service opt-in, and `content` stays a string.** A model that can see gets the
+  article's pictures alongside its HTML, gated on the service's **`multimodal`** param — another
+  `params_json` key like `stream`/`store`, so it needs **no migration**. Unlike those it defaults
+  **off**: most models are text-only and reject an image part outright, so it cannot be inferred; the
+  Settings AI-Services form offers it as a plain Yes/No for **every** dialect (all three support
+  vision). The turn shape is the load-bearing decision: `content` remains a **plain string**
+  everywhere — `_history`, `ai_chat_messages`, `_renderRichText`, `_stripDocContext`, `.grafida`
+  export — and the images ride alongside as a separate **`images`** array of base64 data: URIs on the
+  first user turn (like the display-only `tool` flag). `providers.js`'s **`toWireTurn()`** folds them
+  into the dialect's array-of-parts shape **on the wire only**, so a turn with no images produces a
+  byte-identical request to before: `openai_responses` → `input_text`/`input_image` (a bare data:
+  URI), `anthropic` → `text` + `image` with the base64 payload and `media_type` **split apart** (it
+  will not take a data: URI, so an unparseable one is dropped rather than sent malformed),
+  `openai_completions` (and any unknown dialect) → `text`/`image_url`. `images` is **not** persisted
+  with a remembered chat — the pictures belong to the article, which is re-read on every fresh
+  conversation. Chaining is unaffected: images ride with the doc context, which only ever goes in the
+  first turn.
+- **The article's images are collected through three different paths** (`_collectDocumentImages()` in
+  `panel.js`, walking the editor body in document order). Only a `data:` URI (pasted, or picked from a
+  local file) arrives with its bytes in hand; a `data-grafida-media-id` blob comes from
+  `GET /api/media/{id}`; and an **already-published** image is a plain URL the webview **cannot fetch
+  itself** — the same CORS/ATS wall the AI transport hits — so `GET /api/sites/{id}/image?url=…`
+  (`MediaController::siteImage()` → **`Media\SiteImageFetcher`**) pulls the bytes server-side and
+  returns a data: URI. That fetcher mirrors `AiProxy`'s allowlist: the resolved URL's host must equal
+  the site's own, so an image on a CDN or a hotlinked third party is **refused and skipped**, not
+  fetched; it sniffs the MIME from the bytes (a misconfigured server's `Content-Type` would only get
+  rejected by the vision API later) and caps the size. It needs **no API token** — the image is
+  public — so it only requires the site to exist, not to be connected. One unreachable picture never
+  fails the message: it is dropped and the rest still go.
+- **Images are downscaled to 1024px and capped at 8 per request** (`_downscaleImage()`, a canvas
+  re-encode to JPEG). Joomla bakes a photo's full intrinsic size into the tag, so an article image is
+  routinely 4000px — several MB of base64 per turn, for a picture every vision model downsamples on
+  arrival anyway. A decode/canvas failure falls back to the original URI: an oversized image beats
+  none.
 - **UI:** a docked right-hand `#ai-panel` in the editor (`assets/private/js/ai/panel.js`) hosts the
   streaming conversation; the **document (title + HTML) is embedded as context in the first message**
   and follow-ups resend the whole history. A TinyMCE **AI Assistant** toolbar button toggles the panel

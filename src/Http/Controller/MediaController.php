@@ -18,6 +18,8 @@ use Grafida\Http\Router;
 use Grafida\Http\SiteContext;
 use Grafida\Joomla\ApiClient;
 use Grafida\Media\MediaRepository;
+use Grafida\Media\SiteImageException;
+use Grafida\Media\SiteImageFetcher;
 
 /**
  * Handles `/api/sites/{id}/media*` (the online Media Manager screen) and
@@ -29,6 +31,7 @@ final class MediaController extends Controller
         private readonly SiteContext $siteContext,
         private readonly ApiClient $apiClient,
         private readonly MediaRepository $media,
+        private readonly SiteImageFetcher $siteImages,
     ) {}
 
     public function registerRoutes(Router $router): void
@@ -43,6 +46,28 @@ final class MediaController extends Controller
         $router->add('POST', '/api/sites/{id}/media/rename', fn (RouteContext $ctx): ResponseInterface => $this->renameSiteMedia($ctx->int('id'), $ctx->body()));
         $router->add('POST', '/api/sites/{id}/media/content', fn (RouteContext $ctx): ResponseInterface => $this->updateSiteMediaContent($ctx->int('id'), $ctx->body()));
         $router->add('GET', '/api/media/{id}', fn (RouteContext $ctx): ResponseInterface => $this->mediaBlob($ctx->int('id')));
+        $router->add('GET', '/api/sites/{id}/image', fn (RouteContext $ctx): ResponseInterface => $this->siteImage($ctx->int('id'), $ctx->request()->url->query->get('url', '') ?? ''));
+    }
+
+    /**
+     * Fetches an article image published on the site and returns it as a data: URI.
+     *
+     * Used when handing an article to a multimodal model: an already-published
+     * article references its images by URL, and the webview cannot fetch those
+     * itself (CORS / macOS ATS), so the bytes come through PHP.
+     *
+     * Unlike the rest of this controller this needs no API token — the image is
+     * public — so it only requires the site to exist, not to be connected.
+     */
+    public function siteImage(int $siteId, string $url): ResponseInterface
+    {
+        $site = $this->siteContext->requireSite($siteId);
+
+        try {
+            return Json::ok($this->siteImages->fetch($site, $url));
+        } catch (SiteImageException $e) {
+            return Json::error($e->getMessage(), $e->httpStatus);
+        }
     }
 
     /**

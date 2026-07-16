@@ -106,6 +106,7 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | thinking (AI panel) | Denkt nach… / Gedankengang | Verbform, solange das Modell denkt; Substantiv, sobald der Vorgang abgeschlossen ist und der Text nur noch nachlesbar ist. GRAFIDA_LBL_AI_THINKING / GRAFIDA_LBL_AI_THOUGHT_PROCESS. |
 | temperature (AI param) | Temperatur | Modellparameter; GRAFIDA_LBL_AI_TEMPERATURE. |
 | streaming | Streaming | Antwort-Streaming; als Anglizismus beibehalten. GRAFIDA_LBL_AI_STREAM. |
+| multimodal (model) | Das Modell kann Bilder sehen | Per-Service-Option: die Bilder des Beitrags mitsenden. Als Aussage formuliert, nicht als Anglizismus „multimodal". GRAFIDA_LBL_AI_MULTIMODAL. |
 | tone (writing) | Ton | Schreibton eines KI-Werkzeugs; GRAFIDA_LBL_AI_TONE. |
 | fetch (load from API) | abrufen | „Modelle abrufen" = fetch models. GRAFIDA_BTN_FETCH_MODELS. |
 | custom | Benutzerdefiniert | Benutzerdefiniertes Werkzeug. GRAFIDA_LBL_AI_CUSTOM_TOOL. |
