@@ -11,6 +11,7 @@ Grafida 0.2
 # [LOW] Windows: a command window flashed at startup and on theme detection
 # [LOW] AI tool icons were blank in Settings and the editor's AI Tools menu
 # [LOW] Dialogs closed when clicking outside them, discarding your input
+# [LOW] The site selector's "no sites yet" placeholder was truncated
 
 Grafida 0.1
 ================================================================================

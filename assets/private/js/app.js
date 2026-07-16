@@ -786,8 +786,9 @@ function renderSiteSelector() {
     if (!State.sites.length) {
         const defaultOpt = document.createElement('option');
         defaultOpt.value = '';
-        defaultOpt.textContent = `— ${t('GRAFIDA_MSG_NO_SITES')} —`;
+        defaultOpt.textContent = `— ${t('GRAFIDA_MSG_NO_SITES_SHORT')} —`;
         sel.appendChild(defaultOpt);
+        sel.title = t('GRAFIDA_MSG_NO_SITES');
         sel.disabled = true;
         State.currentSiteId = null;
         renderSidebarFavicon();
@@ -795,6 +796,8 @@ function renderSiteSelector() {
         updateNavState();
         return;
     }
+
+    sel.removeAttribute('title');
 
     State.sites.forEach(site => {
         const opt = document.createElement('option');
