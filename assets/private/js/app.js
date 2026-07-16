@@ -2984,6 +2984,21 @@ function isImageEntry(entry) {
     return IMAGE_EXTENSIONS.includes(ext);
 }
 
+/**
+ * The URL to *display* a Media Manager entry with. Joomla hands us the plain, static
+ * file URL, so after an in-app edit rewrites the file the webview keeps painting its
+ * cached copy of the old picture; stamping the entry's modification time onto the URL
+ * makes every revision a distinct one. Display only — never store this in an article,
+ * where the query string would end up published.
+ */
+function mediaDisplayUrl(entry) {
+    const url = typeof entry.url === 'string' ? entry.url : '';
+    const stamp = String(entry.modified_date || entry.create_date || '');
+    if (!url || !stamp) return url;
+
+    return url + (url.includes('?') ? '&' : '?') + 'grafida_rev=' + encodeURIComponent(stamp);
+}
+
 /** The Media Manager path one level up from `path` (or root). */
 function parentMediaPath(path) {
     const idx = path.lastIndexOf('/');
@@ -3278,7 +3293,7 @@ function openMediaBrowser(siteId, opts = {}) {
                 item.type = 'button';
                 if (typeof f.url === 'string') {
                     const im = document.createElement('img');
-                    im.src = f.url;
+                    im.src = mediaDisplayUrl(f);
                     im.alt = '';
                     item.appendChild(im);
                 }
@@ -3558,7 +3573,7 @@ function buildMediaCard(entry, isDir) {
         thumb.appendChild(icon('folder'));
     } else if (isImageEntry(entry) && typeof entry.url === 'string') {
         const im = document.createElement('img');
-        im.src = entry.url;
+        im.src = mediaDisplayUrl(entry);
         im.alt = '';
         im.loading = 'lazy';
         thumb.appendChild(im);
@@ -3593,7 +3608,7 @@ function buildMediaCard(entry, isDir) {
 /** A simple full-size image preview modal. */
 function openMediaPreview(entry) {
     const img = document.createElement('img');
-    img.src = entry.url;
+    img.src = mediaDisplayUrl(entry);
     img.alt = entry.name || '';
     img.className = 'media-mgr-preview-img';
     const body = el('div', 'media-mgr-preview', img);

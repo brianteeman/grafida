@@ -248,6 +248,14 @@ window-free in tests (a null dialog makes the endpoint return 503).
   (`png`/`jpg`/`jpeg`/`webp`). PATCH/DELETE put the adapter-qualified path in the **URL segment**
   (`v1/media/files/:path`, route pattern `.*`), so `ApiClient::mediaItemUrl()` keeps `/` and `:`
   literal and percent-encodes the rest.
+  ⚠️ **Every `<img>` showing a Media Manager entry must go through `mediaDisplayUrl(entry)`, never the
+  bare `entry.url`.** Joomla returns the plain static file URL, so after an in-app edit rewrites the file
+  the webview keeps painting its cached copy — the crop *does* save and the image editor shows it (those
+  bytes arrive through PHP via `getMediaFile`, which no browser cache sees), while the card thumbnail and
+  the preview still show the picture as it was (gh-4). The helper stamps the entry's `modified_date` onto
+  the URL as a `grafida_rev` parameter, so each revision is a distinct URL. It is **display-only**: what a
+  media pick contributes to an *article* (`browseImageMedia()`, the TinyMCE `file_picker_callback`) stays
+  the bare `url`, or the cache-buster would be published into the article HTML.
 - `src/Html/` — `ContentSplitter` (read-more split), `CssRebaser`, `InlineMedia`, `HtmlDocument`.
 - `src/Publish/PublishService.php` — the publish pipeline (media upload, tags, fields, split, POST/PATCH).
   After a successful publish the SPA (`showPostPublishDialog()`) asks what to do with the local
