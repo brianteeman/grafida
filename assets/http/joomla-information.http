@@ -1,0 +1,110 @@
+### Grafida Joomla Web Services read requests
+###
+### In PhpStorm, select the `local` environment and replace apiRoot and
+### apiToken in http-client.env.json.
+###
+### Grafida sends both authentication headers. Joomla accepts either one on
+### supported versions, but retaining both here mirrors ApiClient exactly.
+
+### Shared request headers
+# Authorization: Bearer {{apiToken}}
+# X-Joomla-Token: {{apiToken}}
+# Accept: application/vnd.api+json
+
+### Discover API base — alternate /api/index.php URL
+GET {{apiRoot}}/api/index.php/v1/users/levels
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### Discover API base — rewrite-only URL
+GET {{apiRoot}}/api/v1/users/levels
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### List remote articles (Grafida defaults: first page, newest Joomla ID first)
+GET {{apiRoot}}/api/v1/content/articles?page[limit]=20&page[offset]=0&list[ordering]=a.id&list[direction]=desc
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### List remote articles with every Grafida-supported filter
+GET {{apiRoot}}/api/v1/content/articles?page[limit]=20&page[offset]=0&list[ordering]=a.title&list[direction]=asc&filter[search]=example&filter[category]=2&filter[tag]=3&filter[language]=en-GB&filter[state]=1&filter[featured]=1&filter[checked_out]=0
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### Fetch one remote article, including JSON:API category and tag relationships
+GET {{apiRoot}}/api/v1/content/articles/{{articleId}}
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### List Joomla content categories
+GET {{apiRoot}}/api/v1/content/categories?filter[extension]=com_content&page[limit]=0
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### List tags
+GET {{apiRoot}}/api/v1/tags?page[limit]=0
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### List access levels
+GET {{apiRoot}}/api/v1/users/levels?page[limit]=0
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### List installed content languages
+GET {{apiRoot}}/api/v1/languages/content?page[limit]=0
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### List article custom fields
+GET {{apiRoot}}/api/v1/fields/content/articles?page[limit]=0
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### List site template styles (used to discover the active editor CSS)
+GET {{apiRoot}}/api/v1/templates/styles/site?page[limit]=0
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### Read Global Configuration entries (Grafida reads only `unicodeslugs`)
+### Requires core.admin; do not save or expose the complete response.
+GET {{apiRoot}}/api/v1/config/application?page[offset]=0&page[limit]=500
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### List Media Manager adapters
+GET {{apiRoot}}/api/v1/media/adapters
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### Browse the default Media Manager root
+GET {{apiRoot}}/api/v1/media/files?url=1
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### Browse a Media Manager adapter path
+GET {{apiRoot}}/api/v1/media/files?url=1&path=local-images:/
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
+
+### Fetch one Media Manager file, including base64 content for the image editor
+### Keep / and : literal in mediaPath; encode other special path characters.
+GET {{apiRoot}}/api/v1/media/files/{{mediaPath}}?url=1&content=1
+Authorization: Bearer {{apiToken}}
+X-Joomla-Token: {{apiToken}}
+Accept: application/vnd.api+json
