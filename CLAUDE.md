@@ -445,6 +445,24 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `selector` format over common block/img/anchor tags — it never changes the tag). Each class is
   pre-registered as a `grafidaInline_N` / `grafidaBlock_N` format pair in the init `formats` option;
   menu items are toggles whose active state mirrors `editor.formatter.match()`.
+  **The Help dialog is the only in-app editor documentation**, so `menu.tools.items` keeps the
+  stock `help` item (the overridden Tools menu would otherwise drop it, leaving the dialog
+  reachable by Alt+0 alone), and `help_tabs` (`editorHelpTabs()` in `app.js`) adds a **Grafida**
+  tab listing the app's own shortcuts plus, when an AI service is configured, an **AI assistant**
+  tab (gh-13). Two traps: `help_tabs` **replaces** the default tab list rather than extending it,
+  so the built-in names (`shortcuts`, `keyboardnav`, `plugins`, `versions`) must be repeated to
+  keep them; and the built-in "Handy Shortcuts" tab is a **hard-coded table** — it does not read
+  the editor's shortcut registry, which is why an `addShortcut()` never appears there and Grafida
+  needs a tab of its own. A dialog `table` cell and an `htmlpanel` are both set via **innerHTML**,
+  so anything user-supplied (an AI tool's title) goes through `escapeHtmlText()`;
+  `helpShortcutText()` mirrors the help plugin's own `convertText()` so our rows render as
+  ⌘/⌃/⇧ glyphs on macOS and `Ctrl + …` elsewhere, and its output is therefore HTML (escape a
+  sentence *before* interpolating a shortcut into its `%s`).
+  ⚠️ **A shortcut's modifier gate is `hasPrimaryModifier()`, never `e.ctrlKey || e.metaKey`**: on
+  Windows `metaKey` is the **Windows key**, whose chords belong to the OS (Win+S opens Windows
+  Search), so accepting either key on every platform binds us to a chord we don't own (gh-13). It
+  resolves to Cmd on macOS and Ctrl elsewhere — the same mapping TinyMCE's own `meta` modifier
+  uses, which is why `addShortcut('meta+s', …)` needed no such fix.
   **Spell checking** uses the native webview checker (`browser_spellcheck: true`) — the bundled
   TinyMCE spellchecker plugin was removed in v6+ and the replacement is a premium cloud service we
   won't use in an offline editor. This sets `spellcheck="true"` on the editing body and defers to the

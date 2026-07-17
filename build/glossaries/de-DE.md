@@ -131,3 +131,6 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | template | Template | Joomla!-Begriff für das Website-Template; wird nicht übersetzt (nicht „Vorlage"). |
 | stylesheet | Stylesheet | CSS-Datei; gängiger Anglizismus, wie in der Joomla!-Doku. |
 | editor CSS | Editor-CSS | Die editor.css des Templates, die den Editor wie die Website aussehen lässt. GRAFIDA_LBL_EDITOR_CSS_URL. |
+| keyboard shortcut | Tastenkombination | Tastenkürzel im Editor; Spaltenüberschrift im Hilfe-Dialog. GRAFIDA_LBL_HELP_SHORTCUT. |
+| action (help table) | Aktion | Spaltenüberschrift im Hilfe-Dialog: was die Tastenkombination bewirkt. GRAFIDA_LBL_HELP_ACTION. |
+| chat panel | Chat-Panel | Das angedockte KI-Unterhaltungsfenster im Editor. |

@@ -140,3 +140,6 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | template | plantilla | Joomla! term for the site template. Plural: plantillas. |
 | stylesheet | hoja de estilos | A CSS file. Standard Joomla! Spanish rendering. |
 | editor CSS | CSS del editor | The template's editor.css, which makes the editor look like the site. GRAFIDA_LBL_EDITOR_CSS_URL. |
+| keyboard shortcut | atajo de teclado | Editor key chord; column heading in the help dialog. GRAFIDA_LBL_HELP_SHORTCUT. |
+| action (help table) | acción | Column heading in the help dialog: what the shortcut does. GRAFIDA_LBL_HELP_ACTION. |
+| chat panel | panel de conversación | The docked AI conversation panel in the editor. |

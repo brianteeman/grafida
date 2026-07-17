@@ -130,3 +130,6 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | template | template | Termine Joomla! per il template del sito; resta invariato (non «modello»). |
 | stylesheet | foglio di stile | File CSS. Resa italiana standard. |
 | editor CSS | CSS dell'editor | Il file editor.css del template, che fa apparire l'editor come il sito. GRAFIDA_LBL_EDITOR_CSS_URL. |
+| keyboard shortcut | scorciatoia da tastiera | Combinazione di tasti dell'editor; intestazione di colonna nella finestra di aiuto. GRAFIDA_LBL_HELP_SHORTCUT. |
+| action (help table) | azione | Intestazione di colonna nella finestra di aiuto: ciò che fa la scorciatoia. GRAFIDA_LBL_HELP_ACTION. |
+| chat panel | pannello di conversazione | Il pannello di conversazione IA agganciato nell'editor. |

@@ -2492,6 +2492,123 @@ function editorStyleClasses() {
         .sort((a, b) => a.localeCompare(b));
 }
 
+/**
+ * True on macOS/iOS. TinyMCE's Env is authoritative once the editor bundle is
+ * loaded; the UA fallback is for the document-level shortcuts, which exist
+ * outside the editor screen too.
+ */
+function isMacPlatform() {
+    if (typeof tinymce !== 'undefined' && tinymce.Env && tinymce.Env.os) {
+        return tinymce.Env.os.isMacOS() || tinymce.Env.os.isiOS();
+    }
+    return /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent || '');
+}
+
+/**
+ * The platform's primary shortcut modifier — Cmd on macOS, Ctrl everywhere
+ * else — matching what TinyMCE's own "meta" modifier maps to. Accepting either
+ * key on every platform is wrong on Windows, where metaKey is the *Windows*
+ * key and its chords belong to the OS (Win+S opens Windows Search, gh-13).
+ */
+function hasPrimaryModifier(e) {
+    return isMacPlatform() ? (e.metaKey && !e.ctrlKey) : (e.ctrlKey && !e.metaKey);
+}
+
+/**
+ * Escape text for use in an HTML string. The Help dialog's table cells and
+ * html panels are set via innerHTML, and an AI tool's title is user-supplied.
+ */
+function escapeHtmlText(text) {
+    const div = document.createElement('div');
+    div.textContent = (text === null || text === undefined) ? '' : String(text);
+    return div.innerHTML;
+}
+
+/**
+ * Render a shortcut spec ("Meta + S") the way the help plugin's own "Handy
+ * Shortcuts" tab does — ⌘/⌃/⇧/⌥ glyphs on macOS, "Ctrl + …" elsewhere — so our
+ * rows read identically to the built-in ones. Mirrors convertText() in
+ * plugins/help. Returns an HTML fragment (the Mac glyphs are entities).
+ */
+function helpShortcutText(spec) {
+    const isMac = isMacPlatform();
+    const replace = isMac
+        ? { alt: '&#x2325;', ctrl: '&#x2303;', shift: '&#x21E7;', meta: '&#x2318;', access: '&#x2303;&#x2325;' }
+        : { meta: 'Ctrl ', access: 'Shift + Alt ' };
+    const parts = spec.split('+').map(segment => {
+        const key = segment.toLowerCase().trim();
+        return Object.prototype.hasOwnProperty.call(replace, key) ? replace[key] : segment;
+    });
+    return isMac ? parts.join('').replace(/\s/, '') : parts.join('+');
+}
+
+/**
+ * The Help dialog's "Grafida" tab: the shortcuts this app adds on top of
+ * TinyMCE's own. It needs a tab of its own because the built-in "Handy
+ * Shortcuts" tab is a hard-coded table — it does not read the editor's
+ * shortcut registry, so an addShortcut() never shows up there (gh-13).
+ */
+function grafidaHelpTab() {
+    // Each row is [label key, shortcut spec]. "Meta" is Cmd on macOS and Ctrl
+    // elsewhere; the three format shortcuts are registered with a literal
+    // "ctrl", so they are Ctrl on every platform, macOS included.
+    const rows = [
+        ['GRAFIDA_LBL_HELP_SC_SAVE', 'Meta + S'],
+        ['GRAFIDA_LBL_HELP_SC_SETTINGS', 'Meta + ,'],
+        ['GRAFIDA_LBL_HELP_SC_CODE', 'Ctrl + Shift + C'],
+        ['GRAFIDA_LBL_HELP_SC_PRE', 'Ctrl + Shift + P'],
+        ['GRAFIDA_LBL_HELP_SC_QUOTE', 'Ctrl + Shift + Q'],
+    ];
+    return {
+        name: 'grafida',
+        title: t('GRAFIDA_LBL_HELP_TAB_GRAFIDA'),
+        items: [{
+            type: 'table',
+            header: [t('GRAFIDA_LBL_HELP_ACTION'), t('GRAFIDA_LBL_HELP_SHORTCUT')],
+            cells: rows.map(([key, spec]) => [escapeHtmlText(t(key)), helpShortcutText(spec)]),
+        }],
+    };
+}
+
+/**
+ * The Help dialog's "AI assistant" tab: what the two AI toolbar entries do and
+ * which writing tools are configured. Only added when an AI service exists —
+ * without one the buttons are omitted from the toolbar, so there is nothing to
+ * document.
+ */
+function aiHelpTab() {
+    const parts = [
+        '<p>' + escapeHtmlText(t('GRAFIDA_MSG_HELP_AI_INTRO')) + '</p>',
+        '<p>' + escapeHtmlText(t('GRAFIDA_MSG_HELP_AI_ASSISTANT')) + '</p>',
+        // Escape first, interpolate after: helpShortcutText() returns entities
+        // on macOS, which escaping would show literally.
+        '<p>' + escapeHtmlText(t('GRAFIDA_MSG_HELP_AI_SEND'))
+            .replace('%s', helpShortcutText('Meta + Enter')) + '</p>',
+        '<p><b>' + escapeHtmlText(t('GRAFIDA_LBL_HELP_AI_TOOLS')) + '</b></p>',
+        '<p>' + escapeHtmlText(t('GRAFIDA_MSG_HELP_AI_TOOLS')) + '</p>',
+    ];
+    if (State.aiTools.length) {
+        parts.push('<ul>' + State.aiTools
+            .map(tool => '<li>' + escapeHtmlText(tool.title) + '</li>').join('') + '</ul>');
+    }
+    parts.push('<p>' + escapeHtmlText(t('GRAFIDA_MSG_HELP_AI_CUSTOM')) + '</p>');
+    return {
+        name: 'grafida-ai',
+        title: t('GRAFIDA_LBL_HELP_TAB_AI'),
+        items: [{ type: 'htmlpanel', presets: 'document', html: parts.join('') }],
+    };
+}
+
+/**
+ * The Help dialog's tab list. help_tabs *replaces* the default list rather than
+ * extending it, so the built-in names have to be repeated to keep them.
+ */
+function editorHelpTabs(hasAiService) {
+    const tabs = ['shortcuts', grafidaHelpTab()];
+    if (hasAiService) tabs.push(aiHelpTab());
+    return tabs.concat(['keyboardnav', 'plugins', 'versions']);
+}
+
 async function initTinyMCE(draft) {
     if (State.tinyMCEEditor) {
         try { State.tinyMCEEditor.remove(); } catch {}
@@ -2585,9 +2702,13 @@ async function initTinyMCE(draft) {
         // plugin stays for its selection and image context toolbars.
         quickbars_insert_toolbar: false,
         // Tools menu: our "sourcecode" item replaces the dropped "code" item.
+        // "help" is the stock item the overridden menu would otherwise drop —
+        // the help dialog is the only in-app editor documentation, and without
+        // this it is reachable by Alt+0 alone.
         menu: {
-            tools: { title: 'Tools', items: 'sourcecode wordcount' },
+            tools: { title: 'Tools', items: 'sourcecode wordcount | help' },
         },
+        help_tabs: editorHelpTabs(hasAiService),
         toolbar: 'undo redo | blocks styleselect | bold italic underline strikethrough | ' +
                  'alignleft aligncenter alignright alignjustify | ' +
                  'bullist numlist outdent indent | removeformat | ' +
@@ -4265,7 +4386,7 @@ function navigateToSettings() {
  * keyboard layout (in the editor iframe the native event is what we get).
  */
 function isSettingsShortcut(e) {
-    if (!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey) return false;
+    if (!hasPrimaryModifier(e) || e.altKey || e.shiftKey) return false;
     return e.key === ',' || e.keyCode === 188;
 }
 
@@ -5928,7 +6049,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // which is handled separately by an editor.addShortcut('meta+s', …) since
     // TinyMCE's iframe has its own document and never sees this listener.
     document.addEventListener('keydown', (e) => {
-        if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== 's') return;
+        if (!hasPrimaryModifier(e) || e.altKey || e.shiftKey) return;
+        if ((e.key || '').toLowerCase() !== 's') return;
         if (State.activeScreen !== 'editor' || !State.currentDraft) return;
         e.preventDefault();
         saveDraft();

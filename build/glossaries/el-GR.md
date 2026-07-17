@@ -131,3 +131,6 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | template | πρότυπο | Joomla! term for the site template (JGLOBAL «Πρότυπο»). Plural: πρότυπα. |
 | stylesheet | φύλλο στυλ | A CSS file. Standard Greek rendering of "stylesheet". |
 | editor CSS | CSS του επεξεργαστή | The template's editor.css, which makes the editor look like the site. GRAFIDA_LBL_EDITOR_CSS_URL. |
+| keyboard shortcut | συντόμευση πληκτρολογίου | Editor key chord; column heading in the help dialog. GRAFIDA_LBL_HELP_SHORTCUT. |
+| action (help table) | ενέργεια | Column heading in the help dialog: what the shortcut does. GRAFIDA_LBL_HELP_ACTION. |
+| chat panel | πίνακας συνομιλίας | The docked AI conversation panel in the editor. |
