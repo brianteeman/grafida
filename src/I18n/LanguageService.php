@@ -51,6 +51,9 @@ final class LanguageService
     /** @var list<string>|null Cached list of shipped language tags. */
     private ?array $availableTags = null;
 
+    /** @var array<string, Language> Catalogues loaded by translateIn(), keyed by tag. */
+    private array $catalogues = [];
+
     public function __construct(
         private readonly SettingsRepository $settings,
         private readonly string $basePath,
@@ -136,6 +139,25 @@ final class LanguageService
     }
 
     /**
+     * Translates a key into a named language rather than the interface one.
+     *
+     * This exists for the few strings whose audience is not the person at the keyboard — a
+     * version note lands in the *site's* version history, so it should speak the article's
+     * language, not the app's. A tag we do not ship (including Joomla's "*" / All) falls back
+     * to {@see translate()}, i.e. the interface language, then en-GB, then the key.
+     */
+    public function translateIn(string $key, string $tag): string
+    {
+        if (!$this->isAvailable($tag) || $tag === $this->currentTag()) {
+            return $this->translate($key);
+        }
+
+        $language = $this->catalogue($tag);
+
+        return $language->hasKey($key) ? $language->_($key) : $this->translate($key);
+    }
+
+    /**
      * Returns every translated string as a flat map, for shipping to the
      * front-end in one call.
      *
@@ -152,6 +174,22 @@ final class LanguageService
         }
 
         return $out;
+    }
+
+    /** Loads (once per tag) the catalogue of a language other than the interface one. */
+    private function catalogue(string $tag): Language
+    {
+        if (isset($this->catalogues[$tag])) {
+            return $this->catalogues[$tag];
+        }
+
+        $factory = new LanguageFactory();
+        $factory->setLanguageDirectory($this->basePath);
+
+        $language = $factory->getLanguage($tag, $this->basePath);
+        $language->load(self::EXTENSION, $this->basePath, $tag);
+
+        return $this->catalogues[$tag] = $language;
     }
 
     private function ensureLoaded(): void

@@ -134,3 +134,4 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | keyboard shortcut | raccourci clavier | Editor key chord; column heading in the help dialog. GRAFIDA_LBL_HELP_SHORTCUT. |
 | action (help table) | action | Column heading in the help dialog: what the shortcut does. GRAFIDA_LBL_HELP_ACTION. |
 | chat panel | panneau de discussion | The docked AI conversation panel in the editor. |
+| version note | note de version | Joomla term (JGLOBAL_FIELD_VERSION_NOTE_LABEL); the note stored with a revision in the article version history. |

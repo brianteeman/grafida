@@ -14,6 +14,7 @@ Grafida 0.2
 + Editor CSS URL site setting, for a template whose editor.css cannot be found automatically
 + Insert/Edit Image: mark an image as decorative, as in Joomla (gh-5)
 + The editor's Help dialog documents Grafida's own shortcuts and the AI assistant (gh-13)
++ Publishing records a "Created using Grafida" note in Joomla's version history (gh-17)
 ~ The editor's Help dialog is back in the Tools menu; it was only reachable with Alt+0
 ~ Article lists show the Joomla article ID before the title
 ~ The editor no longer pops up a quick insert toolbar on every empty line (gh-6)

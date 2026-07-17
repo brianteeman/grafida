@@ -16,11 +16,13 @@ use Grafida\Article\DraftRepository;
 use Grafida\Field\FieldSupport;
 use Grafida\Html\ContentSplitter;
 use Grafida\Html\InlineMedia;
+use Grafida\I18n\LanguageService;
 use Grafida\Joomla\ApiClient;
 use Grafida\Media\MediaRepository;
 use Grafida\Reference\ReferenceService;
 use Grafida\Site\Site;
 use Grafida\Site\SiteService;
+use Grafida\Support\App;
 
 /**
  * Publishes a local draft to its Joomla site.
@@ -50,6 +52,7 @@ final class PublishService
         private readonly ReferenceService $references,
         private readonly DraftRepository $drafts,
         private readonly MediaRepository $media,
+        private readonly LanguageService $language,
         private readonly FieldSupport $fields = new FieldSupport(),
         private readonly ContentSplitter $splitter = new ContentSplitter(),
         private readonly InlineMedia $inlineMedia = new InlineMedia(),
@@ -107,6 +110,17 @@ final class PublishService
         // record — so an alias the user cleared here could never be cleared on the
         // site. The draft is authoritative because importing a remote article reads
         // the site's current value back into it (see ArticleController).
+        //
+        // `version_note` is not an article column at all: it reaches Joomla's version
+        // history only because `ApiController::save()` copies the whole posted body into
+        // the request input as `jform` (for com_fields' benefit), from where
+        // plg_behaviour_versionable reads `jform[version_note]` on `onTableAfterStore`.
+        // It is written in the *article's* language rather than the interface one — it is
+        // read on the site, next to the article it describes — falling back to the
+        // interface language for a language we do not ship (including Joomla's "*" / All).
+        // Sites with com_content's "Save History" off never store it: the plugin checks
+        // `save_history` and returns before reading the note, so this is a silent no-op
+        // rather than an error.
         $attributes = [
             'title'            => $draft->title,
             'catid'            => $draft->catid,
@@ -116,6 +130,11 @@ final class PublishService
             'introtext'        => $split['introtext'],
             'fulltext'         => $split['fulltext'],
             'created_by_alias' => $draft->createdByAlias,
+            'version_note'     => sprintf(
+                $this->language->translateIn('GRAFIDA_MSG_VERSION_NOTE', $draft->language),
+                App::NAME,
+                App::VERSION,
+            ),
         ];
 
         // Optional attributes, included only when they carry a value.

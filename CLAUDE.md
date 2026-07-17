@@ -282,6 +282,13 @@ window-free in tests (a null dialog makes the endpoint return 503).
   the bare `url`, or the cache-buster would be published into the article HTML.
 - `src/Html/` — `ContentSplitter` (read-more split), `CssRebaser`, `InlineMedia`, `HtmlDocument`.
 - `src/Publish/PublishService.php` — the publish pipeline (media upload, tags, fields, split, POST/PATCH).
+  Every write carries a `version_note` — `GRAFIDA_MSG_VERSION_NOTE` ("Created using %1$s %2$s",
+  filled from `App::NAME`/`App::VERSION`) — so a revision names the tool that wrote it in Joomla's
+  version history (gh-17; see the Joomla API facts for the `jform` mechanism that carries it and
+  why a site with history off silently drops it). It is translated with
+  `LanguageService::translateIn()` into the **article's** language (`$draft->language`), not the
+  interface one: it is read on the site, beside the article it describes. This is the codebase's
+  only server-side-translated string.
   After a successful publish the SPA (`showPostPublishDialog()`) asks what to do with the local
   draft: **Delete Local Article** (the default/focused action — removes the draft and returns to the list,
   the published article remaining in the remote list) or **Keep Local Article** (leaves the editor open to
@@ -370,7 +377,12 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `assets/private/` for the feature itself.
 - `src/Markdown/`, `src/I18n/` — Markdown import; language service. `I18n\UiStrings::KEYS` is the
   canonical list of UI string keys shipped to the SPA (used by `BootstrapController` and
-  `SettingsController`).
+  `SettingsController`) — so a key the SPA never reads (`GRAFIDA_MSG_VERSION_NOTE`, resolved
+  server-side in `PublishService`) belongs in `en-GB.ini` but **not** in `KEYS`, or it is shipped
+  to a front-end with no use for it. `LanguageService::translateIn($key, $tag)` translates into a
+  **named** language instead of the interface one, for the few strings whose reader is not the
+  person at the keyboard; an unshipped tag (including Joomla's `*` / All) falls back to
+  `translate()`, i.e. interface language → en-GB → the key. It caches one catalogue per tag.
 - `src/Storage/` — SQLite + migrations, on **`joomla/database`**. There is **no global DB object**:
   the container owns the single `Joomla\Database\DatabaseInterface` instance. `SqliteDatabase`
   extends `Joomla\Database\Sqlite\SqliteDriver` and overrides `connect()` to apply the pragmas the
@@ -792,6 +804,19 @@ map is for when the update mechanism itself is built.
   adding any article attribute, confirm it is in that form; likewise it is only readable back if it
   is listed in the API's `JsonapiView` (`$fieldsToRenderItem`/`List`). `created_by_alias` satisfies
   both.
+- **The version note is settable over the API, by accident rather than design** (gh-17).
+  `version_note` is not a `#__content` column and never touches the article table: it reaches the
+  history because `ApiController::save()` does `$this->input->set('jform', $data)` — copying the
+  whole posted body into the request input, a line whose *stated* purpose is com_fields' catid
+  lookup — and `plg_behaviour_versionable`, firing later on `onTableAfterStore`, reads the note
+  back out of `$input->get('jform')['version_note']`. So a plain `version_note` key in our flat
+  write body lands in Joomla's version history. It survives the form filter because
+  `article.xml` declares the field; `Table::bind()` iterates the table's own properties, so the
+  extra key is ignored rather than treated as an unknown column. **A site with com_content's
+  `save_history` off (Joomla's default) stores nothing** — the plugin checks the param and returns
+  *before* reading the note, so it is a silent no-op, never an error. `Versioning::store()` also
+  dedupes on the content hash: an unchanged re-publish adds no row, and a matching hash with a
+  different note *updates* the existing row's note.
 - Media upload: `POST /v1/media/files` with `{path, content:<base64>}`; the response `url` is public.
 - Template styles: `GET /v1/templates/styles/site` (the `webservices/templates` plugin, **enabled out of
   the box** — `base.sql`'s `plg_webservices_templates` row has `enabled = 1`). Needs `core.manage` on

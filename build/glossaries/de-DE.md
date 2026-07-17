@@ -134,3 +134,4 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | keyboard shortcut | Tastenkombination | Tastenkürzel im Editor; Spaltenüberschrift im Hilfe-Dialog. GRAFIDA_LBL_HELP_SHORTCUT. |
 | action (help table) | Aktion | Spaltenüberschrift im Hilfe-Dialog: was die Tastenkombination bewirkt. GRAFIDA_LBL_HELP_ACTION. |
 | chat panel | Chat-Panel | Das angedockte KI-Unterhaltungsfenster im Editor. |
+| version note | Versionshinweis | Joomla-Begriff (JGLOBAL_FIELD_VERSION_NOTE_LABEL); der Hinweis, der mit einer Version im Versionsverlauf gespeichert wird. |

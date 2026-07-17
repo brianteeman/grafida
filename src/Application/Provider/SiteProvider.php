@@ -17,6 +17,7 @@ use Grafida\Article\DraftRepository;
 use Grafida\Ai\AiChatRepository;
 use Grafida\Html\CssRebaser;
 use Grafida\Http\SiteContext;
+use Grafida\I18n\LanguageService;
 use Grafida\Joomla\ApiClient;
 use Grafida\Media\MediaRepository;
 use Grafida\Media\SiteImageFetcher;
@@ -127,6 +128,7 @@ final class SiteProvider implements ServiceProviderInterface
                 references: $c->get(ReferenceService::class),
                 drafts: $c->get(DraftRepository::class),
                 media: $c->get(MediaRepository::class),
+                language: $c->get(LanguageService::class),
             );
         });
 

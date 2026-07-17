@@ -134,3 +134,4 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | keyboard shortcut | συντόμευση πληκτρολογίου | Editor key chord; column heading in the help dialog. GRAFIDA_LBL_HELP_SHORTCUT. |
 | action (help table) | ενέργεια | Column heading in the help dialog: what the shortcut does. GRAFIDA_LBL_HELP_ACTION. |
 | chat panel | πίνακας συνομιλίας | The docked AI conversation panel in the editor. |
+| version note | σημείωση έκδοσης | Joomla term (JGLOBAL_FIELD_VERSION_NOTE_LABEL); the note stored with a revision in the article version history. |
