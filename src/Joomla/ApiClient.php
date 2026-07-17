@@ -270,11 +270,11 @@ final class ApiClient
      * {@see \Grafida\Reference\TemplateDiscovery} to scan.
      *
      * The route is served by `plg_webservices_templates` (enabled out of the
-     * box) and needs `core.manage` on com_templates. Joomla only mints API
-     * tokens for Super Users by default, so that holds for a token we can use —
-     * but a site that widened the token plugin's allowed groups may still answer
-     * 403, so callers must treat a thrown {@see ApiException} as "unknown"
-     * rather than as a failure.
+     * box) and needs `core.manage` on com_templates. Joomla can be configured
+     * to issue API tokens to non-Super-User groups, whose ordinary Joomla
+     * permissions still apply; this route may therefore answer 403. Callers
+     * must treat a thrown {@see ApiException} as "unknown" rather than as a
+     * failure.
      *
      * @return list<array<string, mixed>>
      */

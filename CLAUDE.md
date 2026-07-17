@@ -704,12 +704,11 @@ map is for when the update mechanism itself is built.
   server rules. `ApiClient` normalises any pasted URL to the bare root and **probes** to find
   the working base, persisting it per site.
 - Auth header: `Authorization: Bearer <token>` (also sends `X-Joomla-Token`). User needs `core.login.api`.
-- **A token-bearing user is a Super User.** `plg_user_token`'s `allowedUserGroups` defaults to `"8"`
-  (Super Users), so Joomla only mints API tokens for Super Users out of the box — which is to say an
-  admin-only route is *not* out of reach, and a feature need not be designed around an author's
-  permissions. A site that widened that param is the exception, so an admin-only route should still
-  degrade rather than throw (see `listTemplateStyles()`), but it must not be treated as unavailable
-  by default.
+- **A token-bearing user is not necessarily a Super User.** `plg_user_token`'s `allowedUserGroups`
+  defaults to `"8"` (Super Users), but an administrator can allow a dedicated group to receive tokens
+  and grant it `core.login.api`; see `docs/Custom API access.md`. The user's normal Joomla permissions
+  still govern every API operation. Treat admin-only routes as optional: they may return 403 for a
+  non-Super-User token, so callers must degrade rather than throw (see `listTemplateStyles()`).
 - Articles: `POST/PATCH /v1/content/articles[/{id}]`. **Write bodies are a flat
   top-level JSON object of field values** — Joomla's JSON:API `{data:{type,attributes}}`
   envelope is for *responses only*; wrapping a write makes Joomla bind nothing and
@@ -733,7 +732,7 @@ map is for when the update mechanism itself is built.
 - Media upload: `POST /v1/media/files` with `{path, content:<base64>}`; the response `url` is public.
 - Template styles: `GET /v1/templates/styles/site` (the `webservices/templates` plugin, **enabled out of
   the box** — `base.sql`'s `plg_webservices_templates` row has `enabled = 1`). Needs `core.manage` on
-  com_templates, i.e. an admin — fine, since tokens are Super-User-only by default (above). The list view
+  com_templates, so it can return 403 for non-Super-User tokens; treat it as optional. The list view
   renders `id`, `template`, `title`, `home`, `client_id`, …; `template` is the template's **directory
   name** and `home` is `"1"` for the site default, a **language tag** for a multilingual site's
   per-language home, and `"0"` otherwise. `page[limit]=0` means "all" here (unlike the config route).

@@ -26,7 +26,9 @@ Grafida uses the Joomla Web Services (REST) API. It's built with [Boson](https:/
 
 ## Requirements
 
-- A Joomla **5.4 or later** site with the Web Services API enabled and an API token for a Super User.
+- A Joomla **5.4 or later** site with the Web Services API enabled and an API token for an account
+  authorised for API access. Super Users work by default. Non-Super-User accounts can be configured
+  for Grafida; see [Custom API access](docs/Custom%20API%20access.md).
 - To run a pre-built release: **macOS 14+**, **Windows 10+**, or **Linux** with GTK4 and
   WebKitGTK 6.0 (`libgtk-4-1`, `libwebkitgtk-6.0-4`).
 
