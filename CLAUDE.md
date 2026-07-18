@@ -582,8 +582,16 @@ window-free in tests (a null dialog makes the endpoint return 503).
   a `TINYMCE_LANGS` entry in `app.js` (none for languages TinyMCE has no pack for — they get the
   English editor UI). This is the editor UI *chrome*; it is unrelated
   to the spell-check dictionary (an OS setting, above) and the article content language.
-  The active site is remembered client-side in `localStorage` (`grafida.lastSiteId`, via
-  `rememberLastSite()` / `recallLastSite()`); it is not persisted server-side. On startup
+  The active site is remembered **server-side**: `rememberLastSite()` persists it via
+  `POST /api/settings/last-site` (`Site\LastSiteService`, the generic `settings` key/value store —
+  key `last_site`, so no migration) and it rides back in the `bootstrap` payload as `lastSiteId`
+  (seeded into `State.lastSiteId`, which `recallLastSite()` reads). ⚠️ It is **not** kept only in
+  `localStorage` — Boson's webview does **not** persist `localStorage` across an app restart, which
+  is the one moment the preference must survive, so a `localStorage` copy is written too but only as
+  a same-session cache; the server value is authoritative. `rememberLastSite()` writes fire-and-forget
+  and only when the id actually changed (dedupes the per-render call in `renderSiteSelector()`), and
+  a since-deleted remembered site self-heals — `renderSiteSelector()` validates the id against the
+  live site list and falls back to the first site, persisting that as the new last site. On startup
   `bootstrap()` opens the **Articles** page (instead of **Sites**) when at least one site is
   defined and a previously remembered last active site is still in the list — the remembered id
   is read *before* `renderSiteSelector()` writes its first-site fallback, so a freshly added but

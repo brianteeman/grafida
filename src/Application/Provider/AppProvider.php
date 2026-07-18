@@ -23,6 +23,7 @@ use Grafida\Http\ApiController;
 use Grafida\Http\HttpClient;
 use Grafida\I18n\LanguageService;
 use Grafida\Markdown\MarkdownService;
+use Grafida\Site\LastSiteService;
 use Grafida\Storage\SettingsRepository;
 use Grafida\Support\App;
 use Grafida\Support\Paths;
@@ -61,6 +62,11 @@ final class AppProvider implements ServiceProviderInterface
         $container->share(
             SpellCheckService::class,
             static fn (Container $c): SpellCheckService => new SpellCheckService($c->get(SettingsRepository::class))
+        );
+
+        $container->share(
+            LastSiteService::class,
+            static fn (Container $c): LastSiteService => new LastSiteService($c->get(SettingsRepository::class))
         );
 
         $container->share(MarkdownService::class, static fn (): MarkdownService => new MarkdownService());

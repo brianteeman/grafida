@@ -25,6 +25,7 @@ use Grafida\Http\Router;
 use Grafida\Http\SiteContext;
 use Grafida\I18n\LanguageService;
 use Grafida\I18n\UiStrings;
+use Grafida\Site\LastSiteService;
 use Grafida\Site\SiteService;
 use Grafida\Support\App;
 
@@ -33,6 +34,7 @@ final class BootstrapController extends Controller
 {
     public function __construct(
         private readonly SiteService $sites,
+        private readonly LastSiteService $lastSite,
         private readonly SiteContext $siteContext,
         private readonly LanguageService $language,
         private readonly DisplayModeService $displayMode,
@@ -67,6 +69,7 @@ final class BootstrapController extends Controller
             'secureStore'         => $this->sites->hasSecureStore(),
             'supportedFieldTypes' => FieldSupport::SUPPORTED,
             'sites'               => array_map($this->siteContext->siteArray(...), $this->sites->list()),
+            'lastSiteId'          => $this->lastSite->current(),
             'app'                 => App::info(),
             'aiServices'          => $ai['aiServices'],
             'aiDefaultServiceId'  => $ai['aiDefaultServiceId'],

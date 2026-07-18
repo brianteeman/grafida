@@ -49,6 +49,8 @@
   checker switched off and offers no menu to turn it on — Grafida now enables it at startup. You
   can also switch spell checking off from Settings
   ([gh-24](https://github.com/akeeba/grafida/issues/24)).
+* Grafida forgot your last used site when you quit and reopened it, always selecting the first
+  site instead — it now remembers your choice across restarts.
 
 See the [`CHANGELOG`](CHANGELOG) for the full list of changes.
 

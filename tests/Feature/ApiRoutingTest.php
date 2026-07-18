@@ -192,6 +192,33 @@ final class ApiRoutingTest extends TestCase
         self::assertTrue($boot['data']['spellCheck']);
     }
 
+    public function testLastSiteDefaultsToNull(): void
+    {
+        [, $boot] = $this->call($this->kernel(), 'GET', '/api/bootstrap');
+
+        self::assertNull($boot['data']['lastSiteId']);
+    }
+
+    public function testLastSitePersists(): void
+    {
+        $kernel = $this->kernel();
+
+        [$status, $json] = $this->call($kernel, 'POST', '/api/settings/last-site', json_encode(['siteId' => 7]));
+
+        self::assertSame(200, $status);
+        self::assertSame(7, $json['data']['lastSiteId']);
+
+        [, $boot] = $this->call($kernel, 'GET', '/api/bootstrap');
+        self::assertSame(7, $boot['data']['lastSiteId']);
+
+        // A zero/absent id clears the stored preference.
+        [, $json] = $this->call($kernel, 'POST', '/api/settings/last-site', json_encode(['siteId' => 0]));
+        self::assertNull($json['data']['lastSiteId']);
+
+        [, $boot] = $this->call($kernel, 'GET', '/api/bootstrap');
+        self::assertNull($boot['data']['lastSiteId']);
+    }
+
     public function testStorageInfoReportsDatabasePath(): void
     {
         [$status, $json] = $this->call($this->kernel(), 'GET', '/api/settings/storage');

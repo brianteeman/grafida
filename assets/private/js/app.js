@@ -45,6 +45,10 @@ const State = {
     update: null,
     sites: [],
     currentSiteId: null,
+    // The site to re-select on the next launch. Persisted server-side (in the
+    // settings table) because Boson's webview does not keep localStorage across
+    // an app restart. Seeded from the bootstrap payload.
+    lastSiteId: null,
     // The draft currently open in the editor. Held in memory and only written to
     // the database on the first Save — a new or remote-imported article leaves no
     // trace until the user explicitly saves it. `id` is null while unsaved.
@@ -591,6 +595,7 @@ const api = {
     systemTheme: () => apiFetch('GET', '/api/settings/system-theme'),
     setSlashTools: (enabled) => apiFetch('POST', '/api/settings/slash-tools', { enabled }),
     setSpellCheck: (enabled) => apiFetch('POST', '/api/settings/spell-check', { enabled }),
+    setLastSite: (siteId) => apiFetch('POST', '/api/settings/last-site', { siteId }),
     checkUpdate: () => apiFetch('GET', '/api/update'),
     getStorageInfo: () => apiFetch('GET', '/api/settings/storage'),
     openStorageFolder: () => apiFetch('POST', '/api/settings/storage/open'),
@@ -759,12 +764,25 @@ function showScreen(name) {
 const LAST_SITE_KEY = 'grafida.lastSiteId';
 
 function rememberLastSite(id) {
+    const numId = id ? parseInt(id, 10) : null;
+
+    // A same-session cache; the authoritative copy is server-side (see below).
     try {
-        if (id) localStorage.setItem(LAST_SITE_KEY, String(id));
+        if (numId) localStorage.setItem(LAST_SITE_KEY, String(numId));
     } catch (e) { /* storage may be unavailable */ }
+
+    // Persist across restarts (localStorage does not survive a Boson webview
+    // relaunch). Fire-and-forget, and only when the value actually changed.
+    if (numId && numId !== State.lastSiteId) {
+        State.lastSiteId = numId;
+        api.setLastSite(numId).catch(() => { /* best-effort persistence */ });
+    }
 }
 
 function recallLastSite() {
+    // The server value (from bootstrap) is authoritative and survives a restart;
+    // fall back to the same-session localStorage copy if it is unset.
+    if (State.lastSiteId) return State.lastSiteId;
     try {
         const raw = localStorage.getItem(LAST_SITE_KEY);
         return raw ? parseInt(raw, 10) : null;
@@ -5979,6 +5997,7 @@ async function bootstrap() {
         State.supportedFieldTypes = data.supportedFieldTypes || [];
         State.app = data.app || {};
         State.sites = data.sites || [];
+        State.lastSiteId = data.lastSiteId ?? null;
         State.aiServices = data.aiServices || [];
         State.aiDefaultServiceId = data.aiDefaultServiceId ?? null;
         State.aiProviders = data.aiProviders || {};

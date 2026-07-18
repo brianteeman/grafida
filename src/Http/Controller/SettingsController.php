@@ -22,6 +22,7 @@ use Grafida\Http\Router;
 use Grafida\I18n\LanguageService;
 use Grafida\I18n\UiStrings;
 use Grafida\Markdown\MarkdownService;
+use Grafida\Site\LastSiteService;
 use Grafida\Storage\StorageService;
 use Grafida\Support\UrlOpener;
 use Grafida\Update\UpdateService;
@@ -40,6 +41,7 @@ final class SettingsController extends Controller
         private readonly DisplayModeService $displayMode,
         private readonly SlashToolsService $slashTools,
         private readonly SpellCheckService $spellCheck,
+        private readonly LastSiteService $lastSite,
         private readonly UrlOpener $urlOpener,
         private readonly UpdateService $updates,
         private readonly StorageService $storage,
@@ -54,6 +56,7 @@ final class SettingsController extends Controller
         $router->add('GET', '/api/settings/system-theme', fn (RouteContext $ctx): ResponseInterface => $this->systemTheme());
         $router->add('POST', '/api/settings/slash-tools', fn (RouteContext $ctx): ResponseInterface => $this->setSlashTools($ctx->body()));
         $router->add('POST', '/api/settings/spell-check', fn (RouteContext $ctx): ResponseInterface => $this->setSpellCheck($ctx->body()));
+        $router->add('POST', '/api/settings/last-site', fn (RouteContext $ctx): ResponseInterface => $this->setLastSite($ctx->body()));
         $router->add('GET', '/api/update', fn (RouteContext $ctx): ResponseInterface => $this->updateStatus());
         $router->add('GET', '/api/settings/storage', fn (RouteContext $ctx): ResponseInterface => $this->storageInfo());
         $router->add('POST', '/api/settings/storage/open', fn (RouteContext $ctx): ResponseInterface => $this->openStorageFolder());
@@ -193,6 +196,20 @@ final class SettingsController extends Controller
         $enabled = $this->spellCheck->set($this->bool($body, 'enabled', true));
 
         return Json::ok(['spellCheck' => $enabled]);
+    }
+
+    /**
+     * Remembers the site the user just selected, so it is re-selected on the
+     * next launch. A zero/absent id clears the stored preference.
+     *
+     * @param array<string, mixed> $body
+     */
+    public function setLastSite(array $body): ResponseInterface
+    {
+        $id = $this->int($body, 'siteId');
+        $this->lastSite->set($id > 0 ? $id : null);
+
+        return Json::ok(['lastSiteId' => $id > 0 ? $id : null]);
     }
 
     /** Re-probes the OS light/dark preference so "auto" can follow it at runtime. */

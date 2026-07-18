@@ -44,6 +44,7 @@ use Grafida\Publish\PublishService;
 use Grafida\Reference\EditorCssService;
 use Grafida\Reference\ReferenceService;
 use Grafida\Site\FaviconService;
+use Grafida\Site\LastSiteService;
 use Grafida\Site\SiteService;
 use Grafida\Storage\SettingsRepository;
 use Grafida\Storage\StorageService;
@@ -64,6 +65,7 @@ final class ControllerProvider implements ServiceProviderInterface
         $container->share(BootstrapController::class, static function (Container $c): BootstrapController {
             return new BootstrapController(
                 sites: $c->get(SiteService::class),
+                lastSite: $c->get(LastSiteService::class),
                 siteContext: $c->get(SiteContext::class),
                 language: $c->get(LanguageService::class),
                 displayMode: $c->get(DisplayModeService::class),
@@ -139,6 +141,7 @@ final class ControllerProvider implements ServiceProviderInterface
                 displayMode: $c->get(DisplayModeService::class),
                 slashTools: $c->get(SlashToolsService::class),
                 spellCheck: $c->get(SpellCheckService::class),
+                lastSite: $c->get(LastSiteService::class),
                 urlOpener: $c->get(UrlOpener::class),
                 updates: $c->get(UpdateService::class),
                 storage: $c->get(StorageService::class),
