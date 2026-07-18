@@ -42,6 +42,9 @@
 * Windows: the Save and Settings shortcuts also fired on the Windows key, and a command window
   briefly flashed at startup and on theme detection
   ([gh-13](https://github.com/akeeba/grafida/issues/13)).
+* The editor gave the content area no padding when your site's `editor.css` supplied none,
+  leaving the text pressed against the edge
+  ([gh-23](https://github.com/akeeba/grafida/issues/23)).
 
 See the [`CHANGELOG`](CHANGELOG) for the full list of changes.
 

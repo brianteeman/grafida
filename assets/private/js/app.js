@@ -2776,6 +2776,18 @@ async function initTinyMCE(draft) {
             'img {' +
             '  max-width: 100%;' +
             '  height: auto;' +
+            '}' +
+            // Give the editing surface breathing room (gh-23). TinyMCE's built-in
+            // content CSS sets body{margin:1rem}, but that CSS is loaded only when the
+            // site supplies no editor.css (see content_css above); a site editor.css
+            // that sets no body spacing (e.g. Bootstrap's Reboot, body{margin:0}) then
+            // leaves the text flush against the iframe edge and the focus ring overlaps
+            // the first characters. content_style is injected after content_css, so
+            // this applies in both branches; margin:0 keeps the inset a uniform 1rem in
+            // the built-in-CSS branch instead of doubling to 2rem.
+            'body {' +
+            '  margin: 0;' +
+            '  padding: 1rem;' +
             '}',
         setup: (editor) => {
             State.tinyMCEEditor = editor;

@@ -36,6 +36,7 @@ Grafida 0.2
 # [LOW] Dialogs closed when clicking outside them, discarding your input
 # [LOW] The site selector's "no sites yet" placeholder was truncated
 # [LOW] Media Manager: the header buttons were jammed against each other
+# [LOW] The editor had no padding around the content when your site's editor.css supplied none (gh-23)
 
 Grafida 0.1
 ================================================================================

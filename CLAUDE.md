@@ -314,6 +314,15 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `width="4032"`), and without a constraining rule the picture overflows the editor's scroll box and becomes
   un-clickable in the WKWebView (broken hit-testing) — scaling it to fit keeps it selectable/editable, and
   only the editor view is affected (the published `width`/`height` are untouched).
+  The `content_style` likewise forces `body { margin: 0; padding: 1rem }` so the editing surface always has
+  breathing room (gh-23): TinyMCE's built-in content CSS carries `body{margin:1rem}`, but that CSS is loaded
+  **only when the site supplies no `editor.css`** (`content_css` is the site stylesheet otherwise), so a site
+  `editor.css` that sets no body spacing — e.g. Bootstrap's Reboot `body{margin:0}`, where the real front-end
+  pads the article via wrapper containers Grafida's editor has no equivalent of — leaves the text flush against
+  the iframe edge and the focus ring clipping the first characters. `content_style` is injected after
+  `content_css` so it applies in both branches; the `margin:0` keeps the inset a uniform 1rem rather than
+  doubling to 2rem in the built-in-CSS branch. Editor-only, like the `img` rule — `editor.css` never reaches
+  the published article.
   TinyMCE's own **"Upload" tab is disabled** (`image_uploadtab: false`) because its "Browse for an image"
   dropzone creates a plain `<input type="file">` that Boson's webview never opens (see the native
   file-dialog note above) — so local uploads go exclusively through the Source-field "Choose file…",
