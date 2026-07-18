@@ -384,6 +384,20 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `DisplayModeService` (the `settings` table is a generic key/value store, so a new preference
   needs **no migration**); the boolean is encoded `'1'`/`'0'`. See the slash-commands note under
   `assets/private/` for the feature itself.
+- `src/Editor/SpellCheckService.php` — persists whether the editor's native spell checking is
+  enabled (`settings` key `spell_check`, **default on**), sent to the SPA as the `bootstrap`
+  payload's `spellCheck` key and written via `POST /api/settings/spell-check`. Same shape as
+  `SlashToolsService`. The stored value drives TinyMCE's `browser_spellcheck`, i.e. the editing
+  body's `spellcheck` attribute — the **authoritative per-element gate**: WebKit will not check an
+  element with `spellcheck="false"` even when its global continuous-checking flag is on, so this
+  preference alone turns the underlining off on every platform. The macOS master flag
+  ({@see MacSpellCheck}) stays **unconditionally enabled** at startup precisely so the attribute
+  can toggle it live: `WebContinuousSpellCheckingEnabled` is read once and cached by WebKit, so
+  forcing *it* false would need a restart to re-enable — the per-element attribute, which WebKit
+  re-evaluates immediately, is what the toggle drives (`applySpellCheckChange()` also updates an
+  open editor's body attribute so no re-init is needed). ⚠️ Turning it back **on** at runtime only
+  marks text edited afterwards, not already-loaded content — an inherent WebKit quirk. See the
+  spell-checking note under `assets/private/` (gh-24).
 - `src/Markdown/`, `src/I18n/` — Markdown import; language service. `I18n\UiStrings::KEYS` is the
   canonical list of UI string keys shipped to the SPA (used by `BootstrapController` and
   `SettingsController`) — so a key the SPA never reads (`GRAFIDA_MSG_VERSION_NOTE`, resolved
@@ -528,12 +542,26 @@ window-free in tests (a null dialog makes the endpoint return 503).
   Search), so accepting either key on every platform binds us to a chord we don't own (gh-13). It
   resolves to Cmd on macOS and Ctrl elsewhere — the same mapping TinyMCE's own `meta` modifier
   uses, which is why `addShortcut('meta+s', …)` needed no such fix.
-  **Spell checking** uses the native webview checker (`browser_spellcheck: true`) — the bundled
-  TinyMCE spellchecker plugin was removed in v6+ and the replacement is a premium cloud service we
-  won't use in an offline editor. This sets `spellcheck="true"` on the editing body and defers to the
+  **Spell checking** uses the native webview checker (`browser_spellcheck`, driven by the
+  `spell_check` setting — **default on**, toggled from the Options page, see `SpellCheckService`) —
+  the bundled TinyMCE spellchecker plugin was removed in v6+ and the replacement is a premium cloud
+  service we won't use in an offline editor. This sets `spellcheck="true"` on the editing body and defers to the
   OS/webview dictionary (WKWebView/`NSSpellChecker` on macOS, WebKitGTK on Linux, WebView2 on Windows);
   suggestions appear in the *native* context menu via **Ctrl/Cmd + right-click** (TinyMCE's own context
-  menu intercepts a plain right-click). **The spell-check language is an OS setting Grafida cannot
+  menu intercepts a plain right-click). ⚠️ **On macOS the checker is dead until continuous spell
+  checking is enabled, and Boson gives no way to enable it — so Grafida must** (gh-24). WKWebView gates
+  *all* native spell checking (even a freshly typed misspelling) on the `WebContinuousSpellCheckingEnabled`
+  NSUserDefaults flag, which its text checker reads once, lazily, on the first check (WebKit's
+  `TextCheckerMac.mm`). A normal Mac app flips this from its **Edit ▸ Spelling ▸ "Check Spelling While
+  Typing"** menu item (`-toggleContinuousSpellChecking:`); Boson wires up no menu bar, so on any machine
+  where no other WebKit app has already turned it on the flag stays off and nothing is ever underlined —
+  which is why it appeared to "work for one person and not another" on identical code. `index.php` fixes
+  this by calling `Grafida\Editor\MacSpellCheck::enable()` **before the app boots** (so it precedes the
+  first spell-check): it sets the flag to `true` in Grafida's **own** preferences domain (never the
+  global one — that would change every WebKit app) via CoreFoundation's **CFPreferences** C API through
+  FFI. CFPreferences is plain C, dodging the arm64 `objc_msgSend` variadic-calling-convention hazard, and
+  unlike a `defaults write` subprocess it spawns nothing. Best-effort — a failure just leaves spell
+  checking off, as before. Linux/Windows webviews have no such gate. **The spell-check language is an OS setting Grafida cannot
   override** — there is no JS/HTML API to pin a dictionary and no native hook into Boson's webview. On
   macOS in particular, results depend on System Settings → Keyboard → Text Input → Spelling: set to a
   fixed language (e.g. "U.S. English"), text in any other language is flagged wholesale; set to

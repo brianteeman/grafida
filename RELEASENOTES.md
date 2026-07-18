@@ -45,6 +45,10 @@
 * The editor gave the content area no padding when your site's `editor.css` supplied none,
   leaving the text pressed against the edge
   ([gh-23](https://github.com/akeeba/grafida/issues/23)).
+* **macOS:** the editor never underlined misspelt words, because the webview leaves its spell
+  checker switched off and offers no menu to turn it on — Grafida now enables it at startup. You
+  can also switch spell checking off from Settings
+  ([gh-24](https://github.com/akeeba/grafida/issues/24)).
 
 See the [`CHANGELOG`](CHANGELOG) for the full list of changes.
 

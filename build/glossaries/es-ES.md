@@ -144,3 +144,4 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | action (help table) | acción | Column heading in the help dialog: what the shortcut does. GRAFIDA_LBL_HELP_ACTION. |
 | chat panel | panel de conversación | The docked AI conversation panel in the editor. |
 | version note | nota de versión | Joomla term (JGLOBAL_FIELD_VERSION_NOTE_LABEL); the note stored with a revision in the article version history. |
+| spell checking | corrección ortográfica | The OS-native spell checker in the editor (gh-24). |

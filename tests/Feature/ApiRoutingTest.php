@@ -165,6 +165,33 @@ final class ApiRoutingTest extends TestCase
         self::assertTrue($boot['data']['slashTools']);
     }
 
+    public function testSpellCheckDefaultsToEnabled(): void
+    {
+        [, $boot] = $this->call($this->kernel(), 'GET', '/api/bootstrap');
+
+        self::assertTrue($boot['data']['spellCheck']);
+    }
+
+    public function testSpellCheckPersists(): void
+    {
+        $kernel = $this->kernel();
+
+        [$status, $json] = $this->call($kernel, 'POST', '/api/settings/spell-check', json_encode(['enabled' => false]));
+
+        self::assertSame(200, $status);
+        self::assertFalse($json['data']['spellCheck']);
+
+        [, $boot] = $this->call($kernel, 'GET', '/api/bootstrap');
+        self::assertFalse($boot['data']['spellCheck']);
+
+        // Back on again — a stored "off" must not be sticky.
+        [, $json] = $this->call($kernel, 'POST', '/api/settings/spell-check', json_encode(['enabled' => true]));
+        self::assertTrue($json['data']['spellCheck']);
+
+        [, $boot] = $this->call($kernel, 'GET', '/api/bootstrap');
+        self::assertTrue($boot['data']['spellCheck']);
+    }
+
     public function testStorageInfoReportsDatabasePath(): void
     {
         [$status, $json] = $this->call($this->kernel(), 'GET', '/api/settings/storage');

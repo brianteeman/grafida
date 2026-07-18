@@ -13,6 +13,7 @@ Grafida 0.2
 + Visit site button under the sidebar favicon opens the active site in your browser
 + Editor CSS URL site setting, for a template whose editor.css cannot be found automatically
 + Insert/Edit Image: mark an image as decorative, as in Joomla (gh-5)
++ Spell checking can be switched off in Settings (gh-24)
 + The editor's Help dialog documents Grafida's own shortcuts and the AI assistant (gh-13)
 + Publishing records a "Created using Grafida" note in Joomla's version history (gh-17)
 ~ The editor's Help dialog is back in the Tools menu; it was only reachable with Alt+0
@@ -28,6 +29,7 @@ Grafida 0.2
 # [MEDIUM] The editor ignored your site's editor.css unless the site used the stock Cassiopeia template (gh-3)
 # [MEDIUM] The editor used the parent template's editor.css on a site running a child template (gh-3)
 # [MEDIUM] Media Manager: an edited image's thumbnail and preview still showed the picture as it was before the edit (gh-4)
+# [MEDIUM] macOS: the editor never underlined misspelt words (gh-24)
 # [LOW] Windows: the Save and Settings shortcuts also answered to the Windows key (gh-13)
 # [LOW] Windows: a command window flashed at startup and on theme detection
 # [LOW] AI panel: a second click on Send could fire a duplicate request

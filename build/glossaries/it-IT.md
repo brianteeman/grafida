@@ -134,3 +134,4 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | action (help table) | azione | Intestazione di colonna nella finestra di aiuto: ciò che fa la scorciatoia. GRAFIDA_LBL_HELP_ACTION. |
 | chat panel | pannello di conversazione | Il pannello di conversazione IA agganciato nell'editor. |
 | version note | nota di versione | Termine Joomla (JGLOBAL_FIELD_VERSION_NOTE_LABEL); la nota salvata con una revisione nella cronologia delle versioni. |
+| spell checking | controllo ortografico | Il controllo ortografico nativo del sistema operativo nell'editor (gh-24). |

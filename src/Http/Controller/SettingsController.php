@@ -15,6 +15,7 @@ use Boson\Api\Dialog\DialogApiInterface;
 use Boson\Contracts\Http\ResponseInterface;
 use Grafida\Display\DisplayModeService;
 use Grafida\Editor\SlashToolsService;
+use Grafida\Editor\SpellCheckService;
 use Grafida\Http\Json;
 use Grafida\Http\RouteContext;
 use Grafida\Http\Router;
@@ -38,6 +39,7 @@ final class SettingsController extends Controller
         private readonly LanguageService $language,
         private readonly DisplayModeService $displayMode,
         private readonly SlashToolsService $slashTools,
+        private readonly SpellCheckService $spellCheck,
         private readonly UrlOpener $urlOpener,
         private readonly UpdateService $updates,
         private readonly StorageService $storage,
@@ -51,6 +53,7 @@ final class SettingsController extends Controller
         $router->add('POST', '/api/settings/display-mode', fn (RouteContext $ctx): ResponseInterface => $this->setDisplayMode($ctx->body()));
         $router->add('GET', '/api/settings/system-theme', fn (RouteContext $ctx): ResponseInterface => $this->systemTheme());
         $router->add('POST', '/api/settings/slash-tools', fn (RouteContext $ctx): ResponseInterface => $this->setSlashTools($ctx->body()));
+        $router->add('POST', '/api/settings/spell-check', fn (RouteContext $ctx): ResponseInterface => $this->setSpellCheck($ctx->body()));
         $router->add('GET', '/api/update', fn (RouteContext $ctx): ResponseInterface => $this->updateStatus());
         $router->add('GET', '/api/settings/storage', fn (RouteContext $ctx): ResponseInterface => $this->storageInfo());
         $router->add('POST', '/api/settings/storage/open', fn (RouteContext $ctx): ResponseInterface => $this->openStorageFolder());
@@ -182,6 +185,14 @@ final class SettingsController extends Controller
         $enabled = $this->slashTools->set($this->bool($body, 'enabled', true));
 
         return Json::ok(['slashTools' => $enabled]);
+    }
+
+    /** @param array<string, mixed> $body */
+    public function setSpellCheck(array $body): ResponseInterface
+    {
+        $enabled = $this->spellCheck->set($this->bool($body, 'enabled', true));
+
+        return Json::ok(['spellCheck' => $enabled]);
     }
 
     /** Re-probes the OS light/dark preference so "auto" can follow it at runtime. */

@@ -17,6 +17,7 @@ use Boson\WebView\WebViewCreateInfo;
 use Boson\Window\WindowCreateInfo;
 use Boson\Window\WindowDecoration;
 use Grafida\Application\ContainerFactory;
+use Grafida\Editor\MacSpellCheck;
 use Grafida\FrontController;
 
 require __DIR__ . '/vendor/autoload.php';
@@ -42,6 +43,13 @@ if (\PHP_OS_FAMILY === 'Windows' && \extension_loaded('ffi')) {
         // No console to hide, or FFI unavailable — nothing to do.
     }
 }
+
+// macOS: WKWebView gates all native spell checking on the WebContinuousSpellChecking-
+// Enabled user default, read once on the first spell-check. A normal Mac app toggles it
+// from its Edit ▸ Spelling menu; Boson wires up no menu bar, so the flag stays off and no
+// misspelling is ever underlined (gh-24). Turn it on in Grafida's own preferences domain
+// before the webview boots. Best-effort; a failure just leaves spell checking off, as before.
+MacSpellCheck::enable();
 
 $app = new Application(new ApplicationCreateInfo(
     schemes: ['boson'],

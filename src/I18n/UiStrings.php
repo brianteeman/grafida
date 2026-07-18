@@ -158,6 +158,9 @@ final class UiStrings
         'GRAFIDA_LBL_HELP_AI_TOOLS', 'GRAFIDA_MSG_HELP_AI_TOOLS', 'GRAFIDA_MSG_HELP_AI_CUSTOM',
         'GRAFIDA_MSG_HELP_SLASH_TOOLS',
 
+        // Editor spell checking (gh-24)
+        'GRAFIDA_LBL_SPELL_CHECK', 'GRAFIDA_MSG_SPELL_CHECK_INFO',
+
         // Editor slash commands (gh-9)
         'GRAFIDA_LBL_SLASH_TOOLS', 'GRAFIDA_MSG_SLASH_TOOLS_INFO',
         'GRAFIDA_LBL_SLASH_H1', 'GRAFIDA_LBL_SLASH_H2', 'GRAFIDA_LBL_SLASH_H3',

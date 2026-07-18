@@ -37,3 +37,14 @@ parameters:
     -
       identifier: method.notFound
       path: src/Display/WindowsThemeReader.php
+    # MacSpellCheck is the same FFI story: PHPStan cannot see through the
+    # CoreFoundation functions or the extern CFPreferences constant symbols.
+    -
+      identifier: property.notFound
+      path: src/Editor/MacSpellCheck.php
+    -
+      identifier: method.notFound
+      path: src/Editor/MacSpellCheck.php
+    -
+      identifier: argument.type
+      path: src/Editor/MacSpellCheck.php

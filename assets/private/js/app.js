@@ -35,6 +35,9 @@ const State = {
     resolvedTheme: 'dark',
     // Whether typing "/" in the editor opens the slash-command menu (gh-9).
     slashTools: true,
+    // Whether the editor's native spell checking is on (gh-24). Drives the editing
+    // body's `spellcheck` attribute — the authoritative per-element gate.
+    spellCheck: true,
     secureStore: true,
     supportedFieldTypes: [],
     app: {},
@@ -587,6 +590,7 @@ const api = {
     setDisplayMode: (mode) => apiFetch('POST', '/api/settings/display-mode', { mode }),
     systemTheme: () => apiFetch('GET', '/api/settings/system-theme'),
     setSlashTools: (enabled) => apiFetch('POST', '/api/settings/slash-tools', { enabled }),
+    setSpellCheck: (enabled) => apiFetch('POST', '/api/settings/spell-check', { enabled }),
     checkUpdate: () => apiFetch('GET', '/api/update'),
     getStorageInfo: () => apiFetch('GET', '/api/settings/storage'),
     openStorageFolder: () => apiFetch('POST', '/api/settings/storage/open'),
@@ -2718,7 +2722,13 @@ async function initTinyMCE(draft) {
         // body so WKWebView/WebKitGTK/Edge underline misspellings; suggestions
         // appear in the native context menu (Ctrl/Cmd + right-click, since
         // TinyMCE's own context menu otherwise intercepts the right-click).
-        browser_spellcheck: true,
+        // NB macOS: WKWebView won't underline anything until its continuous
+        // spell-checking flag is on, which index.php enables at startup via
+        // Grafida\Editor\MacSpellCheck (gh-24) — the attribute alone is not enough.
+        // The Settings toggle drives this (and the live update in
+        // applySpellCheckChange): browser_spellcheck: false sets spellcheck="false"
+        // on the body, which WebKit honours even with the master flag on.
+        browser_spellcheck: State.spellCheck !== false,
         // The editor UI always follows the app theme; the editing surface only
         // switches to the dark built-in CSS when the site supplies no editor.css.
         content_css: cssOpts.length ? cssOpts : editorContentCss(),
@@ -4700,6 +4710,7 @@ function renderSettingsScreen() {
 
     renderDisplayModeSetting();
     renderSlashToolsSetting();
+    renderSpellCheckSetting();
     renderStorageSettings();
     renderAiServicesCard();
     loadAiToolsData();
@@ -4737,6 +4748,21 @@ function renderSlashToolsSetting() {
         opt.value = value;
         opt.textContent = t(key);
         if ((State.slashTools !== false) === (value === '1')) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+/** Populates the spell-checking selector, reflecting the stored preference. */
+function renderSpellCheckSetting() {
+    const sel = document.getElementById('settings-spell-check-select');
+    if (!sel) return;
+    clearNode(sel);
+
+    [['1', 'GRAFIDA_BTN_YES'], ['0', 'GRAFIDA_BTN_NO']].forEach(([value, key]) => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = t(key);
+        if ((State.spellCheck !== false) === (value === '1')) opt.selected = true;
         sel.appendChild(opt);
     });
 }
@@ -5879,6 +5905,28 @@ async function applySlashToolsChange(enabled) {
     }
 }
 
+/**
+ * Persists the spell-checking preference and applies it to an open editor live.
+ * The editing body's `spellcheck` attribute is the authoritative per-element gate
+ * (WebKit re-evaluates it immediately, on every platform), so setting it needs no
+ * editor re-init. The macOS master flag stays enabled (see MacSpellCheck), so this
+ * toggles cleanly both ways without a restart. Note: turning it back ON only marks
+ * text edited afterwards, not the already-loaded content — an inherent WebKit quirk.
+ */
+async function applySpellCheckChange(enabled) {
+    try {
+        const result = await api.setSpellCheck(enabled);
+        State.spellCheck = result.spellCheck !== false;
+        if (State.tinyMCEEditor) {
+            try { State.tinyMCEEditor.getBody().spellcheck = State.spellCheck; } catch {}
+        }
+        showToast(t('GRAFIDA_MSG_SAVED'), 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+        renderSpellCheckSetting();
+    }
+}
+
 // Keep "auto" mode in step with the OS as it changes at runtime.
 const onSystemThemeChange = () => {
     if ((State.displayMode || 'auto') === 'auto') applyTheme(true);
@@ -5926,6 +5974,7 @@ async function bootstrap() {
             ? data.systemPrefersDark
             : null;
         State.slashTools = data.slashTools !== false;
+        State.spellCheck = data.spellCheck !== false;
         State.secureStore = data.secureStore !== false;
         State.supportedFieldTypes = data.supportedFieldTypes || [];
         State.app = data.app || {};
@@ -6188,6 +6237,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const slashToolsSel = document.getElementById('settings-slash-tools-select');
     if (slashToolsSel) {
         slashToolsSel.addEventListener('change', () => applySlashToolsChange(slashToolsSel.value === '1'));
+    }
+
+    const spellCheckSel = document.getElementById('settings-spell-check-select');
+    if (spellCheckSel) {
+        spellCheckSel.addEventListener('change', () => applySpellCheckChange(spellCheckSel.value === '1'));
     }
 
     const btnModalClose = document.getElementById('btn-modal-close');

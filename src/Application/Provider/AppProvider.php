@@ -16,6 +16,7 @@ use Grafida\Application\Container;
 use Grafida\Application\Kernel;
 use Grafida\Display\DisplayModeService;
 use Grafida\Editor\SlashToolsService;
+use Grafida\Editor\SpellCheckService;
 use Grafida\Field\FieldSupport;
 use Grafida\FrontController;
 use Grafida\Http\ApiController;
@@ -55,6 +56,11 @@ final class AppProvider implements ServiceProviderInterface
         $container->share(
             SlashToolsService::class,
             static fn (Container $c): SlashToolsService => new SlashToolsService($c->get(SettingsRepository::class))
+        );
+
+        $container->share(
+            SpellCheckService::class,
+            static fn (Container $c): SpellCheckService => new SpellCheckService($c->get(SettingsRepository::class))
         );
 
         $container->share(MarkdownService::class, static fn (): MarkdownService => new MarkdownService());
