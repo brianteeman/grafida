@@ -87,4 +87,12 @@ else
   echo "ImageMagick not found — skipping Grafida.ico" >&2
 fi
 
+# --- macOS DMG background -------------------------------------------------
+# Regenerate the disk-image background artwork from its own SVG master too, so
+# "refresh the visual assets" stays a single command. Best-effort.
+if [ -x "$ROOT/scripts/make-dmg-background.sh" ]; then
+  echo "Rendering DMG background (scripts/make-dmg-background.sh)"
+  bash "$ROOT/scripts/make-dmg-background.sh" || echo "DMG background generation reported problems" >&2
+fi
+
 echo "Done. Icons in $ICON_DIR"

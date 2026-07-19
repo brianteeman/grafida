@@ -57,6 +57,79 @@ DMG_MB=$(( (STAGING_KB / 1024) + 20 ))
 rm -f "$TEMP_DMG" "$DMG"
 hdiutil create -volname "$VOLNAME" -srcfolder "$STAGING" -ov \
   -format UDRW -size "${DMG_MB}m" "$TEMP_DMG"
+
+# Give the disk image a branded Finder layout: our background artwork, a hidden
+# toolbar, and the app icon next to /Applications with an install arrow between
+# them (drawn on the background). The writable UDRW image is mounted, dressed via
+# Finder AppleScript, then detached; the layout persists in the volume's .DS_Store
+# and survives the UDZO convert below.
+#
+# Best-effort: a missing background asset, or an osascript failure (e.g. the macOS
+# automation permission to control Finder has not been granted — the first run
+# prompts for it), only warns and leaves a plain-but-working DMG.
+BG_TIFF="$ROOT/build/icon/dmg-background.tiff"
+VOL_ICNS="$ROOT/build/icon/Grafida.icns"
+style_dmg() {
+  [ -f "$BG_TIFF" ] || { echo "  Background artwork not found ($BG_TIFF) — leaving the DMG unstyled." >&2; return 1; }
+
+  local mount_point
+  mount_point="$(hdiutil attach -readwrite -noverify -noautoopen "$TEMP_DMG" \
+    | grep -Eo '/Volumes/[^"]+$' | head -1)"
+  [ -n "$mount_point" ] && [ -d "$mount_point" ] || { echo "  Could not mount the writable image to style it." >&2; return 1; }
+
+  # Each step's status is checked explicitly rather than via `set -e`: a failing
+  # command inside a `{ …; } || …` group does not abort under errexit, so relying
+  # on it would let an osascript failure fall through unnoticed.
+  local ok=1
+  mkdir -p "$mount_point/.background" \
+    && cp "$BG_TIFF" "$mount_point/.background/background.tiff" || ok=0
+
+  if [ "$ok" = 1 ]; then
+    if osascript <<APPLESCRIPT
+tell application "Finder"
+  tell disk "$VOLNAME"
+    open
+    set current view of container window to icon view
+    set toolbar visible of container window to false
+    set statusbar visible of container window to false
+    set the bounds of container window to {400, 150, 1040, 550}
+    set theViewOptions to the icon view options of container window
+    set arrangement of theViewOptions to not arranged
+    set icon size of theViewOptions to 128
+    set text size of theViewOptions to 13
+    set background picture of theViewOptions to file ".background:background.tiff"
+    set position of item "Grafida.app" of container window to {160, 210}
+    set position of item "Applications" of container window to {480, 210}
+    update without registering applications
+    delay 1
+    close
+  end tell
+end tell
+APPLESCRIPT
+    then
+      # Volume icon (shown when the DMG is mounted), set AFTER the Finder styling:
+      # opening the volume in Finder above deletes a pre-existing .VolumeIcon.icns,
+      # so it must be written once Finder is done with the window. Best-effort.
+      if [ -f "$VOL_ICNS" ]; then
+        cp "$VOL_ICNS" "$mount_point/.VolumeIcon.icns" || true
+        SetFile -a C "$mount_point" 2>/dev/null || true
+      fi
+    else
+      ok=0
+    fi
+  fi
+
+  [ "$ok" = 1 ] || echo "  Finder styling failed (automation permission?) — the DMG will be plain." >&2
+
+  sync
+  hdiutil detach "$mount_point" >/dev/null 2>&1 \
+    || hdiutil detach "$mount_point" -force >/dev/null 2>&1 || true
+  return $(( ok ? 0 : 1 ))
+}
+
+echo "Styling the disk image (Finder layout + background)"
+style_dmg || true
+
 hdiutil convert "$TEMP_DMG" -format UDZO -imagekey zlib-level=9 -o "$DMG"
 
 rm -f "$TEMP_DMG"

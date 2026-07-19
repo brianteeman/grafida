@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Grafida — edit Joomla! articles on your desktop.
+  Copyright (c) 2026 Nicholas K. Dionysopoulos
+  GNU General Public License version 3, or later.
+
+  Master artwork for the macOS disk-image (.dmg) background. It fills the DMG
+  Finder window's 640x400 content area 1:1; scripts/make-dmg.sh positions the
+  app icon at {160,210} and the /Applications symlink at {480,210} (icon size
+  128) ON TOP of this image, so the arrow sits in the gap between them and the
+  header stays clear of both glyphs. Run scripts/make-dmg-background.sh to
+  rasterise this into dmg-background.png / @2x.png / .tiff, then commit them.
+-->
+<svg width="640" height="400" viewBox="0 0 640 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="page" x1="0" y1="0" x2="0" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f7f9fc"/>
+      <stop offset="1" stop-color="#e9eefb"/>
+    </linearGradient>
+    <!-- Icon gradients, mirrored from build/icon/grafida.svg -->
+    <linearGradient id="bg" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#3a7bff"/>
+      <stop offset="1" stop-color="#1740c4"/>
+    </linearGradient>
+    <linearGradient id="wood" x1="0" y1="-60" x2="0" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#f3c98a"/>
+      <stop offset="1" stop-color="#d99c4e"/>
+    </linearGradient>
+    <linearGradient id="barrel" x1="0" y1="-60" x2="0" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffe06a"/>
+      <stop offset="0.5" stop-color="#f8c93b"/>
+      <stop offset="1" stop-color="#e0a81f"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Page background -->
+  <rect x="0" y="0" width="640" height="400" fill="url(#page)"/>
+
+  <!-- Header: brand icon + wordmark, horizontally centred around x=320 -->
+  <g>
+    <!-- The pencil-J icon (1024 canvas, visible content 64..960) scaled to 64px -->
+    <g transform="translate(188,26) scale(0.0714) translate(-64,-64)">
+      <rect x="64" y="64" width="896" height="896" rx="210" fill="url(#bg)"/>
+      <rect x="64" y="64" width="896" height="448" rx="210" fill="#ffffff" opacity="0.07"/>
+      <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M 470 300 L 700 300 M 610 300 L 610 600 C 610 706 540 752 452 752 C 388 752 342 720 326 664"
+              stroke="#0d2a73" stroke-width="150"/>
+        <path d="M 470 300 L 700 300 M 610 300 L 610 600 C 610 706 540 752 452 752 C 388 752 342 720 326 664"
+              stroke="#ffffff" stroke-width="104"/>
+      </g>
+      <g transform="translate(452,752) rotate(-37)" stroke="#0d2a73" stroke-width="12" stroke-linejoin="round">
+        <rect x="470" y="-58" width="78" height="116" rx="34" fill="#ef6f86"/>
+        <rect x="430" y="-58" width="56" height="116" fill="#cfd4dc"/>
+        <line x1="448" y1="-58" x2="448" y2="58" stroke="#9aa1ad" stroke-width="8"/>
+        <line x1="468" y1="-58" x2="468" y2="58" stroke="#9aa1ad" stroke-width="8"/>
+        <rect x="150" y="-58" width="288" height="116" fill="url(#barrel)"/>
+        <path d="M 150 -58 L 150 58 L 38 30 L 38 -30 Z" fill="url(#wood)"/>
+        <path d="M 38 -30 L 38 30 L 0 0 Z" fill="#3b3b3b"/>
+      </g>
+    </g>
+    <text x="268" y="74" font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif"
+          font-size="46" font-weight="700" fill="#0d2a73">Grafida</text>
+  </g>
+
+  <!-- Tagline -->
+  <text x="320" y="112" text-anchor="middle"
+        font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif"
+        font-size="17" fill="#5a6480">Edit Joomla! articles on your desktop</text>
+
+  <!-- Install arrow: sits at y=210 in the gap between the app icon (~x=224) and
+       the Applications folder (~x=416). -->
+  <g stroke="#3a7bff" fill="#3a7bff" stroke-linecap="round">
+    <line x1="252" y1="210" x2="382" y2="210" stroke-width="11"/>
+    <path d="M 372 190 L 410 210 L 372 230 Z" stroke-linejoin="round" stroke-width="6"/>
+  </g>
+
+  <!-- Instruction, below the two icon rows -->
+  <text x="320" y="344" text-anchor="middle"
+        font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif"
+        font-size="18" font-weight="600" fill="#3a4256">Drag Grafida onto the Applications folder to install</text>
+</svg>
