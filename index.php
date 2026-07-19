@@ -60,6 +60,15 @@ $app = new Application(new ApplicationCreateInfo(
         height: 860,
         decoration: WindowDecoration::DarkMode,
         webview: new WebViewCreateInfo(
+            // Enable the native webview context menu (gh-26). Boson leaves it off in
+            // non-debug builds (WebViewCreateInfo::$contextMenu defaults to $app->isDebug),
+            // but it is what carries the spell-check suggestions: Ctrl/Cmd + right-click
+            // makes TinyMCE step aside so the native menu shows. With it disabled (as in a
+            // release build) there is no native menu to fall back to — on Windows/WebView2
+            // Ctrl+right-click did nothing at all. TinyMCE preventDefaults its own
+            // plain-right-click menu, so this never produces a double menu inside the editor;
+            // devTools stays debug-gated, so "Inspect element" does not appear in production.
+            contextMenu: true,
             devTools: (bool) filter_var(getenv('BOSON_DEBUG'), \FILTER_VALIDATE_BOOLEAN, \FILTER_NULL_ON_FAILURE),
         ),
     ),

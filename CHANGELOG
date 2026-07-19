@@ -31,6 +31,7 @@ Grafida 0.2
 # [MEDIUM] The editor used the parent template's editor.css on a site running a child template (gh-3)
 # [MEDIUM] Media Manager: an edited image's thumbnail and preview still showed the picture as it was before the edit (gh-4)
 # [MEDIUM] macOS: the editor never underlined misspelt words (gh-24)
+# [MEDIUM] Windows: Ctrl+right-click showed no native context menu, so spelling suggestions were unreachable (gh-26)
 # [MEDIUM] Grafida forgot your last used site on restart, selecting the first one instead
 # [LOW] Windows: the Save and Settings shortcuts also answered to the Windows key (gh-13)
 # [LOW] Windows: a command window flashed at startup and on theme detection

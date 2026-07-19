@@ -548,7 +548,18 @@ window-free in tests (a null dialog makes the endpoint return 503).
   service we won't use in an offline editor. This sets `spellcheck="true"` on the editing body and defers to the
   OS/webview dictionary (WKWebView/`NSSpellChecker` on macOS, WebKitGTK on Linux, WebView2 on Windows);
   suggestions appear in the *native* context menu via **Ctrl/Cmd + right-click** (TinyMCE's own context
-  menu intercepts a plain right-click). ⚠️ **On macOS the checker is dead until continuous spell
+  menu intercepts a plain right-click). ⚠️ **That native menu must be explicitly enabled or the
+  suggestions are unreachable** (gh-26): Boson leaves the webview context menu **off** in non-debug
+  builds (`WebViewCreateInfo::$contextMenu` defaults to `$app->isDebug`), so a release build had no
+  native menu to fall back to — on Windows/WebView2 (`AreDefaultContextMenusEnabled = false`)
+  Ctrl+right-click did nothing at all; macOS/WKWebView happened to still surface its spelling menu,
+  which is why it looked platform-specific. `index.php` therefore passes
+  `WebViewCreateInfo(contextMenu: true)`. This is safe: TinyMCE `preventDefault`s its own
+  plain-right-click menu (the silver theme's desktop-show path), so no double menu appears inside the
+  editor, and it steps aside (no `preventDefault`) on Ctrl+right-click so the native menu shows. The
+  deliberate side effect is that right-clicking the SPA chrome *outside* the editor now shows the
+  webview's native menu too (native text-editing entries in inputs, harmless elsewhere); `devTools`
+  stays debug-gated, so "Inspect element" does not appear in production. ⚠️ **On macOS the checker is dead until continuous spell
   checking is enabled, and Boson gives no way to enable it — so Grafida must** (gh-24). WKWebView gates
   *all* native spell checking (even a freshly typed misspelling) on the `WebContinuousSpellCheckingEnabled`
   NSUserDefaults flag, which its text checker reads once, lazily, on the first check (WebKit's
