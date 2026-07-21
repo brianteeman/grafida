@@ -1,3 +1,8 @@
+Grafida 0.3
+================================================================================
++ Diagnose Connection: see the exact request and response when a site connection fails (gh-37)
++ Optional Request Log: record the last 20 requests to the site, with JSON export (gh-37)
+
 Grafida 0.2
 ================================================================================
 + Slash commands: type / in the editor for a filterable menu of headings, lists, images and more; switch it off in Settings (gh-9)
@@ -18,8 +23,6 @@ Grafida 0.2
 + Spell checking can be switched off in Settings (gh-24)
 + The editor's Help dialog documents Grafida's own shortcuts and the AI assistant (gh-13)
 + Publishing records a "Created using Grafida" note in Joomla's version history (gh-17)
-+ Diagnose Connection: see the exact request and response when a site connection fails (gh-37)
-+ Optional Request Log: record the last 20 requests to the site, with JSON export (gh-37)
 ~ The editor's Help dialog is back in the Tools menu; it was only reachable with Alt+0
 ~ Article lists show the Joomla article ID before the title
 ~ The editor no longer pops up a quick insert toolbar on every empty line (gh-6)
