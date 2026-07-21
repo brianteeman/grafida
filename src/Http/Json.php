@@ -44,6 +44,16 @@ final class Json
 
         return new Response((string) $body, $status, [
             'Content-Type' => 'application/json; charset=utf-8',
+            // Nothing the internal API answers is ever reusable: it is the live
+            // state of the local database and of the remote site. The webview
+            // caches custom-scheme GETs heuristically when a response says
+            // nothing about freshness, and that cache survives an app restart,
+            // so a response could be reused without our PHP ever running (found
+            // while investigating gh-35). The SPA also asks for `cache: 'no-store'`;
+            // this makes the responses themselves say so, for any caller that
+            // does not go through apiFetch().
+            'Cache-Control' => 'no-store, no-cache, must-revalidate',
+            'Pragma'        => 'no-cache',
         ]);
     }
 }

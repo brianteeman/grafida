@@ -74,6 +74,29 @@ final class ApiRoutingTest extends TestCase
         );
     }
 
+    /**
+     * The webview caches custom-scheme GETs heuristically when a response says
+     * nothing about freshness, and that cache outlives an app restart — so a
+     * response could be reused without our PHP ever running (found while
+     * investigating gh-35). Every API response must opt out.
+     */
+    public function testApiResponsesAreNotCacheable(): void
+    {
+        $kernel = $this->kernel();
+
+        foreach (['/api/bootstrap', '/api/sites', '/api/sites/999'] as $path) {
+            $response = $kernel->handle(new Request('GET', 'boson://app' . $path, [], ''));
+            $headers  = [];
+
+            foreach ($response->headers as $name => $value) {
+                $headers[strtolower((string) $name)] = (string) $value;
+            }
+
+            self::assertArrayHasKey('cache-control', $headers, $path);
+            self::assertStringContainsString('no-store', $headers['cache-control'], $path);
+        }
+    }
+
     public function testSystemThemeEndpoint(): void
     {
         [$status, $json] = $this->call($this->kernel(), 'GET', '/api/settings/system-theme');

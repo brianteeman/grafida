@@ -524,6 +524,14 @@ async function apiFetch(method, path, body = null) {
     const opts = {
         method,
         headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        // The webview applies its ordinary HTTP cache to `boson://app/api/…`
+        // GETs, and that cache is disk-backed and app-scoped: it outlives a
+        // restart, and after a local-storage reset the new site is id 1 again,
+        // so the very same URL could be answered from a pre-reset response
+        // without our PHP ever running (found while investigating gh-35).
+        // 'no-store' suppresses both the lookup and the store, so an
+        // already-poisoned entry self-heals too.
+        cache: 'no-store',
     };
     if (body !== null) {
         opts.body = JSON.stringify(body);

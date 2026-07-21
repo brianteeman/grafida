@@ -82,6 +82,20 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `withCategoryTitles`, the JSON:API relationship readers) live in `Grafida\Http\SiteContext`,
   an injected collaborator — composition, not a god base class. Controllers must never call
   each other; share through the injected services.
+  ⚠️ **Nothing the internal API answers may be cached by the webview** (gh-35). `boson://app/api/…`
+  is an ordinary URL as far as WKWebView/WebView2 are concerned, so a GET whose response says
+  nothing about freshness is cached heuristically — in a **disk-backed, app-scoped** cache that
+  outlives an app restart *and* a local-storage reset (after a reset the next site is id 1 again,
+  so the very same URL can be answered from a pre-reset response with our PHP never running).
+  This was found while investigating gh-35 and is **not** what caused it — that was a
+  `reference_cache` snapshot from the site the record was originally connected to — but it is a
+  real hazard with the same symptom, so it is closed off. Two independent opt-outs:
+  the SPA's single `apiFetch()` chokepoint sends **`cache: 'no-store'`** — the load-bearing one,
+  since suppressing the *lookup* is what makes an already-poisoned entry self-heal — and
+  `Http\Json::response()` sets `Cache-Control: no-store` on every response so they are
+  self-describing for any caller that does not go through `apiFetch()`. Note this is unrelated to
+  the **`reference_cache`** SQLite cache (see `src/Reference/`), which is deliberately permanent
+  and has the manual Refresh button as its invalidation.
   `SiteController` also exposes **Diagnose Connection** (`POST /api/sites/diagnose`, delegating
   to `Site\ConnectionDiagnostics`) alongside the existing `/api/sites/test`, and
   `SettingsController` exposes the Request Log (gh-37, see `src/Debug/`): `POST
