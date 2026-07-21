@@ -80,6 +80,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | rotate | Girar | Rotate left/right: «Girar a la izquierda/derecha». |
 | flip | Voltear | Flip horizontally/vertically: «Voltear horizontalmente/verticalmente». |
 | crop | Recortar | Crop tool; apply/cancel = «Aplicar/Cancelar recorte». |
+| selection (crop) | Selección | El rectángulo de recorte; «Selección: An × Al» en la barra de estado del editor de imágenes. |
 | resize | Redimensionar | Resize an image to new dimensions. |
 | width | Anchura | Image width. |
 | height | Altura | Image height. |

@@ -85,6 +85,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | rotate | Περιστροφή | Image-editor action; left/right = αριστερά/δεξιά. |
 | flip | Αναστροφή | Image-editor action; horizontal = Οριζόντια, vertical = Κατακόρυφη. |
 | crop | Περικοπή | Image-editor crop tool. «Εφαρμογή/Ακύρωση περικοπής». |
+| selection (crop) | Επιλογή | Η ορθογώνια περιοχή περικοπής· «Επιλογή: Π × Υ» στη γραμμή κατάστασης του επεξεργαστή εικόνας. |
 | resize | Αλλαγή μεγέθους | Image-editor resize. |
 | reset | Επαναφορά | Image-editor reset (consistent with storage reset term). |
 | width | Πλάτος | Image dimension. |

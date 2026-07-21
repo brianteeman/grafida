@@ -1777,7 +1777,15 @@ input[type="color"].form-control {
     max-width: 100%;
 }
 
-.img-editor-stage.cropping { cursor: crosshair; }
+.img-editor-stage.cropping {
+    cursor: crosshair;
+    /* Arming crop mode has to be visible without moving the mouse (gh-31). The
+       glow is --color-accent at 35%, spelled out because rgba() cannot take a
+       hex custom property; the accent is the same in both themes. */
+    border-color: var(--color-accent);
+    box-shadow: 0 0 0 3px rgba(249, 57, 4, 0.35);
+}
+
 .img-editor-canvas { display: block; }
 
 .img-editor-selection {
@@ -1786,6 +1794,29 @@ input[type="color"].form-control {
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.45);
     pointer-events: none;
 }
+
+/* Armed-but-nothing-drawn-yet prompt: dims the image and says what to do. */
+.img-editor-prompt {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.45);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    border-radius: var(--radius);
+    /* Never swallow the mousedown that starts the crop drag. */
+    pointer-events: none;
+}
+
+.img-editor-prompt .fa-solid { font-size: 26px; }
 
 .img-editor-controls {
     width: 100%;
@@ -1833,6 +1864,11 @@ input[type="color"].form-control {
 
 .img-editor-dims { font-weight: 600; color: var(--color-text); }
 .img-editor-hint { text-align: right; }
+
+/* While crop mode is armed the hint stops being ambient advice and becomes
+   live state (the instruction, then the selection's size), so it is no longer
+   styled as muted background text. */
+.img-editor-hint-active { color: var(--color-accent); font-weight: 600; }
 
 /* ------------------------------------------------------------------ */
 /*  AI panel (right-hand column in the editor layout)                 */

@@ -80,6 +80,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | rotate | Pivoter | Rotate an image (left/right = vers la gauche/droite). |
 | flip | Retourner | Flip an image (horizontally/vertically = horizontalement/verticalement). |
 | crop | Rogner | Crop an image. « rognage » = the crop (noun). |
+| selection (crop) | Sélection | Le rectangle de rognage ; « Sélection : L × H » dans la barre d’état de l’éditeur d’image. |
 | resize | Redimensionner | Resize an image. |
 | width | Largeur | Image width. |
 | height | Hauteur | Image height. |

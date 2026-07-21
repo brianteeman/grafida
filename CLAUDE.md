@@ -384,6 +384,18 @@ window-free in tests (a null dialog makes the endpoint return 503).
   (`png`/`jpg`/`jpeg`/`webp`). PATCH/DELETE put the adapter-qualified path in the **URL segment**
   (`v1/media/files/:path`, route pattern `.*`), so `ApiClient::mediaItemUrl()` keeps `/` and `:`
   literal and percent-encodes the rest.
+  **Crop is a mode, so arming it has to be visible without moving the mouse** (gh-31). It used to
+  change nothing but the stage's `cursor`, which only shows once you happen to hover the image, so
+  the button read as inert. `updateCropUi()` is now the single place that renders crop state, and it
+  drives four signals at once: the stage gets an accent ring, an `.img-editor-prompt` scrim dims the
+  image behind a "drag a rectangle" instruction, the button flips to **Cancel crop** (label *and*
+  icon, via `setIconBtnLabel()` — colour alone is not an accessible state cue, and `aria-pressed`
+  carries it to assistive tech), and the statusbar hint stops being muted advice and becomes live
+  state. Once a rectangle exists the prompt hides — the selection box's own 9999px scrim takes over
+  as the highlight — and the hint turns into a `GRAFIDA_LBL_CROP_SELECTION` readout of the selection
+  in **source** pixels (`sel` is in *display* pixels, so it is divided by `State.imgEditorScale`).
+  Apply crop is `disabled` until the selection is usable, since applying a zero-sized one silently
+  did nothing; a bare click (which leaves exactly that) clears the selection so the prompt returns.
   ⚠️ **Every `<img>` showing a Media Manager entry must go through `mediaDisplayUrl(entry)`, never the
   bare `entry.url`.** Joomla returns the plain static file URL, so after an in-app edit rewrites the file
   the webview keeps painting its cached copy — the crop *does* save and the image editor shows it (those

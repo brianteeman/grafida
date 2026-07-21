@@ -75,6 +75,7 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | open | Apri | Etichetta pulsante; imperativo. |
 | preview | Anteprima | Anteprima di un file/immagine. |
 | crop | Ritaglia | Editor immagini; azione di ritaglio. Sostantivo: «ritaglio» («Applica ritaglio»). |
+| selection (crop) | Selezione | Il rettangolo di ritaglio; «Selezione: L × A» nella barra di stato dell’editor immagini. |
 | resize | Ridimensiona | Editor immagini; cambiare le dimensioni dell'immagine. |
 | rotate | Ruota | Editor immagini: «Ruota a sinistra/destra». |
 | flip | Capovolgi | Editor immagini: «Capovolgi orizzontalmente/verticalmente». |
