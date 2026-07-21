@@ -38,6 +38,10 @@ const State = {
     // Whether the editor's native spell checking is on (gh-24). Drives the editing
     // body's `spellcheck` attribute — the authoritative per-element gate.
     spellCheck: true,
+    // Whether the Debug "Request Log" is recording site-facing HTTP calls (gh-37).
+    // Unlike slashTools/spellCheck this defaults OFF — it is an opt-in diagnostic
+    // aid with a memory cost, not something every user wants running.
+    requestLog: false,
     secureStore: true,
     supportedFieldTypes: [],
     app: {},
@@ -551,6 +555,10 @@ async function apiFetch(method, path, body = null) {
 const api = {
     bootstrap: () => apiFetch('GET', '/api/bootstrap'),
     testConnection: (url, token) => apiFetch('POST', '/api/sites/test', { url, token }),
+    // siteId lets the edit-modal's blank "leave blank to keep" token field
+    // fall back to the site's stored token server-side (see
+    // SiteController::diagnoseConnection()); null for the add-site modal.
+    diagnoseConnection: (url, token, siteId = null) => apiFetch('POST', '/api/sites/diagnose', { url, token, siteId }),
     listSites: () => apiFetch('GET', '/api/sites'),
     createSite: (body) => apiFetch('POST', '/api/sites', body),
     updateSite: (id, body) => apiFetch('PATCH', `/api/sites/${id}`, body),
@@ -601,6 +609,10 @@ const api = {
     openStorageFolder: () => apiFetch('POST', '/api/settings/storage/open'),
     resetStorage: () => apiFetch('POST', '/api/settings/storage/reset'),
     openUrl: (url) => apiFetch('POST', '/api/open-url', { url }),
+    setRequestLog: (enabled) => apiFetch('POST', '/api/settings/request-log', { enabled }),
+    getRequestLog: () => apiFetch('GET', '/api/request-log'),
+    clearRequestLog: () => apiFetch('POST', '/api/request-log/clear'),
+    exportRequestLog: (directory) => apiFetch('POST', '/api/request-log/export', { directory }),
     // AI Services
     listAiServices: () => apiFetch('GET', '/api/ai/services'),
     getAiService: (id) => apiFetch('GET', `/api/ai/services/${id}`),
@@ -914,6 +926,160 @@ function updateNewArticleButton() {
 }
 
 // ============================================================
+//  HTTP EXCHANGE RENDERING (Diagnose Connection / Request Log)
+// ============================================================
+//
+// Renders the shape PHP's Grafida\Debug\RequestRecord::toArray() emits:
+//   { timestamp, durationMs,
+//     request:  { method, url, headers, body },
+//     response: { status, headers, body },
+//     error }
+// where a `body` is { kind: 'none'|'binary'|'json'|'text', text, truncated }
+// (see src/Debug/BodyFormatter.php::describe()). This is the ONE place that
+// knows how to turn that shape into DOM — shared by the Diagnose Connection
+// panel (buildSiteFormBody, below) and the Request Log screen. Every value
+// here is remote/site data (headers, bodies, URLs), so nothing below ever
+// uses innerHTML — only el()/icon()/textContent.
+
+const HTTP_STATUS_ICONS = {
+    ok:    { icon: 'circle-check',       cls: 'http-status-ok' },
+    warn:  { icon: 'circle-exclamation', cls: 'http-status-warn' },
+    error: { icon: 'circle-xmark',       cls: 'http-status-error' },
+};
+
+/** Buckets a response status into ok (2xx) / warn (3xx) / error (4xx/5xx or no response at all). */
+function httpStatusBucket(status) {
+    if (status == null) return 'error';
+    if (status >= 200 && status < 300) return 'ok';
+    if (status >= 300 && status < 400) return 'warn';
+    return 'error';
+}
+
+/**
+ * The colour-coded HTTP status indicator for a captured response. Mirrors the
+ * articleStateIcon() precedent: a distinct icon per bucket carries the
+ * meaning (colour alone never does), plus a role="img"/aria-label.
+ */
+function httpStatusIcon(status) {
+    const bucket = httpStatusBucket(status);
+    const info = HTTP_STATUS_ICONS[bucket];
+    const labelText = status == null ? t('GRAFIDA_LBL_NO_RESPONSE') : String(status);
+    const glyph = icon(info.icon);
+    glyph.classList.add('fa-fw');
+    const wrap = el('span', `http-status ${info.cls}`, glyph, el('span', 'http-status-label', labelText));
+    wrap.setAttribute('role', 'img');
+    wrap.setAttribute('aria-label', labelText);
+    return wrap;
+}
+
+/**
+ * Renders a captured header map as a definition-list-ish block. Returns null
+ * (never an empty element) when there are no headers, so callers can omit
+ * the block entirely.
+ *
+ * @param {object|null|undefined} headersObject  Header name => value.
+ * @returns {HTMLElement|null}
+ */
+function buildExchangeHeaders(headersObject) {
+    const entries = Object.entries(headersObject || {});
+    if (entries.length === 0) return null;
+
+    const box = el('div', 'http-headers');
+    entries.forEach(([name, value]) => {
+        box.appendChild(el('div', 'http-header-row',
+            el('span', 'http-header-name', name),
+            el('span', 'http-header-value', String(value))));
+    });
+    return box;
+}
+
+/**
+ * Renders a captured body descriptor ({kind, text, truncated}). Returns null
+ * for `kind: 'none'` so the caller omits the whole Body block — a body is
+ * only ever shown when one was actually captured.
+ *
+ * @param {object|null|undefined} bodyDescriptor
+ * @returns {HTMLElement|null}
+ */
+function buildExchangeBody(bodyDescriptor) {
+    if (!bodyDescriptor || bodyDescriptor.kind === 'none') return null;
+
+    if (bodyDescriptor.kind === 'binary') {
+        return el('p', 'http-body-binary', t('GRAFIDA_MSG_BINARY_DATA'));
+    }
+
+    // 'json' or 'text' — already prettified/redacted by PHP.
+    const pre = el('pre', 'http-body');
+    pre.textContent = bodyDescriptor.text || '';
+    if (!bodyDescriptor.truncated) return pre;
+
+    return el('div', 'http-body-wrap', pre,
+        el('p', 'text-muted http-body-truncated', t('GRAFIDA_MSG_BODY_TRUNCATED')));
+}
+
+/**
+ * Renders one Request or Response side of a captured exchange: a label +
+ * lead line (method/URL, or status), then headers (if any) and body (if
+ * any). When `collapsible` is true the whole thing is wrapped in a native
+ * <details> (Request Log, where most entries stay closed); otherwise it
+ * renders open (Diagnose Connection, where every attempt is shown in full).
+ *
+ * @param {string} labelText
+ * @param {Node[]} leadNodes  Nodes for the summary/heading line.
+ * @param {HTMLElement|null} headers
+ * @param {HTMLElement|null} body
+ * @param {boolean} collapsible
+ */
+function buildExchangeSection(labelText, leadNodes, headers, body, collapsible) {
+    const lead = [el('span', 'http-exchange-label', labelText), ...leadNodes];
+    const children = [];
+    if (headers) children.push(headers);
+    if (body) children.push(body);
+
+    if (collapsible) {
+        return el('details', 'http-exchange-section', el('summary', 'http-exchange-summary', ...lead), ...children);
+    }
+
+    return el('div', 'http-exchange-section', el('div', 'http-exchange-heading', ...lead), ...children);
+}
+
+/**
+ * Renders one captured HTTP exchange (the shape PHP's RequestRecord::toArray()
+ * emits) as a DOM fragment. Shared by the Diagnose Connection panel and the
+ * Request Log screen.
+ *
+ * @param {object}  entry        One RequestRecord::toArray() entry.
+ * @param {boolean} [collapsible=false]  Wrap Request/Response in <details>
+ *                  (Request Log) or render them open (Diagnose Connection).
+ * @returns {HTMLElement}
+ */
+function buildHttpExchange(entry, collapsible = false) {
+    const wrap = el('div', 'http-exchange');
+
+    wrap.appendChild(buildExchangeSection(
+        t('GRAFIDA_LBL_HTTP_REQUEST'),
+        [el('span', 'http-method', entry.request.method), el('code', 'http-url', entry.request.url)],
+        buildExchangeHeaders(entry.request.headers),
+        buildExchangeBody(entry.request.body),
+        collapsible,
+    ));
+
+    wrap.appendChild(buildExchangeSection(
+        t('GRAFIDA_LBL_HTTP_RESPONSE'),
+        [httpStatusIcon(entry.response.status)],
+        buildExchangeHeaders(entry.response.headers),
+        buildExchangeBody(entry.response.body),
+        collapsible,
+    ));
+
+    if (entry.error) {
+        wrap.appendChild(el('p', 'alert alert-error', icon('triangle-exclamation'), txt(' ' + entry.error)));
+    }
+
+    return wrap;
+}
+
+// ============================================================
 //  SITES SCREEN
 // ============================================================
 
@@ -1041,7 +1207,18 @@ function buildSiteFormBody(site = null) {
     testBtn.id = 'btn-test-connection';
     const testResult = el('span', null);
     testResult.id = 'test-result';
-    const testRow = el('div', 'form-actions', testBtn, testResult);
+
+    // Diagnose Connection — reports every candidate API base tried, with the
+    // full request/response exchange, into the panel below the row.
+    const diagBtn = iconBtn('stethoscope', t('GRAFIDA_BTN_DIAGNOSE_CONNECTION'), 'btn', 'btn-secondary');
+    diagBtn.id = 'btn-diagnose-connection';
+
+    const testRow = el('div', 'form-actions', testBtn, diagBtn, testResult);
+
+    // Empty until a diagnose run fills it in; `.diagnose-result:empty` in CSS
+    // keeps it from taking up visible space until then.
+    const diagnoseResult = el('div', 'diagnose-result');
+    diagnoseResult.id = 'diagnose-result';
 
     return [
         formGroup(t('GRAFIDA_LBL_TITLE'), titleInput),
@@ -1049,6 +1226,7 @@ function buildSiteFormBody(site = null) {
         tokenGroup,
         cssGroup,
         testRow,
+        diagnoseResult,
     ];
 }
 
@@ -1068,6 +1246,8 @@ function openAddSiteModal() {
     const footer = buildSiteFormFooter(() => saveSiteHandler(null));
     showModal(t('GRAFIDA_BTN_ADD_SITE'), body, footer);
     document.getElementById('btn-test-connection').addEventListener('click', testConnectionHandler);
+    // No site to fall back to yet, so an empty token is a real validation failure.
+    document.getElementById('btn-diagnose-connection').addEventListener('click', () => diagnoseConnectionHandler(null));
 }
 
 function openEditSiteModal(id) {
@@ -1077,6 +1257,9 @@ function openEditSiteModal(id) {
     const footer = buildSiteFormFooter(() => saveSiteHandler(id));
     showModal(t('GRAFIDA_BTN_EDIT'), body, footer);
     document.getElementById('btn-test-connection').addEventListener('click', testConnectionHandler);
+    // Passing the site id lets a blank ("leave blank to keep") token field
+    // fall back to the stored token server-side.
+    document.getElementById('btn-diagnose-connection').addEventListener('click', () => diagnoseConnectionHandler(site.id));
 }
 
 async function testConnectionHandler() {
@@ -1106,6 +1289,67 @@ async function testConnectionHandler() {
         resultEl.textContent = t('GRAFIDA_MSG_CONNECTION_FAIL');
     } finally {
         testBtn.disabled = false;
+    }
+}
+
+/**
+ * Runs the Diagnose Connection probe and renders every candidate API base it
+ * tried — full request/response detail, redaction and formatting already
+ * done by PHP — into `#diagnose-result`. Mirrors testConnectionHandler()'s
+ * shape/validation, plus the siteId fallback for the edit modal's blank
+ * "leave blank to keep" token field (see SiteController::diagnoseConnection()).
+ *
+ * @param {number|null} siteId  The site being edited, or null when adding.
+ */
+async function diagnoseConnectionHandler(siteId = null) {
+    const urlEl = document.getElementById('modal-site-url');
+    const tokenEl = document.getElementById('modal-site-token');
+    const resultEl = document.getElementById('diagnose-result');
+    const diagBtn = document.getElementById('btn-diagnose-connection');
+    const url = urlEl ? urlEl.value.trim() : '';
+    const token = tokenEl ? tokenEl.value.trim() : '';
+
+    clearNode(resultEl);
+
+    // A blank token is only meaningful when editing an existing site (PHP
+    // substitutes its stored token); with no site to fall back to, it's the
+    // same validation failure as testConnectionHandler's.
+    if (!url || (!token && !siteId)) {
+        resultEl.appendChild(el('p', 'text-muted', 'Please enter URL and token.'));
+        return;
+    }
+
+    diagBtn.disabled = true;
+    resultEl.appendChild(el('div', 'loading-row', el('div', 'spinner'), txt(' ' + t('GRAFIDA_MSG_LOADING'))));
+
+    try {
+        const result = await api.diagnoseConnection(url, token, siteId);
+        clearNode(resultEl);
+
+        if (result.apiBase) {
+            resultEl.appendChild(el('p', 'alert alert-success',
+                icon('circle-check'), txt(' ' + t('GRAFIDA_MSG_CONNECTION_OK'))));
+            resultEl.appendChild(el('p', 'diagnose-api-base',
+                el('span', 'text-muted', t('GRAFIDA_LBL_API_BASE')),
+                el('code', null, result.apiBase)));
+        } else {
+            resultEl.appendChild(el('p', 'alert alert-error',
+                icon('triangle-exclamation'), txt(' ' + (result.error || t('GRAFIDA_MSG_CONNECTION_FAIL')))));
+        }
+
+        (result.attempts || []).forEach((attempt, i) => {
+            const card = el('div', 'diagnose-attempt');
+            card.appendChild(el('h4', 'diagnose-attempt-heading',
+                ...formatNodes(t('GRAFIDA_LBL_DIAGNOSE_ATTEMPT'), String(i + 1))));
+            card.appendChild(buildHttpExchange(attempt, false));
+            resultEl.appendChild(card);
+        });
+    } catch (err) {
+        clearNode(resultEl);
+        resultEl.appendChild(el('p', 'alert alert-error',
+            icon('triangle-exclamation'), txt(' ' + String(err.message))));
+    } finally {
+        diagBtn.disabled = false;
     }
 }
 
@@ -4835,6 +5079,7 @@ function renderSettingsScreen() {
     renderDisplayModeSetting();
     renderSlashToolsSetting();
     renderSpellCheckSetting();
+    renderRequestLogSetting();
     renderStorageSettings();
     renderAiServicesCard();
     loadAiToolsData();
@@ -4887,6 +5132,25 @@ function renderSpellCheckSetting() {
         opt.value = value;
         opt.textContent = t(key);
         if ((State.spellCheck !== false) === (value === '1')) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+/**
+ * Populates the Request Log selector, reflecting the stored preference. Unlike
+ * renderSlashToolsSetting()/renderSpellCheckSetting() the default is OFF
+ * (State.requestLog === true, not !== false) — see the State.requestLog note.
+ */
+function renderRequestLogSetting() {
+    const sel = document.getElementById('settings-request-log-select');
+    if (!sel) return;
+    clearNode(sel);
+
+    [['1', 'GRAFIDA_BTN_YES'], ['0', 'GRAFIDA_BTN_NO']].forEach(([value, key]) => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = t(key);
+        if ((State.requestLog === true) === (value === '1')) opt.selected = true;
         sel.appendChild(opt);
     });
 }
@@ -4976,6 +5240,112 @@ function applyStrings() {
     renderSettingsScreen();
     renderSidebarFooter();
     renderUpdateNotice();
+}
+
+// ============================================================
+//  REQUEST LOG SCREEN (Debug, gh-37)
+// ============================================================
+//
+// The opt-in HTTP capture the Debug setting turns on (see State.requestLog /
+// renderRequestLogSetting() / applyRequestLogChange() above, and the sidebar
+// item toggled by renderSidebarNav()). Rendering reuses the exact same
+// buildHttpExchange() the Diagnose Connection panel uses (collapsible = true
+// here, since most of up-to-20 entries should stay closed), so there is one
+// place — not two — that knows how to turn PHP's RequestRecord shape into DOM.
+
+/**
+ * Rebuilds the Request Log screen: the toolbar (refresh/export/clear, rebuilt
+ * every call so their labels track the current language) and the list of
+ * captured exchanges. PHP already orders entries newest-first and caps them
+ * at 20 — this never re-sorts or re-slices.
+ */
+async function renderRequestLogScreen() {
+    const actions = document.getElementById('requestlog-actions');
+    if (actions) {
+        clearNode(actions);
+
+        const refreshBtn = iconBtn('rotate', t('GRAFIDA_BTN_REFRESH'), 'btn', 'btn-secondary');
+        refreshBtn.addEventListener('click', () => renderRequestLogScreen());
+        actions.appendChild(refreshBtn);
+
+        const exportBtn = iconBtn('file-export', t('GRAFIDA_BTN_EXPORT'), 'btn', 'btn-secondary');
+        exportBtn.addEventListener('click', exportRequestLogHandler);
+        actions.appendChild(exportBtn);
+
+        const clearBtn = iconBtn('trash', t('GRAFIDA_BTN_CLEAR'), 'btn', 'btn-danger');
+        clearBtn.addEventListener('click', clearRequestLogHandler);
+        actions.appendChild(clearBtn);
+    }
+
+    const list = document.getElementById('requestlog-list');
+    if (!list) return;
+    clearNode(list);
+
+    let entries;
+    try {
+        const result = await api.getRequestLog();
+        entries = result.entries || [];
+    } catch (err) {
+        list.appendChild(el('p', 'alert alert-error', icon('triangle-exclamation'), txt(' ' + err.message)));
+        return;
+    }
+
+    if (!entries.length) {
+        list.appendChild(el('p', 'text-muted', t('GRAFIDA_MSG_NO_REQUESTS')));
+        return;
+    }
+
+    entries.forEach(entry => {
+        const durationText = formatNodes(t('GRAFIDA_LBL_DURATION_MS'), String(entry.durationMs));
+        const head = el('div', 'requestlog-head',
+            el('span', 'requestlog-timestamp', entry.timestamp),
+            el('span', 'http-method', entry.request.method),
+            el('code', 'http-url', entry.request.url),
+            httpStatusIcon(entry.response.status),
+            el('span', 'http-duration', ...durationText));
+
+        const card = el('div', 'requestlog-item', head, buildHttpExchange(entry, true));
+        list.appendChild(card);
+    });
+}
+
+/** Confirm, then clear the buffer and re-render — mirrors resetStorage()'s confirm/act/refresh shape. */
+async function clearRequestLogHandler() {
+    const ok = await confirmYesNo(
+        t('GRAFIDA_LBL_REQUEST_LOG'),
+        [el('p', null, t('GRAFIDA_MSG_CLEAR_REQUEST_LOG_CONFIRM'))]
+    );
+    if (!ok) return;
+
+    try {
+        await api.clearRequestLog();
+        await renderRequestLogScreen();
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
+}
+
+/**
+ * Writes the current Request Log to a JSON file. Boson has no native Save-As
+ * dialog, so — like `.grafida` export (exportCurrentDraft(), above) — this
+ * asks for a destination folder first.
+ */
+async function exportRequestLogHandler() {
+    let dir;
+    try {
+        dir = await api.selectDirectory();
+    } catch (err) {
+        showToast(err.message, 'error');
+        return;
+    }
+    if (!dir || dir.cancelled) return;
+
+    try {
+        const result = await api.exportRequestLog(dir.path);
+        showToast(formatText(t('GRAFIDA_MSG_REQUEST_LOG_EXPORTED'), result.path), 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+    }
 }
 
 // ============================================================
@@ -6051,6 +6421,28 @@ async function applySpellCheckChange(enabled) {
     }
 }
 
+/**
+ * Persists the Request Log (Debug) preference. The sidebar item appears/
+ * disappears immediately (renderSidebarNav()); turning it off also empties
+ * the buffer server-side (SettingsController::setRequestLog()) and, if the
+ * Request Log screen happens to be open, bounces the user back to Settings —
+ * a screen with nothing left to show is not one to leave open.
+ */
+async function applyRequestLogChange(enabled) {
+    try {
+        const result = await api.setRequestLog(enabled);
+        State.requestLog = result.requestLog === true;
+        renderSidebarNav();
+        if (!State.requestLog && State.activeScreen === 'requestlog') {
+            showScreen('settings');
+        }
+        showToast(t('GRAFIDA_MSG_SAVED'), 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+        renderRequestLogSetting();
+    }
+}
+
 // Keep "auto" mode in step with the OS as it changes at runtime.
 const onSystemThemeChange = () => {
     if ((State.displayMode || 'auto') === 'auto') applyTheme(true);
@@ -6099,6 +6491,8 @@ async function bootstrap() {
             : null;
         State.slashTools = data.slashTools !== false;
         State.spellCheck = data.spellCheck !== false;
+        // Inverted default vs. the two flags above: Request Log defaults OFF.
+        State.requestLog = data.requestLog === true;
         State.secureStore = data.secureStore !== false;
         State.supportedFieldTypes = data.supportedFieldTypes || [];
         State.app = data.app || {};
@@ -6117,6 +6511,7 @@ async function bootstrap() {
     applyTheme();
     applyStrings();
     renderSidebarFooter();
+    renderSidebarNav();
     // Capture the remembered site *before* renderSiteSelector() persists a fallback.
     const remembered = recallLastSite();
 
@@ -6164,6 +6559,19 @@ function setupCollapsible(asideId, toggleId, storageKey, onChange) {
             if (onChange) onChange();
         });
     }
+}
+
+/**
+ * Shows/hides the Request Log sidebar item to match the Debug setting (gh-37):
+ * unlike the always-present nav links, this one only exists while the opt-in
+ * Request Log is on. Re-syncs the collapsed rail's tooltips afterwards, since
+ * that rail mirrors each visible item's label and this can change which items
+ * are visible.
+ */
+function renderSidebarNav() {
+    const link = document.getElementById('nav-request-log');
+    if (link) link.hidden = !State.requestLog;
+    syncSidebarTooltips();
 }
 
 /**
@@ -6264,6 +6672,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (screen === 'articles') loadArticlesScreen();
             if (screen === 'media') loadMediaScreen();
             if (screen === 'settings') renderSettingsScreen();
+            if (screen === 'requestlog') renderRequestLogScreen();
         });
     });
 
@@ -6367,6 +6776,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const spellCheckSel = document.getElementById('settings-spell-check-select');
     if (spellCheckSel) {
         spellCheckSel.addEventListener('change', () => applySpellCheckChange(spellCheckSel.value === '1'));
+    }
+
+    const requestLogSel = document.getElementById('settings-request-log-select');
+    if (requestLogSel) {
+        requestLogSel.addEventListener('change', () => applyRequestLogChange(requestLogSel.value === '1'));
     }
 
     const btnModalClose = document.getElementById('btn-modal-close');

@@ -55,6 +55,10 @@
                 <i class="nav-icon fa-solid fa-gear" aria-hidden="true"></i>
                 <span data-i18n="GRAFIDA_NAV_SETTINGS">Settings</span>
             </a>
+            <a data-screen="requestlog" href="#" role="menuitem" id="nav-request-log" hidden>
+                <i class="nav-icon fa-solid fa-list-check" aria-hidden="true"></i>
+                <span data-i18n="GRAFIDA_NAV_REQUEST_LOG">Request Log</span>
+            </a>
         </nav>
 
         <div id="sidebar-update" hidden></div>
@@ -259,6 +263,14 @@
                 </div>
             </div>
             <div class="card settings-card">
+                <p class="card-title" data-i18n="GRAFIDA_LBL_DEBUG">Debug</p>
+                <p class="text-muted" data-i18n="GRAFIDA_MSG_REQUEST_LOG_INFO"></p>
+                <div class="form-group">
+                    <label for="settings-request-log-select" data-i18n="GRAFIDA_LBL_REQUEST_LOG">Request log</label>
+                    <select id="settings-request-log-select" class="form-control"></select>
+                </div>
+            </div>
+            <div class="card settings-card">
                 <p class="card-title" data-i18n="GRAFIDA_LBL_STORAGE">Local storage</p>
                 <div class="form-group">
                     <label data-i18n="GRAFIDA_LBL_DB_LOCATION">Database location</label>
@@ -284,6 +296,16 @@
                 <hr class="divider">
                 <div id="ai-tools-list"></div>
             </div>
+        </section>
+
+        <!-- ===== REQUEST LOG SCREEN (Debug, gh-37) ===== -->
+        <section id="requestlog-screen" class="screen" role="main">
+            <div class="screen-header">
+                <h2 data-i18n="GRAFIDA_NAV_REQUEST_LOG">Request Log</h2>
+                <div class="screen-actions" id="requestlog-actions"></div>
+            </div>
+            <p class="text-muted" data-i18n="GRAFIDA_MSG_REQUEST_LOG_DESC"></p>
+            <div id="requestlog-list"></div>
         </section>
 
     </div><!-- /#content -->

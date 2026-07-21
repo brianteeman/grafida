@@ -140,3 +140,11 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | replace | Remplacer | Replace text in the source code editor; « Tout remplacer » for replace all (gh-34). |
 | find next / previous | rechercher le suivant / le précédent | Jump to the next or previous match; help dialog rows (gh-34). |
 | regexp | expression régulière | Search pattern in the source code editor search bar (gh-34). |
+| Request Log | Journal des requêtes | The in-memory record of the last 20 API requests sent to the site (gh-37). |
+| Debug (settings card) | Débogage | Settings card title grouping the request log / diagnose-connection features. |
+| request / response (HTTP) | Requête / Réponse | One recorded HTTP request or response, shown in the request log or the connection diagnosis. |
+| header (HTTP) | (no dedicated term) | HTTP headers are rendered unlabelled as name/value pairs; nothing to translate. |
+| body / payload (HTTP) | Corps | The request/response body in the request log; « Le corps a été tronqué » = body truncated. |
+| redacted (token) | masqué | API tokens are masked/hidden in the request log, never shown in the clear. |
+| diagnose connection | Diagnostiquer la connexion | Button that reports every candidate API base URL tried, with the full request/response exchange (gh-37). |
+| attempt (diagnose) | Tentative | A single diagnose attempt against one candidate API base URL. |

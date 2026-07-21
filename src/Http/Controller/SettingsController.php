@@ -13,6 +13,9 @@ namespace Grafida\Http\Controller;
 
 use Boson\Api\Dialog\DialogApiInterface;
 use Boson\Contracts\Http\ResponseInterface;
+use Grafida\Debug\RequestLog;
+use Grafida\Debug\RequestLogService;
+use Grafida\Debug\RequestRecord;
 use Grafida\Display\DisplayModeService;
 use Grafida\Editor\SlashToolsService;
 use Grafida\Editor\SpellCheckService;
@@ -24,14 +27,15 @@ use Grafida\I18n\UiStrings;
 use Grafida\Markdown\MarkdownService;
 use Grafida\Site\LastSiteService;
 use Grafida\Storage\StorageService;
+use Grafida\Support\App;
 use Grafida\Support\UrlOpener;
 use Grafida\Update\UpdateService;
 
 /**
  * Handles the miscellaneous settings/system endpoints: language, display
  * mode, the editor's slash commands, storage maintenance, the update checker,
- * Markdown conversion, the native URL opener, and the native file/directory
- * dialogs.
+ * Markdown conversion, the native URL opener, the Request Log (gh-37's Debug
+ * setting), and the native file/directory dialogs.
  */
 final class SettingsController extends Controller
 {
@@ -45,6 +49,8 @@ final class SettingsController extends Controller
         private readonly UrlOpener $urlOpener,
         private readonly UpdateService $updates,
         private readonly StorageService $storage,
+        private readonly RequestLog $requestLog,
+        private readonly RequestLogService $requestLogService,
         private readonly ?DialogApiInterface $dialog = null,
     ) {}
 
@@ -57,6 +63,10 @@ final class SettingsController extends Controller
         $router->add('POST', '/api/settings/slash-tools', fn (RouteContext $ctx): ResponseInterface => $this->setSlashTools($ctx->body()));
         $router->add('POST', '/api/settings/spell-check', fn (RouteContext $ctx): ResponseInterface => $this->setSpellCheck($ctx->body()));
         $router->add('POST', '/api/settings/last-site', fn (RouteContext $ctx): ResponseInterface => $this->setLastSite($ctx->body()));
+        $router->add('POST', '/api/settings/request-log', fn (RouteContext $ctx): ResponseInterface => $this->setRequestLog($ctx->body()));
+        $router->add('GET', '/api/request-log', fn (RouteContext $ctx): ResponseInterface => $this->requestLog());
+        $router->add('POST', '/api/request-log/clear', fn (RouteContext $ctx): ResponseInterface => $this->clearRequestLog());
+        $router->add('POST', '/api/request-log/export', fn (RouteContext $ctx): ResponseInterface => $this->exportRequestLog($ctx->body()));
         $router->add('GET', '/api/update', fn (RouteContext $ctx): ResponseInterface => $this->updateStatus());
         $router->add('GET', '/api/settings/storage', fn (RouteContext $ctx): ResponseInterface => $this->storageInfo());
         $router->add('POST', '/api/settings/storage/open', fn (RouteContext $ctx): ResponseInterface => $this->openStorageFolder());
@@ -202,12 +212,17 @@ final class SettingsController extends Controller
      * Remembers the site the user just selected, so it is re-selected on the
      * next launch. A zero/absent id clears the stored preference.
      *
+     * Also clears the Request Log: the log's requests belong to whichever
+     * site was active when they were made, so switching sites starts a fresh
+     * buffer rather than mixing two sites' exchanges together.
+     *
      * @param array<string, mixed> $body
      */
     public function setLastSite(array $body): ResponseInterface
     {
         $id = $this->int($body, 'siteId');
         $this->lastSite->set($id > 0 ? $id : null);
+        $this->requestLog->clear();
 
         return Json::ok(['lastSiteId' => $id > 0 ? $id : null]);
     }
@@ -244,5 +259,81 @@ final class SettingsController extends Controller
         $this->storage->reset();
 
         return Json::ok();
+    }
+
+    /**
+     * Toggles the Request Log (Debug) setting. Turning it off also empties
+     * the buffer immediately — an implicit "clear" the user would otherwise
+     * have to trigger separately, and the honest thing to do since a
+     * disabled log should show nothing next time it is enabled.
+     *
+     * @param array<string, mixed> $body
+     */
+    public function setRequestLog(array $body): ResponseInterface
+    {
+        $enabled = $this->requestLogService->set($this->bool($body, 'enabled', false));
+
+        if (!$enabled) {
+            $this->requestLog->clear();
+        }
+
+        return Json::ok(['requestLog' => $enabled]);
+    }
+
+    /** The Request Log screen's data: whether it is enabled and every entry currently stored, newest first. */
+    public function requestLog(): ResponseInterface
+    {
+        return Json::ok([
+            'enabled' => $this->requestLogService->current(),
+            'entries' => array_map(static fn (RequestRecord $r): array => $r->toArray(), $this->requestLog->entries()),
+        ]);
+    }
+
+    public function clearRequestLog(): ResponseInterface
+    {
+        $this->requestLog->clear();
+
+        return Json::ok();
+    }
+
+    /**
+     * Writes the current Request Log to a JSON file in the given directory —
+     * the same "ask for a destination folder" pattern as
+     * {@see \Grafida\Http\Controller\DraftController::exportDraft()}, since
+     * Boson has no native Save-As dialog. Redaction is automatic:
+     * {@see RequestRecord::toArray()} is the only way a record is serialised
+     * and it always redacts, so there is no separate export-specific
+     * redaction path to keep in sync.
+     *
+     * @param array<string, mixed> $body
+     */
+    public function exportRequestLog(array $body): ResponseInterface
+    {
+        $directory = $this->str($body, 'directory');
+
+        if ($directory === '' || !is_dir($directory) || !is_writable($directory)) {
+            return Json::error('A valid, writable destination folder is required.', 400);
+        }
+
+        $payload = [
+            'app'        => App::NAME . ' ' . App::VERSION,
+            'exportedAt' => gmdate('Y-m-d H:i:s'),
+            'entries'    => array_map(static fn (RequestRecord $r): array => $r->toArray(), $this->requestLog->entries()),
+        ];
+
+        $json = json_encode($payload, \JSON_PRETTY_PRINT | \JSON_UNESCAPED_SLASHES | \JSON_UNESCAPED_UNICODE);
+
+        if ($json === false) {
+            return Json::error('Could not encode the request log', 500);
+        }
+
+        $filename = 'grafida-request-log-' . gmdate('Ymd-His') . '.json';
+        $path     = rtrim($directory, '/\\') . \DIRECTORY_SEPARATOR . $filename;
+
+        if (@file_put_contents($path, $json) === false) {
+            return Json::error('Could not write the export file', 500);
+        }
+
+        return Json::ok(['path' => $path, 'filename' => $filename]);
     }
 }

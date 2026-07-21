@@ -140,3 +140,11 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | replace | Αντικατάσταση | Replace text in the source code editor; «Αντικατάσταση όλων» for replace all (gh-34). |
 | find next / previous | εύρεση επόμενου / προηγούμενου | Jump to the next or previous match; help dialog rows (gh-34). |
 | regexp | κανονική έκφραση | Search pattern in the source code editor search bar (gh-34). |
+| Request Log | Καταγραφή αιτημάτων / Αρχείο καταγραφής αιτημάτων | The in-memory record of the last 20 API requests sent to the site (gh-37). Nav/heading uses the longer form; the settings dropdown label the shorter one. |
+| Debug (settings card) | Εντοπισμός σφαλμάτων | Settings card title grouping the request log / diagnose-connection features. |
+| request / response (HTTP) | Αίτημα / Απόκριση | One recorded HTTP request or response, shown in the request log or the connection diagnosis. |
+| header (HTTP) | (χωρίς ειδικό όρο) | HTTP headers are rendered unlabelled as name/value pairs; nothing to translate. |
+| body / payload (HTTP) | Σώμα (μηνύματος) | The request/response body in the request log; «Το σώμα του μηνύματος περικόπηκε» = body truncated. |
+| redacted (token) | αποκρύπτεται | API tokens are hidden/redacted in the request log, never shown in the clear. |
+| diagnose connection | Διάγνωση σύνδεσης | Button that reports every candidate API base URL tried, with the full request/response exchange (gh-37). |
+| attempt (diagnose) | Απόπειρα | A single diagnose attempt against one candidate API base URL. |

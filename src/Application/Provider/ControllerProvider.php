@@ -21,6 +21,8 @@ use Grafida\Ai\Defaults;
 use Grafida\Application\Container;
 use Grafida\Article\DraftExportService;
 use Grafida\Article\DraftRepository;
+use Grafida\Debug\RequestLog;
+use Grafida\Debug\RequestLogService;
 use Grafida\Display\DisplayModeService;
 use Grafida\Editor\SlashToolsService;
 use Grafida\Editor\SpellCheckService;
@@ -43,6 +45,7 @@ use Grafida\Media\SiteImageFetcher;
 use Grafida\Publish\PublishService;
 use Grafida\Reference\EditorCssService;
 use Grafida\Reference\ReferenceService;
+use Grafida\Site\ConnectionDiagnostics;
 use Grafida\Site\FaviconService;
 use Grafida\Site\LastSiteService;
 use Grafida\Site\SiteService;
@@ -74,6 +77,8 @@ final class ControllerProvider implements ServiceProviderInterface
                 aiDefaults: $c->get(Defaults::class),
                 aiServices: $c->get(AiServiceManager::class),
                 aiTools: $c->get(AiToolRepository::class),
+                requestLog: $c->get(RequestLog::class),
+                requestLogService: $c->get(RequestLogService::class),
             );
         });
 
@@ -85,6 +90,7 @@ final class ControllerProvider implements ServiceProviderInterface
                 siteContext: $c->get(SiteContext::class),
                 fields: $c->get(FieldSupport::class),
                 editorCss: $c->get(EditorCssService::class),
+                diagnostics: $c->get(ConnectionDiagnostics::class),
             );
         });
 
@@ -145,6 +151,8 @@ final class ControllerProvider implements ServiceProviderInterface
                 urlOpener: $c->get(UrlOpener::class),
                 updates: $c->get(UpdateService::class),
                 storage: $c->get(StorageService::class),
+                requestLog: $c->get(RequestLog::class),
+                requestLogService: $c->get(RequestLogService::class),
                 dialog: $dialog,
             );
         });

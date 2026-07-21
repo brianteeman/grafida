@@ -29,6 +29,7 @@ use Grafida\Reference\ReferenceService;
 use Grafida\Http\Transport;
 use Grafida\Secret\SecretStore;
 use Grafida\Secret\SecretStoreFactory;
+use Grafida\Site\ConnectionDiagnostics;
 use Grafida\Site\FaviconRepository;
 use Grafida\Site\FaviconService;
 use Grafida\Site\SiteRepository;
@@ -111,6 +112,13 @@ final class SiteProvider implements ServiceProviderInterface
                 new CssRebaser(),
                 $http,
             );
+        });
+
+        $container->share(ConnectionDiagnostics::class, static function (Container $c): ConnectionDiagnostics {
+            /** @var Transport $http */
+            $http = $c->get('http.diagnostics');
+
+            return new ConnectionDiagnostics($http);
         });
 
         $container->share(SiteContext::class, static function (Container $c): SiteContext {

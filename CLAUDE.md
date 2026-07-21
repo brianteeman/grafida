@@ -82,6 +82,15 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `withCategoryTitles`, the JSON:API relationship readers) live in `Grafida\Http\SiteContext`,
   an injected collaborator — composition, not a god base class. Controllers must never call
   each other; share through the injected services.
+  `SiteController` also exposes **Diagnose Connection** (`POST /api/sites/diagnose`, delegating
+  to `Site\ConnectionDiagnostics`) alongside the existing `/api/sites/test`, and
+  `SettingsController` exposes the Request Log (gh-37, see `src/Debug/`): `POST
+  /api/settings/request-log` (the on/off toggle), `GET /api/request-log` (the stored entries),
+  `POST /api/request-log/clear`, and `POST /api/request-log/export` — which, like
+  `DraftExportService`'s `.grafida` export, asks for a destination **folder** rather than a
+  file (`POST /api/dialog/select-directory`): Boson's `DialogApiInterface` has no Save-As
+  dialog, so the filename (`grafida-request-log-<timestamp>.json`) is derived and the file
+  written server-side instead.
 - `src/Joomla/ApiClient.php` — Joomla REST client: base-URL normalisation + probing, JSON:API.
 - `src/Secret/` — OS secret stores (macOS `security`, Linux `secret-tool`, Windows DPAPI) + factory.
   Windows DPAPI runs through **`WindowsDpapi`** (a direct FFI call into `crypt32.dll`), **not** a
@@ -248,6 +257,36 @@ window-free in tests (a null dialog makes the endpoint return 503).
   **already-open, just-saved** draft's content and saved AI chats while explicitly preserving
   its own id/`site_id`/`remote_id`, so a replaced draft stays linked to the same site and
   (if any) the same remote article.
+- `src/Debug/` — the recording substrate behind **Diagnose Connection** and the opt-in
+  **Request Log** (gh-37): `RequestRecord` (one captured HTTP exchange), `Redactor`,
+  `BodyFormatter`, `RecordingTransport`, `RequestLog`/`RequestLogService`, and the
+  `RecordSink` interface both `ArraySink` and `RequestLog` itself implement. The log is an
+  **in-memory ring buffer** (`RequestLog`, capacity 20) — not a table — because it is cleared
+  at app start, on every site switch and whenever the setting is turned off, so nothing about
+  it is meant to outlive the process; the on/off flag rides in the generic `settings` key/value store
+  (`request_log`, **default off** — unlike `slash_tools`/`spell_check`, which default on)
+  and needs no migration. Recording is a **`Transport` decorator** (`RecordingTransport`),
+  not a change to `HttpClient`, which stays a dumb transport — this is what lets *Diagnose
+  Connection* (`Grafida\Site\ConnectionDiagnostics`) work with the Request Log switched off:
+  it builds a throwaway `ApiClient` over a `RecordingTransport` writing to a private
+  `ArraySink`, never touching the shared log. `http.default`/`http.short`/`http.reference`
+  (see `HttpProvider`) are wrapped into the container-shared `RequestLog`; **`http.ai` is
+  not** (AI traffic is not "requests to the site", may be huge, and carries a different
+  provider's key), and **`http.diagnostics` is also deliberately unwrapped** — a diagnose
+  run records into its own `ArraySink`, so wrapping this transport too would double-record
+  every probe into the shared log.
+  ⚠️ **Redaction is unconditional.** `RequestRecord::toArray()` is the only serialisation
+  path a record ever goes through — whether it is bound for the Request Log screen, the
+  Diagnose Connection panel, or the JSON export — and it always masks `Authorization`/
+  `X-Joomla-Token` (and any literal occurrence of the token elsewhere in a URL or body) down
+  to first-4 + dots + last-4. There is no separate export-only redaction path to fall out of
+  sync with the screen.
+  Bodies are **capped at 64 KiB per direction at capture time** (`BodyFormatter::cap()`,
+  applied by `RecordingTransport` before a record is even built — a media upload is a
+  multi-megabyte base64 blob, and keeping 20 of those in memory is not acceptable) and
+  described by kind — `none`/`text`/`json`/`binary`: JSON is pretty-printed, binary renders
+  as the localised "(… binary data …)" marker, and an empty body is omitted rather than
+  shown blank.
 - `src/Media/` — offline image blobs (`media_blobs`) + `SiteImageFetcher` (fetches a published
   article image for a multimodal AI request — see the AI facts). `ApiClient::listMedia()` browses the
   site's Media Manager (`GET /v1/media/files`); `ApiController` exposes it as
@@ -645,7 +684,12 @@ window-free in tests (a null dialog makes the endpoint return 503).
   both states — a collapsed item's label is `display:none`, leaving it with no accessible name at
   all. It re-runs on toggle, on `applyStrings()` (language switch) and from `renderSidebarFooter()`
   (the version label is filled in asynchronously by `bootstrap()`), since it copies rendered text
-  rather than looking keys up itself.
+  rather than looking keys up itself. The sidebar's **Request Log** item (`#nav-request-log`,
+  below Settings, gh-37) is `hidden` unless `State.requestLog` is on — an opt-in Debug setting,
+  not an always-present link — so `renderSidebarNav()` toggles its `hidden` attribute and, because
+  hiding or showing an item changes which labels the collapsed rail has to mirror, **must also
+  re-run `syncSidebarTooltips()`** itself rather than waiting for one of that function's other
+  three triggers to fire on its own.
 - `language/<tag>/<tag>.ini` — translations, one file per language (e.g. `language/de-DE/de-DE.ini`).
   (There is **no** Joomla `.sys.ini` or `language/grafida.xml` manifest, and the files are **not**
   named `<tag>.com_grafida.ini` — Grafida is a desktop app, not a Joomla component. `LanguageService`

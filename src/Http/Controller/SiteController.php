@@ -19,6 +19,7 @@ use Grafida\Http\Router;
 use Grafida\Http\SiteContext;
 use Grafida\Reference\EditorCssService;
 use Grafida\Reference\ReferenceService;
+use Grafida\Site\ConnectionDiagnostics;
 use Grafida\Site\FaviconService;
 use Grafida\Site\SiteService;
 
@@ -32,11 +33,17 @@ final class SiteController extends Controller
         private readonly SiteContext $siteContext,
         private readonly FieldSupport $fields,
         private readonly EditorCssService $editorCss,
+        private readonly ConnectionDiagnostics $diagnostics,
     ) {}
 
     public function registerRoutes(Router $router): void
     {
         $router->add('POST', '/api/sites/test', fn (RouteContext $ctx): ResponseInterface => $this->testConnection($ctx->body()));
+        // Registered before the /api/sites/{id}/... routes' fellow-traveller
+        // patterns: {id} only ever matches digits, so "diagnose" cannot be
+        // shadowed regardless of order — kept literal-first anyway to match
+        // /api/sites/test's convention.
+        $router->add('POST', '/api/sites/diagnose', fn (RouteContext $ctx): ResponseInterface => $this->diagnoseConnection($ctx->body()));
         $router->add('GET', '/api/sites', fn (RouteContext $ctx): ResponseInterface => $this->listSites());
         $router->add('POST', '/api/sites', fn (RouteContext $ctx): ResponseInterface => $this->createSite($ctx->body()));
         $router->add('PATCH', '/api/sites/{id}', fn (RouteContext $ctx): ResponseInterface => $this->updateSite($ctx->int('id'), $ctx->body()));
@@ -52,6 +59,37 @@ final class SiteController extends Controller
         $apiBase = $this->sites->testConnection($this->str($body, 'url'), $this->str($body, 'token'));
 
         return Json::ok(['apiBase' => $apiBase]);
+    }
+
+    /**
+     * Runs the same API-base probe as {@see testConnection()}, but reports
+     * every candidate base tried — the full request/response exchange,
+     * redacted and body-formatted — instead of only the final verdict. Never
+     * throws for a failed connection: an unreachable site is the normal case
+     * here, and the whole point is to show the user the exchange.
+     *
+     * The edit-site modal leaves the token field blank to mean "keep the
+     * stored token"; when the posted token is empty and an existing `siteId`
+     * is given, fall back to that site's stored token via
+     * {@see SiteService::tokenFor()}.
+     *
+     * @param array<string, mixed> $body
+     */
+    public function diagnoseConnection(array $body): ResponseInterface
+    {
+        $url   = $this->str($body, 'url');
+        $token = $this->str($body, 'token');
+
+        if ($token === '') {
+            $siteId = $this->int($body, 'siteId');
+            $site   = $siteId > 0 ? $this->sites->find($siteId) : null;
+
+            if ($site !== null) {
+                $token = $this->sites->tokenFor($site) ?? '';
+            }
+        }
+
+        return Json::ok($this->diagnostics->run($url, $token));
     }
 
     public function listSites(): ResponseInterface

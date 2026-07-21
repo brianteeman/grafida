@@ -20,7 +20,7 @@ use Grafida\Editor\SpellCheckService;
 use Grafida\Field\FieldSupport;
 use Grafida\FrontController;
 use Grafida\Http\ApiController;
-use Grafida\Http\HttpClient;
+use Grafida\Http\Transport;
 use Grafida\I18n\LanguageService;
 use Grafida\Markdown\MarkdownService;
 use Grafida\Site\LastSiteService;
@@ -76,7 +76,7 @@ final class AppProvider implements ServiceProviderInterface
         $container->share(UrlOpener::class, static fn (): UrlOpener => new UrlOpener());
 
         $container->share(UpdateService::class, static function (Container $c): UpdateService {
-            /** @var HttpClient $http */
+            /** @var Transport $http */
             $http = $c->get('http.short');
 
             return new UpdateService($http, App::VERSION, Paths::updatesFile());

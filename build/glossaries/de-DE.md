@@ -140,3 +140,11 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | replace | Ersetzen | Text im Quellcode-Editor ersetzen; „Alle ersetzen“ für replace all (gh-34). |
 | find next / previous | weitersuchen / rückwärts suchen | Zum nächsten bzw. vorherigen Treffer springen; Zeilen im Hilfe-Dialog (gh-34). |
 | regexp | regulärer Ausdruck | Suchmuster in der Suchleiste des Quellcode-Editors (gh-34). |
+| Request Log | Anfrageprotokoll | Die In-Memory-Aufzeichnung der letzten 20 API-Anfragen an die Website (gh-37). |
+| Debug (settings card) | Debug | Bewusst als Anglizismus beibehalten, wie in der deutschen Joomla!-Verwaltung („Debug-System"). |
+| request / response (HTTP) | Anfrage / Antwort | Eine aufgezeichnete HTTP-Anfrage bzw. -Antwort im Anfrageprotokoll oder in der Verbindungsdiagnose. |
+| header (HTTP) | (kein eigener Begriff) | HTTP-Header werden im UI ohne Label als Name/Wert-Paare dargestellt; kein Übersetzungsbedarf. |
+| body / payload (HTTP) | Inhalt | Der Anfrage-/Antwortkörper im Anfrageprotokoll; „Inhalt wurde gekürzt" = body truncated. |
+| redacted (token) | geschwärzt | API-Token werden im Anfrageprotokoll geschwärzt, nicht im Klartext angezeigt. |
+| diagnose connection | Verbindung diagnostizieren | Schaltfläche, die jede versuchte API-Basis-URL mit vollständigem Anfrage-/Antwort-Protokoll meldet (gh-37). |
+| attempt (diagnose) | Versuch | Ein einzelner Diagnoseversuch mit einer Kandidaten-API-Basis-URL. |

@@ -139,3 +139,11 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | replace | Sostituisci | Replace text in the source code editor; «Sostituisci tutto» for replace all (gh-34). |
 | find next / previous | trova successivo / precedente | Jump to the next or previous match; help dialog rows (gh-34). |
 | regexp | espressione regolare | Search pattern in the source code editor search bar (gh-34). |
+| Request Log | Registro delle richieste | The in-memory record of the last 20 API requests sent to the site (gh-37). |
+| Debug (settings card) | Debug | Kept in English, as in Italian Joomla! ("Sistema di debug"). |
+| request / response (HTTP) | Richiesta / Risposta | One recorded HTTP request or response, shown in the request log or the connection diagnosis. |
+| header (HTTP) | (nessun termine dedicato) | HTTP headers are rendered unlabelled as name/value pairs; nothing to translate. |
+| body / payload (HTTP) | Corpo | The request/response body in the request log; «Il corpo è stato troncato» = body truncated. |
+| redacted (token) | oscurato | API tokens are obscured/redacted in the request log, never shown in the clear. |
+| diagnose connection | Diagnostica connessione | Button that reports every candidate API base URL tried, with the full request/response exchange (gh-37). |
+| attempt (diagnose) | Tentativo | A single diagnose attempt against one candidate API base URL. |

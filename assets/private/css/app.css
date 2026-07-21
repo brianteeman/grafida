@@ -2565,6 +2565,234 @@ body.resizing-col {
     padding: 4px 0;
 }
 
+/* ------------------------------------------------------------------ */
+/*  Diagnose Connection / Request Log — shared HTTP exchange rendering */
+/*  (buildHttpExchange() & friends in app.js; the shape comes from PHP's */
+/*  Grafida\Debug\RequestRecord::toArray()). Every colour below is one   */
+/*  of the existing --color-* custom properties, so this is already     */
+/*  theme-aware through the same :root / [data-theme="light"] switch    */
+/*  the rest of the stylesheet uses — no new colours are introduced.    */
+/* ------------------------------------------------------------------ */
+
+/* Nothing to show until a diagnose run fills this in. */
+.diagnose-result:empty {
+    display: none;
+}
+
+.diagnose-result {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 50vh;
+    overflow-y: auto;
+}
+
+.diagnose-attempt {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 12px;
+}
+
+.diagnose-attempt-heading {
+    font-family: var(--font-title);
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0 0 8px;
+    color: var(--color-text);
+}
+
+.diagnose-api-base {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    font-size: 12px;
+    margin: 0;
+}
+
+.diagnose-api-base code {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 2px 6px;
+    word-break: break-all;
+    color: var(--color-text);
+}
+
+.http-exchange {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.http-exchange-section {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.http-exchange-heading,
+.http-exchange-summary {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 12px;
+}
+
+/* Only set on Request Log's collapsed entries (buildHttpExchange(entry, true)). */
+.http-exchange-summary {
+    cursor: pointer;
+    user-select: none;
+}
+
+.http-exchange-label {
+    font-weight: 600;
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+}
+
+.http-method {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    font-weight: 600;
+    color: var(--color-accent);
+}
+
+.http-url {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    font-size: 12px;
+    word-break: break-all;
+    color: var(--color-text);
+}
+
+/* Status bucket: distinct icon per state (never colour alone), see
+   httpStatusIcon() in app.js — same precedent as .article-state-icon. */
+.http-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    font-weight: 600;
+}
+
+.http-status.http-status-ok    { color: var(--color-success); }
+.http-status.http-status-warn  { color: var(--color-warning); }
+.http-status.http-status-error { color: var(--color-danger); }
+
+.http-headers {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 11px;
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+}
+
+.http-header-row {
+    display: flex;
+    gap: 6px;
+    word-break: break-all;
+}
+
+.http-header-name {
+    color: var(--color-text-muted);
+    flex: 0 0 auto;
+}
+
+/* Punctuation lives in CSS, not a concatenated JS string. */
+.http-header-name::after {
+    content: ":";
+}
+
+.http-header-value {
+    color: var(--color-text);
+}
+
+.http-body-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.http-body {
+    margin: 0;
+    font-size: 11px;
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 220px;
+    overflow-x: auto;
+    overflow-y: auto;
+    color: var(--color-text);
+}
+
+.http-body-binary {
+    font-style: italic;
+    color: var(--color-text-muted);
+    font-size: 11px;
+    margin: 0;
+}
+
+.http-body-truncated {
+    font-size: 11px;
+    margin: 0;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Request Log screen (Debug, gh-37) — reuses the same card/http-*    */
+/*  variables and colours as above; no colours of its own.             */
+/* ------------------------------------------------------------------ */
+
+.screen-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.requestlog-item {
+    background: var(--color-surface-2);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-lg);
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.requestlog-item:last-child {
+    margin-bottom: 0;
+}
+
+.requestlog-head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12px;
+    margin-bottom: 8px;
+}
+
+.requestlog-timestamp {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    color: var(--color-text-muted);
+}
+
+.http-duration {
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    color: var(--color-text-muted);
+    font-size: 11px;
+    margin-left: auto;
+}
+
 /* Publish blocked: copy HTML button section */
 .publish-blocked-msg {
     display: flex;

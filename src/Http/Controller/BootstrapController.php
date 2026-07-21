@@ -15,6 +15,8 @@ use Boson\Contracts\Http\ResponseInterface;
 use Grafida\Ai\AiServiceManager;
 use Grafida\Ai\AiToolRepository;
 use Grafida\Ai\Defaults;
+use Grafida\Debug\RequestLog;
+use Grafida\Debug\RequestLogService;
 use Grafida\Display\DisplayModeService;
 use Grafida\Editor\SlashToolsService;
 use Grafida\Editor\SpellCheckService;
@@ -43,6 +45,8 @@ final class BootstrapController extends Controller
         private readonly Defaults $aiDefaults,
         private readonly AiServiceManager $aiServices,
         private readonly AiToolRepository $aiTools,
+        private readonly RequestLog $requestLog,
+        private readonly RequestLogService $requestLogService,
     ) {}
 
     public function registerRoutes(Router $router): void
@@ -52,6 +56,10 @@ final class BootstrapController extends Controller
 
     public function bootstrap(): ResponseInterface
     {
+        // Starting the application clears the Request Log before any new
+        // requests are sent to the site — this is the SPA's first call.
+        $this->requestLog->clear();
+
         // The AI subsystem is optional: a failure assembling it (e.g. a missing
         // bundled resource in a build) must never blank the rest of the app, so
         // it degrades to "no AI configured" rather than failing the whole payload.
@@ -66,6 +74,7 @@ final class BootstrapController extends Controller
             'systemPrefersDark'   => $this->displayMode->systemPrefersDark(),
             'slashTools'          => $this->slashTools->current(),
             'spellCheck'          => $this->spellCheck->current(),
+            'requestLog'          => $this->requestLogService->current(),
             'secureStore'         => $this->sites->hasSecureStore(),
             'supportedFieldTypes' => FieldSupport::SUPPORTED,
             'sites'               => array_map($this->siteContext->siteArray(...), $this->sites->list()),
