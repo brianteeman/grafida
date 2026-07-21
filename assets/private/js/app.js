@@ -2939,12 +2939,56 @@ async function initTinyMCE(draft) {
     }
 
     const cssOpts = [];
+    // siteCssHasScheme: whether the (transformed) site stylesheet actually
+    // styles State.resolvedTheme, used below to gate the content_style
+    // color-scheme declaration.
+    let siteCssHasScheme = false;
     if (State.editorCss) {
         try {
-            const blob = new Blob([State.editorCss], { type: 'text/css' });
+            // Boson's webview misreports prefers-color-scheme (always dark on
+            // macOS — see Display\DisplayModeService::systemPrefersDark()), so
+            // a site editor.css with automatic dark mode (e.g. Bootstrap 5.3's
+            // media-query colour mode) rendered the editor content permanently
+            // dark, whatever State.resolvedTheme actually was (gh-38). Resolve
+            // those prefers-color-scheme blocks against the authoritative
+            // resolved theme in the CSS text itself before it becomes a Blob
+            // URL. State.editorCss stays raw: parseEditorCssClasses() (the
+            // Styles drop-down) must keep seeing every class, including ones
+            // that only appear in a dark block, and a theme change re-runs
+            // this transform against the original via applyTheme(true).
+            let transformedCss = State.editorCss;
+            if (typeof window.GrafidaCssTheme !== 'undefined') {
+                try {
+                    const resolved = window.GrafidaCssTheme.resolveColorScheme(State.editorCss, State.resolvedTheme);
+                    transformedCss = resolved.css;
+                    siteCssHasScheme = resolved.matched;
+                } catch {
+                    // Fall back to the untransformed CSS — the editor must
+                    // never fail to open over this.
+                    transformedCss = State.editorCss;
+                }
+            }
+            const blob = new Blob([transformedCss], { type: 'text/css' });
             cssOpts.push(URL.createObjectURL(blob));
         } catch {}
     }
+
+    // The :root color-scheme declaration lets the UA-rendered bits inside the
+    // content iframe (form controls, scrollbars, the default canvas) agree
+    // with the resolved theme instead of following the webview's misreported
+    // preference (gh-38). It is deliberately conditional in dark mode: a
+    // light-only site stylesheet (siteCssHasScheme false) has its own light
+    // `color:` declarations, and a dark canvas underneath those would be
+    // unreadable — so `color-scheme: dark` is only emitted when the editing
+    // surface is actually dark, i.e. either there is no site stylesheet at all
+    // (cssOpts empty, so TinyMCE's built-in dark content CSS applies) or the
+    // site stylesheet does style dark (siteCssHasScheme). In light mode the
+    // declaration is always safe: it only corrects the webview's wrong guess
+    // and can never conflict with a stylesheet's own light styling (light is
+    // the UA default anyway).
+    const colorSchemeStyle = State.resolvedTheme === 'light'
+        ? 'html { color-scheme: light; }'
+        : ((cssOpts.length === 0 || siteCssHasScheme) ? 'html { color-scheme: dark; }' : '');
 
     const editorSiteId = State.currentDraft ? State.currentDraft.siteId : State.currentSiteId;
     const site = State.sites.find(s => s.id === editorSiteId);
@@ -3066,7 +3110,8 @@ async function initTinyMCE(draft) {
             'body {' +
             '  margin: 0;' +
             '  padding: 1rem;' +
-            '}',
+            '}' +
+            colorSchemeStyle,
         setup: (editor) => {
             State.tinyMCEEditor = editor;
 
@@ -6330,8 +6375,11 @@ function resolveTheme() {
  * Applies the resolved theme to the document (CSS variables key off the
  * `data-theme` attribute on <html>). When `reinitEditor` is true and the
  * TinyMCE editor is open, it is re-created so its skin and built-in content
- * CSS follow the new theme — unless the site supplies its own editor.css,
- * in which case the editor content keeps the site's styling.
+ * CSS follow the new theme. A site editor.css is re-resolved too, not just
+ * kept as-is: initTinyMCE() re-runs GrafidaCssTheme.resolveColorScheme()
+ * against the (still-raw) State.editorCss for the new theme, so a stylesheet
+ * with its own prefers-color-scheme blocks (gh-38) follows the theme change
+ * the same way the built-in content CSS does.
  */
 function applyTheme(reinitEditor = false) {
     const resolved = resolveTheme();

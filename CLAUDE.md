@@ -642,6 +642,38 @@ window-free in tests (a null dialog makes the endpoint return 503).
   "Automatic by Language", per-sentence detection works but **only among the languages enabled in that
   list** (so a German writer must enable German there). Windows/Linux likewise defer to their OS
   spell-check configuration. This is a documented limitation, not a bug.
+  **The editor content follows the app's resolved colour scheme, not the webview's lie** (gh-38).
+  The content iframe loads the site's `editor.css` (`State.editorCss`), and Boson's webview
+  misreports `prefers-color-scheme` to that document exactly as it does everywhere else — always
+  dark on macOS, the same lie `Display\DisplayModeService::systemPrefersDark()` exists to work
+  around for the app chrome. A stylesheet with automatic dark mode (e.g. Bootstrap 5.3 built with
+  `$color-mode-type: media-query`) therefore rendered the editor content permanently dark, whatever
+  Grafida's own theme was. There is no way to make the webview report the truth, so
+  `js/editor/csstheme.js` (`window.GrafidaCssTheme.resolveColorScheme(css, scheme)`) resolves those
+  `prefers-color-scheme` media queries **in the CSS text itself**, against `State.resolvedTheme`,
+  before the stylesheet becomes the Blob URL `initTinyMCE()` hands to `content_css`: a query
+  requiring the resolved scheme has the feature stripped so its block applies unconditionally
+  (recognising the plain `(prefers-color-scheme: dark)` form, the boolean `(prefers-color-scheme)`
+  form, and both Level-4 negation spellings — `not all and (…)` and `(not (…))`); a query requiring
+  the other scheme is removed, dropping the whole `@media` block if nothing else keeps it alive. It
+  is a pure string transform (no app.js globals), string/comment-aware so a `content: "@media {"`
+  declaration cannot derail the scan, and recurses into a kept block's body so a nested `@media`
+  inside `@media`/`@supports`/`@layer` is resolved too. It is **deliberately conservative**: a
+  prelude with a top-level `or`, a query mentioning both schemes, or any `prefers-color-scheme`
+  mention in a form it does not confidently parse, is left **exactly as found**, contents
+  included — mangling a real-world stylesheet is a far worse failure mode than leaving today's
+  behaviour in place. ⚠️ `State.editorCss` itself stays **raw** — `parseEditorCssClasses()` (the
+  Styles drop-down) must keep seeing every class name, including one that only appears inside a
+  dark block, and the transform must be re-runnable against the original when the theme changes,
+  which it is: `applyTheme(true)` → `initTinyMCE()` re-resolves it every time (see that function's
+  doc comment). The call site guards against the module being absent or throwing, falling back to
+  the untransformed CSS — the editor must never fail to open over this. `content_style` also gets a
+  `:root { color-scheme: … }` declaration so the iframe's UA-rendered bits (form controls,
+  scrollbars) agree with the theme too; in dark mode this is emitted **only** when the editing
+  surface is actually dark (no site stylesheet at all, or the site stylesheet's own dark rules
+  actually matched — the transform's `matched` flag) — otherwise a light-only stylesheet's own
+  `color:` rules would sit on a forced-dark canvas and become unreadable. In light mode it is always
+  safe to emit (light is the UA default, so it can only correct the webview's wrong guess).
   **The editor UI language follows the interface language.** `tinymce.init()` is given a
   `language` + `language_url` (`editorLanguage()` / the `TINYMCE_LANGS` map in `app.js`) pointing
   at the matching pack vendored under `js/tinymce/langs/` (`el`, `fr-FR`, `de`, `es`, `it`,
@@ -876,8 +908,9 @@ sets `failOnEmptyTestSuite="false"` because `tests/Integration/` was originally 
 without that flag PHPUnit fails the whole run on an empty suite before the feature suite executes.
 - **`composer test:js`** (`node --test 'tests/js/**/*.test.mjs'`) covers the SPA modules PHPUnit
   **cannot** reach: `assets/private/js/ai/providers.js` (the AI transport — the provider call runs in
-  the SPA, see the AI facts) and `assets/private/js/editor/slashtools.js` (the slash-command menu).
-  For both it is the only automated coverage. It uses node's built-in test runner and loads the
+  the SPA, see the AI facts), `assets/private/js/editor/slashtools.js` (the slash-command menu), and
+  `assets/private/js/editor/csstheme.js` (the editor colour-scheme rewriter, gh-38). For all three it
+  is the only automated coverage. It uses node's built-in test runner and loads the
   browser IIFE in a `vm` context with fakes for the globals app.js supplies (`window`/`fetch`/`api`,
   or `State`/`t`/`editor`); no bundler and no new dependency (node is already a build prerequisite).
   ⚠️ **The sandbox is its own realm**, which bites twice: providers.js detects a CORS failure with
