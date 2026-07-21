@@ -95,7 +95,9 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `Http\Json::response()` sets `Cache-Control: no-store` on every response so they are
   self-describing for any caller that does not go through `apiFetch()`. Note this is unrelated to
   the **`reference_cache`** SQLite cache (see `src/Reference/`), which is deliberately permanent
-  and has the manual Refresh button as its invalidation.
+  and authoritative for rendering — the manual Refresh button remains — but which the SPA also
+  quietly freshens in the background since gh-42 (see `src/Reference/` and the `assets/private/`
+  notes below).
   `SiteController` also exposes **Diagnose Connection** (`POST /api/sites/diagnose`, delegating
   to `Site\ConnectionDiagnostics`) alongside the existing `/api/sites/test`, and
   `SettingsController` exposes the Request Log (gh-37, see `src/Debug/`): `POST
@@ -152,6 +154,20 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `ReferenceService` uses a short-timeout (8s) API client; `sync()` warms the cache best-effort
   when a site is connected/updated, and opening the editor falls back to cache per-list (only the
   manual refresh button surfaces fetch errors).
+  ⚠️ **`reference_cache` is permanent server-side and stays authoritative for rendering — a
+  screen always paints from the cache first — but it is no longer freshened *only* by the manual
+  button** (gh-42; previously a category added on the site stayed invisible until the user pressed
+  it, and the button itself missed the Articles screen's own filter-dropdown cache). `fetchedAt()`
+  reports the **oldest** `fetched_at` across the five refreshable kinds (`KIND_CATEGORIES`,
+  `KIND_TAGS`, `KIND_LEVELS`, `KIND_FIELDS`, `KIND_LANGUAGES` — deliberately excluding
+  `KIND_CONFIG`, whose route needs `core.admin` and would otherwise report "never fetched"
+  forever on most sites), or `null` when any of those five has never been cached — a partially
+  warmed cache is, for freshness purposes, no cache. `SiteController::references()` sends it as
+  the payload's `fetchedAt` key. The SPA reads it to decide whether to quietly refresh a site's
+  reference data in the background, once per site per session and again after a 15-minute TTL
+  (`REFERENCES_MAX_AGE_MS`, `ensureFreshReferences()` in `app.js`) — fire-and-forget, no toast, no
+  error surfaced, so an offline site keeps opening from cache exactly as before. See the
+  `assets/private/` SPA notes below for the front-end half.
   `unicodeSlugs()` caches one Global Configuration value under the `config` kind — `unicodeslugs`,
   the "Unicode Aliases" option, which the alias preview needs (see `src/Article/`). It is the one
   thing here that is **never strict**, whatever the caller asks: `GET v1/config/application` needs
@@ -802,6 +818,33 @@ window-free in tests (a null dialog makes the endpoint return 503).
   defined and a previously remembered last active site is still in the list — the remembered id
   is read *before* `renderSiteSelector()` writes its first-site fallback, so a freshly added but
   never-selected site does not trigger the Articles default.
+  **`State.references` is tagged with the site it belongs to** (`State.referencesSiteId`, gh-42):
+  it is a single slot shared by every screen (the editor sidebar, `makeAlias()`'s alias preview,
+  `collectDraftFormData()`'s custom fields), so nothing may read it directly — every reader goes
+  through `cachedReferences(siteId)`, which returns `null` unless the slot's tag matches, and every
+  writer goes through `setCachedReferences(siteId, refs)`. This is what stops the editor from ever
+  reusing another site's categories, which the previous untagged slot could not rule out. A
+  metadata reload (the Sites-screen button, the editor sidebar's own button, or the background
+  freshening below) always goes through **`invalidateSiteReferences(siteId)`** — the single place
+  that drops **both** per-site caches of the site's reference data, `State.references` *and* the
+  Articles screen's independent `State.articleListRefs` (whose omission from the reload path was
+  the gh-42 bug: the category/tag/language filter drop-downs kept whatever they were first built
+  with for the whole session, even after a successful refresh) — followed by
+  **`applyRefreshedReferences(siteId, refs)`**, which re-seeds the slot and repaints whichever
+  screen is showing data derived from it: it reloads the Articles screen when that is the active
+  one, and re-renders the editor sidebar through its own form-preserving path
+  (`collectDraftFormData()` merged back over the draft) when the editor is open on that site —
+  never TinyMCE itself. Because `reference_cache` is otherwise permanent server-side (see
+  `src/Reference/`), **`ensureFreshReferences(siteId, fetchedAt)`** quietly calls
+  `applyRefreshedReferences()` in the background after the screen has already rendered from cache
+  — once per site per session (`State.referencesFreshened`, a `Set`; marked *before* the request
+  fires, so an unreachable site is not retried on every visit) and again once `fetchedAt` is older
+  than `REFERENCES_MAX_AGE_MS` (15 minutes). It is fire-and-forget: no toast, no error surfaced,
+  and a failure leaves the site marked freshened anyway, so an offline site opens exactly as it did
+  before this existed. ⚠️ `fetchedAt` is a naive UTC `Y-m-d H:i:s` string (see `src/Reference/`)
+  and is compared **as a string** against `utcStampAgo()`'s own naive UTC stamp, never via
+  `Date.parse()` — the same WKWebView mishandling already documented for `ai_chats.last_response_at`
+  and `drafts.updated_at`.
   **Collapsible/resizable layout** (`initLayoutControls()` in `app.js`): the left **`#sidebar`**
   and the editor metadata **`#editor-sidebar`** ("Article properties") each carry an `.icon-toggle`
   button (`#sidebar-toggle` / `#editor-sidebar-toggle`) that toggles a `.collapsed` class — the left

@@ -36,6 +36,22 @@ final class ReferenceService
     public const KIND_LANGUAGES  = 'languages';
     public const KIND_CONFIG     = 'config';
 
+    /**
+     * The kinds a staleness check considers. Deliberately excludes
+     * {@see KIND_CONFIG}: its route needs `core.admin`, so a 403 is the
+     * healthy case for most sites and a site that can never cache it would
+     * otherwise report "never fetched" forever and refresh on every visit.
+     *
+     * @var list<string>
+     */
+    private const REFRESHABLE_KINDS = [
+        self::KIND_CATEGORIES,
+        self::KIND_TAGS,
+        self::KIND_LEVELS,
+        self::KIND_FIELDS,
+        self::KIND_LANGUAGES,
+    ];
+
     public function __construct(
         private readonly ReferenceRepository $repository,
         private readonly SiteService $sites,
@@ -136,6 +152,38 @@ final class ReferenceService
         $cached = $this->repository->get($siteId, self::KIND_CONFIG);
 
         return (bool) ($cached['payload']['unicodeslugs'] ?? false);
+    }
+
+    /**
+     * When the site's cached reference data was last fetched, as a naive UTC
+     * `Y-m-d H:i:s` string — the **oldest** of the reference kinds, so a
+     * caller deciding whether to refresh sees the weakest link rather than
+     * the strongest.
+     *
+     * Returns null when any kind has never been cached at all: a partially
+     * warmed cache is, for freshness purposes, no cache.
+     */
+    public function fetchedAt(Site $site): ?string
+    {
+        if ($site->id === null) {
+            return null;
+        }
+
+        $oldest = null;
+
+        foreach (self::REFRESHABLE_KINDS as $kind) {
+            $cached = $this->repository->get($site->id, $kind);
+
+            if ($cached === null) {
+                return null;
+            }
+
+            if ($oldest === null || $cached['fetched_at'] < $oldest) {
+                $oldest = $cached['fetched_at'];
+            }
+        }
+
+        return $oldest;
     }
 
     /**

@@ -329,6 +329,49 @@ final class ApiRoutingTest extends TestCase
         self::assertSame('', $created['data']['createdByAlias']);
     }
 
+    /**
+     * gh-42: the references payload must carry a `fetchedAt` key the SPA uses
+     * to decide whether to freshen the cache in the background — either null
+     * (never fully warmed, as here: a bare seeded site with no token to fetch
+     * with) or a naive UTC `Y-m-d H:i:s` string.
+     */
+    public function testReferencesPayloadCarriesFetchedAt(): void
+    {
+        $kernel = $this->kernel();
+        $siteId = $this->seedSite();
+
+        [$status, $json] = $this->call($kernel, 'GET', '/api/sites/' . $siteId . '/references');
+
+        self::assertSame(200, $status);
+        self::assertTrue($json['ok']);
+        self::assertArrayHasKey('fetchedAt', $json['data']);
+        self::assertNull($json['data']['fetchedAt']);
+    }
+
+    /**
+     * gh-42: once every refreshable kind is cached, `fetchedAt` reports it as
+     * a naive UTC `Y-m-d H:i:s` string rather than staying null.
+     */
+    public function testReferencesPayloadReportsFetchedAtOnceCacheIsWarm(): void
+    {
+        $kernel = $this->kernel();
+        $siteId = $this->seedSite();
+
+        $pdo = TestDatabase::connection($this->lastDb);
+        $now = gmdate('Y-m-d H:i:s');
+
+        foreach (['categories', 'tags', 'levels', 'fields', 'languages'] as $kind) {
+            $pdo->prepare(
+                'INSERT INTO reference_cache (site_id, kind, payload, fetched_at) VALUES (?, ?, ?, ?)'
+            )->execute([$siteId, $kind, '[]', $now]);
+        }
+
+        [$status, $json] = $this->call($kernel, 'GET', '/api/sites/' . $siteId . '/references');
+
+        self::assertSame(200, $status);
+        self::assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/', $json['data']['fetchedAt']);
+    }
+
     public function testMediaBlobMissingIs404(): void
     {
         [$status, $json] = $this->call($this->kernel(), 'GET', '/api/media/999');

@@ -88,6 +88,15 @@ const State = {
     // Which Articles-page tab is showing: 'drafts' (Local Drafts) or 'remote'.
     articlesTab: 'drafts',
     references: null,
+    // The site `references` was loaded for. `references` is per-site data held
+    // in a single slot, so every reader must check this before trusting it
+    // (see cachedReferences(), gh-42).
+    referencesSiteId: null,
+    // Sites whose reference data has already been freshened from the network
+    // in this app session. `reference_cache` is permanent server-side, so
+    // without this a category added on the site would stay invisible until
+    // the user found the manual Reload metadata button (gh-42).
+    referencesFreshened: new Set(),
     editorCss: null,
     tinyMCEEditor: null,
     activeScreen: 'sites',
@@ -928,6 +937,7 @@ function selectSite(siteId) {
     State.currentSiteId = siteId;
     rememberLastSite(siteId);
     State.references = null;
+    State.referencesSiteId = null;
     State.editorCss = null;
     const sel = document.getElementById('site-select');
     if (sel) sel.value = String(siteId);
@@ -1133,17 +1143,18 @@ function renderSitesScreen() {
 
 /**
  * Re-fetch reference metadata (categories, tags, access levels, languages,
- * custom fields) from the site, bypassing the local cache. Updates
- * State.references when the reloaded site is the one currently open in the
- * editor. The optional button is disabled while the request is in flight.
+ * custom fields) from the site, bypassing the local cache. Goes through
+ * applyRefreshedReferences(), which invalidates every SPA-side cache of that
+ * site's reference data and repaints whichever screen is showing it —
+ * including the editor sidebar, preserving unsaved edits (gh-42). The
+ * optional button is disabled while the request is in flight.
  */
 async function reloadSiteMetadata(siteId, button) {
     if (!siteId) return false;
     if (button) button.disabled = true;
     try {
         const refs = await api.refreshReferences(siteId);
-        const editorSiteId = State.currentDraft ? State.currentDraft.siteId : null;
-        if (siteId === State.currentSiteId || siteId === editorSiteId) State.references = refs;
+        await applyRefreshedReferences(siteId, refs);
 
         // The refresh re-downloads the favicon; reflect it on the Sites list and
         // in the sidebar without a full reload.
@@ -1157,6 +1168,7 @@ async function reloadSiteMetadata(siteId, button) {
         }
 
         showToast(t('GRAFIDA_MSG_REFS_REFRESHED'), 'success');
+
         return true;
     } catch (err) {
         showToast(err.message, 'error');
@@ -1477,6 +1489,7 @@ async function confirmDeleteSite(id) {
             if (State.currentSiteId === id) {
                 State.currentSiteId = null;
                 State.references = null;
+                State.referencesSiteId = null;
             }
             const sites = await api.listSites();
             State.sites = sites;
@@ -1596,9 +1609,100 @@ async function loadArticlesScreen() {
     }
 }
 
+/**
+ * The cached reference data for a site, or null when the shared slot holds
+ * another site's data (or none). `State.references` is a single slot shared
+ * by every screen, so nothing may read it without naming the site it wants
+ * (gh-42).
+ */
+function cachedReferences(siteId) {
+    if (!siteId || State.referencesSiteId !== siteId) return null;
+    return State.references;
+}
+
+/** Puts a site's freshly-fetched reference data in the shared slot. */
+function setCachedReferences(siteId, refs) {
+    State.references = refs;
+    State.referencesSiteId = siteId || null;
+}
+
+/**
+ * Drops every SPA-side cache of a site's reference data. Called after the
+ * server-side cache for that site has been refreshed, and before anything is
+ * re-read, so no screen can keep painting a list the site no longer has
+ * (gh-42).
+ */
+function invalidateSiteReferences(siteId) {
+    if (State.referencesSiteId === siteId) setCachedReferences(null, null);
+    if (State.articleListRefs && State.articleListRefs.siteId === siteId) State.articleListRefs = null;
+}
+
+/** How old cached site reference data may get before it is quietly refreshed (gh-42). */
+const REFERENCES_MAX_AGE_MS = 15 * 60 * 1000;
+
+/** `Y-m-d H:i:s` in UTC, N ms ago — comparable as a plain string (see CLAUDE.md). */
+function utcStampAgo(ms) {
+    const d = new Date(Date.now() - ms);
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} `
+         + `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+}
+
+/**
+ * Applies a freshly-refreshed reference payload for a site: drops the stale
+ * per-screen caches, re-seeds the shared slot, and repaints whichever screen
+ * is showing data derived from it (gh-42).
+ *
+ * The editor is repainted through its own form-preserving path — a re-render
+ * that dropped the user's unsaved selections would be a far worse bug than a
+ * stale category list.
+ */
+async function applyRefreshedReferences(siteId, refs) {
+    invalidateSiteReferences(siteId);
+    setCachedReferences(siteId, refs);
+
+    if (siteId === State.currentSiteId && State.activeScreen === 'articles') {
+        await loadArticlesScreen();
+    }
+
+    if (State.activeScreen === 'editor' && State.currentDraft && State.currentDraft.siteId === siteId) {
+        const current = collectDraftFormData();
+        renderEditorSidebar({ ...State.currentDraft, ...current });
+    }
+}
+
+/**
+ * Quietly brings a site's reference data up to date, if it looks stale.
+ *
+ * Fire-and-forget: the caller has already rendered from the cache, so a slow
+ * or failed refresh changes nothing. An error is swallowed — an offline site
+ * must behave exactly as it did before this existed (gh-42).
+ *
+ * Re-entrancy note: applyRefreshedReferences() may call loadArticlesScreen(),
+ * which calls loadArticleFilterRefs(), which calls this function again. The
+ * "mark before fetching" guard below is what stops that from looping: the
+ * second call sees the site already freshened *and* a fetchedAt that is now
+ * only seconds old, so it returns immediately.
+ */
+function ensureFreshReferences(siteId, fetchedAt) {
+    if (!siteId) return;
+    if (State.referencesFreshened.has(siteId) && fetchedAt && fetchedAt >= utcStampAgo(REFERENCES_MAX_AGE_MS)) return;
+
+    // Mark before the request, not after, so two overlapping callers do not
+    // both fire; if the request fails, leave it marked — retrying on every
+    // screen visit against a dead site is worse than waiting for the TTL or
+    // the manual button.
+    State.referencesFreshened.add(siteId);
+
+    api.refreshReferences(siteId).then(refs => applyRefreshedReferences(siteId, refs)).catch(() => {});
+}
+
 /** Loads (and caches per-site) the categories/tags/languages for the filter bar. */
 async function loadArticleFilterRefs() {
-    if (State.articleListRefs && State.articleListRefs.siteId === State.currentSiteId) return;
+    if (State.articleListRefs && State.articleListRefs.siteId === State.currentSiteId) {
+        ensureFreshReferences(State.currentSiteId, State.articleListRefs.fetchedAt);
+        return;
+    }
     try {
         const refs = await api.getReferences(State.currentSiteId);
         State.articleListRefs = {
@@ -1606,7 +1710,9 @@ async function loadArticleFilterRefs() {
             categories: refs.categories || [],
             tags: refs.tags || [],
             languages: refs.languages || [],
+            fetchedAt: refs.fetchedAt || null,
         };
+        ensureFreshReferences(State.currentSiteId, refs.fetchedAt);
     } catch {
         State.articleListRefs = { siteId: State.currentSiteId, categories: [], tags: [], languages: [] };
     }
@@ -2262,12 +2368,12 @@ async function openDraftInEditor(draft) {
 async function openEditorScreen(draft) {
     showScreen('editor');
 
-    const needRefs = !State.references;
+    const needRefs = !cachedReferences(draft.siteId);
     const needCss = State.editorCss === null;
     const promises = [];
 
     if (needRefs) {
-        promises.push(api.getReferences(draft.siteId).then(r => { State.references = r; }));
+        promises.push(api.getReferences(draft.siteId).then(r => { setCachedReferences(draft.siteId, r); }));
     }
     if (needCss) {
         promises.push(
@@ -2287,6 +2393,12 @@ async function openEditorScreen(draft) {
     // Snapshot the freshly-loaded form so we can detect unsaved changes later.
     State.editorBaseline = JSON.stringify(collectDraftFormData());
 
+    // Quietly bring this site's reference data up to date if it looks stale
+    // (gh-42). Must come after the baseline snapshot above, or a repaint
+    // racing the snapshot could mark a pristine article dirty.
+    const cached = cachedReferences(draft.siteId);
+    ensureFreshReferences(draft.siteId, cached ? cached.fetchedAt : null);
+
     // Notify the AI panel that the editor has (re)initialised. The panel resets
     // its conversation state and hides itself so each article starts with a
     // clean slate. panel.js may not be loaded in tests, so guard the call.
@@ -2301,7 +2413,7 @@ function renderEditorSidebar(draft) {
     // across metadata reloads, which pass the collected images back in).
     State.editorImages = normalizeImages(draft.images);
 
-    const refs = State.references || {
+    const refs = cachedReferences(draft.siteId) || {
         categories: [], tags: [], levels: [], languages: [],
         fields: { supported: [], unsupported: [] },
     };
@@ -2386,13 +2498,12 @@ function renderEditorSidebar(draft) {
     sidebar.appendChild(renderImagesSection(draft.siteId));
 
     // Reload the site's reference metadata (categories, tags, access levels,
-    // languages, custom fields). Re-renders the sidebar afterwards, preserving
-    // the current unsaved selections.
+    // languages, custom fields). applyRefreshedReferences() (called from
+    // reloadSiteMetadata()) re-renders the sidebar afterwards, preserving the
+    // current unsaved selections (gh-42).
     const reloadBtn = iconBtn('arrows-rotate', t('GRAFIDA_BTN_RELOAD_METADATA'), 'btn', 'btn-sm', 'btn-secondary');
     reloadBtn.addEventListener('click', async () => {
-        const current = collectDraftFormData();
-        const ok = await reloadSiteMetadata(draft.siteId, reloadBtn);
-        if (ok) renderEditorSidebar({ ...draft, ...current });
+        await reloadSiteMetadata(draft.siteId, reloadBtn);
     });
     sidebar.appendChild(el('div', 'sidebar-reload', reloadBtn));
 }
@@ -2449,10 +2560,10 @@ async function changeEditorSite(newSiteId) {
     State.editorForceDirty = true;
 
     // Reload the new site's reference data and editor CSS, then rebuild.
-    State.references = null;
+    setCachedReferences(null, null);
     State.editorCss = null;
     try {
-        State.references = await api.getReferences(newSiteId);
+        setCachedReferences(newSiteId, await api.getReferences(newSiteId));
     } catch (err) {
         showToast(err.message, 'error');
     }
@@ -5028,7 +5139,9 @@ function blobToBase64(blob) {
  * by Joomla anyway, so this only needs to be a faithful preview of the result.
  */
 function makeAlias(text) {
-    const str = aliasSlug(text, !!(State.references && State.references.unicodeSlugs));
+    const siteId = State.currentDraft && State.currentDraft.siteId;
+    const refs = cachedReferences(siteId);
+    const str = aliasSlug(text, !!(refs && refs.unicodeSlugs));
 
     // Joomla considers an alias of nothing but dashes as empty too.
     if (str.replace(/-/g, '').trim() !== '') return str;
@@ -5106,7 +5219,7 @@ function regenerateAlias(force) {
  */
 function collectDraftFormData() {
     const editor = State.tinyMCEEditor;
-    const refs = State.references || { fields: { supported: [] } };
+    const refs = cachedReferences(State.currentDraft && State.currentDraft.siteId) || { fields: { supported: [] } };
 
     const fields = {};
     (refs.fields.supported || []).forEach(field => {
@@ -7172,6 +7285,7 @@ document.addEventListener('DOMContentLoaded', () => {
             State.currentSiteId = val ? parseInt(val, 10) : null;
             rememberLastSite(State.currentSiteId);
             State.references = null;
+            State.referencesSiteId = null;
             State.editorCss = null;
             renderSidebarFavicon();
             updateNewArticleButton();

@@ -188,6 +188,11 @@ final class SiteController extends Controller
             // title stays Greek instead of being transliterated away.
             'unicodeSlugs' => $this->references->unicodeSlugs($site, $refresh),
             'favicon'    => $refresh && $site->id !== null ? $this->favicons->dataUri($site->id) : null,
+            // When the cache was last warmed (the oldest of the refreshable
+            // kinds), or null when it has never been fully warmed. Read after
+            // the refresh calls above, so a refresh = true request reports the
+            // timestamp it just wrote. Drives the SPA's background freshening.
+            'fetchedAt' => $this->references->fetchedAt($site),
         ]);
     }
 
