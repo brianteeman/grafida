@@ -136,3 +136,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | chat panel | panneau de discussion | The docked AI conversation panel in the editor. |
 | version note | note de version | Joomla term (JGLOBAL_FIELD_VERSION_NOTE_LABEL); the note stored with a revision in the article version history. |
 | spell checking | vérification orthographique | The OS-native spell checker in the editor (gh-24). |
+| search (source code) | Rechercher | Search in the source code editor (CodeMirror); the search bar label « Rechercher : » (gh-34). Espace avant les deux-points, comme ailleurs. |
+| replace | Remplacer | Replace text in the source code editor; « Tout remplacer » for replace all (gh-34). |
+| find next / previous | rechercher le suivant / le précédent | Jump to the next or previous match; help dialog rows (gh-34). |
+| regexp | expression régulière | Search pattern in the source code editor search bar (gh-34). |

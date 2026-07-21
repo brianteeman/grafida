@@ -136,3 +136,7 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | chat panel | Chat-Panel | Das angedockte KI-Unterhaltungsfenster im Editor. |
 | version note | Versionshinweis | Joomla-Begriff (JGLOBAL_FIELD_VERSION_NOTE_LABEL); der Hinweis, der mit einer Version im Versionsverlauf gespeichert wird. |
 | spell checking | Rechtschreibprüfung | Die native Rechtschreibprüfung des Betriebssystems im Editor (gh-24). |
+| search (source code) | Suchen | Suche im Quellcode-Editor (CodeMirror); Beschriftung der Suchleiste „Suchen:“ (gh-34). Vgl. „Suchen…“ als Filter-Platzhalter. |
+| replace | Ersetzen | Text im Quellcode-Editor ersetzen; „Alle ersetzen“ für replace all (gh-34). |
+| find next / previous | weitersuchen / rückwärts suchen | Zum nächsten bzw. vorherigen Treffer springen; Zeilen im Hilfe-Dialog (gh-34). |
+| regexp | regulärer Ausdruck | Suchmuster in der Suchleiste des Quellcode-Editors (gh-34). |

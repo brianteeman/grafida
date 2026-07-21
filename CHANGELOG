@@ -1,6 +1,7 @@
 Grafida 0.2
 ================================================================================
 + Slash commands: type / in the editor for a filterable menu of headings, lists, images and more; switch it off in Settings (gh-9)
++ Search and replace in the source code editor with Ctrl/Cmd+F (gh-34)
 + Editable article alias (URL slug) in the editor, auto-generated from the title
 + Created by Alias in the editor, to credit an author other than the publishing account (gh-8)
 + Searchable icon picker for AI tools

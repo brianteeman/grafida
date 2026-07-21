@@ -474,12 +474,36 @@ window-free in tests (a null dialog makes the endpoint return 503).
   buttons carry a leading `<i class="fa-solid fa-…" aria-hidden="true">` before the label;
   in `app.js` use the `icon()` / `iconBtn()` helpers. Source-code editing uses vendored
   **CodeMirror 5** (`js/codemirror/`: `lib/` + `mode/{xml,javascript,css,htmlmixed}` +
-  `addon/edit/{matchbrackets,closetag}` + the `material-darker` dark theme) instead of
+  `addon/edit/{matchbrackets,closetag}` + `addon/dialog` + `addon/search/{search,searchcursor,
+  jump-to-line}` + the `material-darker` dark theme) instead of
   TinyMCE's stock `code` plugin: that plugin is dropped from the `plugins` list, and a
   custom `sourcecode` toolbar button + Tools-menu item (registered in the editor `setup`)
   opens `openSourceCodeEditor()` — a `showModal()` dialog hosting a CodeMirror `htmlmixed`
   editor (light `default` / dark `material-darker` theme, matched to `State.resolvedTheme`).
   Save writes the source back via `editor.setContent(…, {source_view: true})` in one undo step.
+  **Search/replace** (gh-34) is the stock CM5 search bar, *not* the Find/next/previous/all panel
+  in the issue's screenshot — that is Joomla's CodeMirror **6**, a different library we do not
+  ship. Four things worth knowing:
+  - **TinyMCE never sees the find chord**, despite the editor living behind an editor button: the
+    source editor is the SPA's own `showModal()` overlay in the top-level document, outside
+    TinyMCE's container *and* its iframe, so its shortcut handlers never fire there. The two
+    document-level chords in `app.js` (Ctrl/Cmd+S, Ctrl/Cmd+,) don't collide either.
+  - `codeSearchKeys()` binds **platform-native chords only** — Cmd on macOS, Ctrl elsewhere,
+    per the gh-13 rationale — to the *persistent* commands (`findPersistent` &co.); replace,
+    replace-all and `Alt-G` jump-to-line come from CodeMirror's own default keymap.
+  - ⚠️ **`makeCodeSearchPersistent()` is load-bearing twice over.** CodeMirror's "persistent" bar
+    is only persistent against Enter — it still closes on focusout, so clicking into the code to
+    fix what you found would drop the bar and every match highlight; the governing `closeOnBlur`
+    option is hard-coded inside the addon, so the helper wraps the instance's `openDialog` to
+    force it (closing any open dialog first, since without blur-closing two would stack). It then
+    installs a **capture-phase Escape guard**, because with the bar open and focus in the code
+    Escape would otherwise reach `_modalEscHandler` and discard the whole edit.
+  - The dialogs' English literals are localised through CodeMirror's **`phrases`** option
+    (`codeSearchPhrases()`), which is keyed by the addon's own source strings — so the map's keys
+    are `'Search:'`, `'Replace all:'` … and must not be tidied. Yes/No reuse `GRAFIDA_BTN_YES`/`_NO`.
+  `addon/search/matchesonscrollbar` (scrollbar match markers) is deliberately **not** vendored:
+  `annotatescrollbar` only paints when `cm.display.barWidth` is non-zero, which overlay scrollbars
+  (macOS, and Chromium generally) make 0 — it would render on some platforms and not others.
   The toolbar also carries a **"Styles" drop-down** (`styleselect`, a custom `addMenuButton`
   registered in `setup`) that applies a CSS class to the selection the way Joomla's editor does.
   Its class list is `editorStyleClasses()` — class names `parseEditorCssClasses()` discovers in the

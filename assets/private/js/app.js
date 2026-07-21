@@ -2583,6 +2583,12 @@ function grafidaHelpTab() {
         ['GRAFIDA_LBL_HELP_SC_CODE', 'Ctrl + Shift + C'],
         ['GRAFIDA_LBL_HELP_SC_PRE', 'Ctrl + Shift + P'],
         ['GRAFIDA_LBL_HELP_SC_QUOTE', 'Ctrl + Shift + Q'],
+        // The source editor's find chords are CodeMirror's platform defaults,
+        // and its replace chord is the one that differs between them (gh-34).
+        ['GRAFIDA_LBL_HELP_SC_FIND', 'Meta + F'],
+        ['GRAFIDA_LBL_HELP_SC_FIND_NEXT', 'Meta + G'],
+        ['GRAFIDA_LBL_HELP_SC_FIND_PREV', 'Shift + Meta + G'],
+        ['GRAFIDA_LBL_HELP_SC_REPLACE', isMacPlatform() ? 'Meta + Alt + F' : 'Meta + Shift + F'],
     ];
     const items = [{
         type: 'table',
@@ -3406,10 +3412,107 @@ async function browseImageMedia(kind, siteId) {
 }
 
 /**
+ * The CodeMirror search/replace dialog strings, translated (gh-34). CodeMirror
+ * looks each English source string up in the `phrases` option, so the map is
+ * keyed by the addons' own literals — do not "tidy" the keys.
+ */
+function codeSearchPhrases() {
+    return {
+        'Search:': t('GRAFIDA_LBL_CM_SEARCH'),
+        '(Use /re/ syntax for regexp search)': t('GRAFIDA_LBL_CM_REGEXP_HINT'),
+        'With:': t('GRAFIDA_LBL_CM_WITH'),
+        'Replace?': t('GRAFIDA_LBL_CM_REPLACE_Q'),
+        'Replace:': t('GRAFIDA_LBL_CM_REPLACE'),
+        'Replace all:': t('GRAFIDA_LBL_CM_REPLACE_ALL'),
+        'Replace with:': t('GRAFIDA_LBL_CM_REPLACE_WITH'),
+        'Yes': t('GRAFIDA_BTN_YES'),
+        'No': t('GRAFIDA_BTN_NO'),
+        'All': t('GRAFIDA_BTN_CM_ALL'),
+        'Stop': t('GRAFIDA_BTN_CM_STOP'),
+        'Jump to line:': t('GRAFIDA_LBL_CM_JUMP_TO_LINE'),
+        '(Use line:column or scroll% syntax)': t('GRAFIDA_LBL_CM_JUMP_HINT'),
+    };
+}
+
+/**
+ * Bind the source editor's find shortcuts to CodeMirror's *persistent* search
+ * bar (the stock one-shot dialog closes on the first Enter, which makes
+ * next/previous unusable). Platform-native chords only — Cmd on macOS, Ctrl
+ * elsewhere — matching hasPrimaryModifier() and the rest of the app; the
+ * replace, replace-all and jump-to-line chords come from CodeMirror's own
+ * default keymap. search.js reads extraKeys first when handling a key pressed
+ * inside the bar, so Enter/next/previous work from there too.
+ */
+function codeSearchKeys() {
+    return isMacPlatform()
+        ? {
+            'Cmd-F': 'findPersistent',
+            'Cmd-G': 'findPersistentNext',
+            'Shift-Cmd-G': 'findPersistentPrev',
+        }
+        : {
+            'Ctrl-F': 'findPersistent',
+            'Ctrl-G': 'findPersistentNext',
+            'Shift-Ctrl-G': 'findPersistentPrev',
+        };
+}
+
+/**
+ * Make the source editor's search bar stay put, and keep Escape from closing
+ * the whole modal while it is open (gh-34).
+ *
+ * CodeMirror's "persistent" search bar is only persistent against Enter: it
+ * still closes on focusout, so clicking into the code to fix what you found
+ * makes the bar and every match highlight vanish. The option that governs that
+ * (`closeOnBlur`) is hard-coded inside the addon, so wrap the instance's
+ * openDialog to force it — and close any dialog still open first, since with
+ * blur-closing gone two of them would otherwise stack up.
+ *
+ * That leaves Escape: the dialog swallows its own while it has focus, but with
+ * focus in the code it would bubble to _modalEscHandler and discard the edit.
+ * The capture-phase listener runs before that one and closes just the dialog
+ * (through the addon's own close callback, so the search highlight is cleared
+ * too). It unregisters itself once the host is gone, so the modal's Save and
+ * Cancel paths need no cleanup hook.
+ */
+function makeCodeSearchPersistent(host, cm) {
+    const openDialog = cm.openDialog.bind(cm);
+    let closeDialog = null;
+
+    cm.openDialog = (template, callback, options) => {
+        if (closeDialog) closeDialog();
+        closeDialog = openDialog(template, callback, Object.assign({}, options, { closeOnBlur: false }));
+        return closeDialog;
+    };
+
+    const guard = (e) => {
+        if (!host.isConnected) {
+            document.removeEventListener('keydown', guard, true);
+            return;
+        }
+        if (e.key !== 'Escape' || !host.querySelector('.CodeMirror-dialog')) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+        if (closeDialog) closeDialog();
+        // openConfirm — the replace Yes/No/All/Stop bar — hands out no close
+        // callback of its own, so tidy up whatever is left by hand.
+        host.querySelectorAll('.CodeMirror-dialog').forEach((dialog) => {
+            if (dialog.parentNode) dialog.parentNode.classList.remove('dialog-opened');
+            dialog.remove();
+        });
+        cm.execCommand('clearSearch');
+        cm.focus();
+    };
+    document.addEventListener('keydown', guard, true);
+}
+
+/**
  * Open the article HTML in a CodeMirror source-code editor (a modal), replacing
  * TinyMCE's stock "code" plugin so raw HTML gets syntax highlighting, line
- * numbers and bracket/tag matching. On Save the edited source is written back
- * into TinyMCE as a single undo step; Cancel (or Escape) discards.
+ * numbers, bracket/tag matching and search/replace. On Save the edited source
+ * is written back into TinyMCE as a single undo step; Cancel (or Escape)
+ * discards.
  */
 function openSourceCodeEditor(editor) {
     const host = el('div', 'cm-source-host');
@@ -3439,7 +3542,10 @@ function openSourceCodeEditor(editor) {
         matchBrackets: true,
         indentUnit: 2,
         tabSize: 2,
+        extraKeys: codeSearchKeys(),
+        phrases: codeSearchPhrases(),
     });
+    makeCodeSearchPersistent(host, cm);
     // CodeMirror mis-measures while the modal is laid out; refresh once visible.
     setTimeout(() => { cm.refresh(); cm.focus(); }, 0);
 }

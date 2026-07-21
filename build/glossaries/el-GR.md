@@ -136,3 +136,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | chat panel | πίνακας συνομιλίας | The docked AI conversation panel in the editor. |
 | version note | σημείωση έκδοσης | Joomla term (JGLOBAL_FIELD_VERSION_NOTE_LABEL); the note stored with a revision in the article version history. |
 | spell checking | ορθογραφικός έλεγχος | The OS-native spell checker in the editor (gh-24). |
+| search (source code) | Αναζήτηση | Search in the source code editor (CodeMirror); the search bar label «Αναζήτηση:» (gh-34). |
+| replace | Αντικατάσταση | Replace text in the source code editor; «Αντικατάσταση όλων» for replace all (gh-34). |
+| find next / previous | εύρεση επόμενου / προηγούμενου | Jump to the next or previous match; help dialog rows (gh-34). |
+| regexp | κανονική έκφραση | Search pattern in the source code editor search bar (gh-34). |

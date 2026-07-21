@@ -1473,6 +1473,64 @@ input[type="color"].form-control {
     line-height: 1.5;
 }
 
+/*
+ * Search / replace dialogs (gh-34). CodeMirror's dialog.css inherits the
+ * editor's background and hard-codes a #eee separator, which is invisible in
+ * the dark theme; dress the bar as an app surface instead.
+ */
+.cm-source-host .CodeMirror-dialog {
+    background: var(--color-surface-2);
+    color: var(--color-text);
+    padding: 6px 10px;
+    font-family: var(--font-main);
+    font-size: 13px;
+}
+
+.cm-source-host .CodeMirror-dialog-top {
+    border-bottom: 1px solid var(--color-border);
+}
+
+.cm-source-host .CodeMirror-dialog-bottom {
+    border-top: 1px solid var(--color-border);
+}
+
+.cm-source-host .CodeMirror-dialog input {
+    background: var(--color-input-bg);
+    border: 1px solid var(--color-input-border);
+    border-radius: var(--radius);
+    color: var(--color-text);
+    padding: 3px 6px;
+    font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+    font-size: 12px;
+}
+
+.cm-source-host .CodeMirror-dialog input:focus {
+    outline: none;
+    border-color: var(--color-input-focus);
+}
+
+.cm-source-host .CodeMirror-search-hint {
+    color: var(--color-text-muted) !important;
+}
+
+.cm-source-host .CodeMirror-search-label {
+    margin-right: 4px;
+}
+
+.cm-source-host .CodeMirror-dialog button {
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius);
+    color: var(--color-text);
+    cursor: pointer;
+    font-size: 12px;
+    padding: 2px 8px;
+}
+
+.cm-source-host .CodeMirror-dialog button:hover {
+    border-color: var(--color-accent);
+}
+
 .media-browser {
     display: flex;
     flex-direction: column;

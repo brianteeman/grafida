@@ -190,6 +190,31 @@
             },
             {
                 "type": "file",
+                "from": "node_modules/codemirror/addon/dialog/dialog.js",
+                "to": "assets/private/js/codemirror/addon/dialog/dialog.js"
+            },
+            {
+                "type": "file",
+                "from": "node_modules/codemirror/addon/dialog/dialog.css",
+                "to": "assets/private/js/codemirror/addon/dialog/dialog.css"
+            },
+            {
+                "type": "file",
+                "from": "node_modules/codemirror/addon/search/searchcursor.js",
+                "to": "assets/private/js/codemirror/addon/search/searchcursor.js"
+            },
+            {
+                "type": "file",
+                "from": "node_modules/codemirror/addon/search/search.js",
+                "to": "assets/private/js/codemirror/addon/search/search.js"
+            },
+            {
+                "type": "file",
+                "from": "node_modules/codemirror/addon/search/jump-to-line.js",
+                "to": "assets/private/js/codemirror/addon/search/jump-to-line.js"
+            },
+            {
+                "type": "file",
                 "from": "node_modules/codemirror/theme/material-darker.css",
                 "to": "assets/private/js/codemirror/theme/material-darker.css"
             }
@@ -202,11 +227,16 @@
                 "assets/private/js/codemirror/mode/css/css.js",
                 "assets/private/js/codemirror/mode/htmlmixed/htmlmixed.js",
                 "assets/private/js/codemirror/addon/edit/matchbrackets.js",
-                "assets/private/js/codemirror/addon/edit/closetag.js"
+                "assets/private/js/codemirror/addon/edit/closetag.js",
+                "assets/private/js/codemirror/addon/dialog/dialog.js",
+                "assets/private/js/codemirror/addon/search/searchcursor.js",
+                "assets/private/js/codemirror/addon/search/search.js",
+                "assets/private/js/codemirror/addon/search/jump-to-line.js"
             ],
             "css": [
                 "assets/private/js/codemirror/lib/codemirror.css",
-                "assets/private/js/codemirror/theme/material-darker.css"
+                "assets/private/js/codemirror/theme/material-darker.css",
+                "assets/private/js/codemirror/addon/dialog/dialog.css"
             ]
         }
     },

@@ -135,3 +135,7 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | chat panel | pannello di conversazione | Il pannello di conversazione IA agganciato nell'editor. |
 | version note | nota di versione | Termine Joomla (JGLOBAL_FIELD_VERSION_NOTE_LABEL); la nota salvata con una revisione nella cronologia delle versioni. |
 | spell checking | controllo ortografico | Il controllo ortografico nativo del sistema operativo nell'editor (gh-24). |
+| search (source code) | Cerca | Search in the source code editor (CodeMirror); the search bar label «Cerca:» (gh-34). |
+| replace | Sostituisci | Replace text in the source code editor; «Sostituisci tutto» for replace all (gh-34). |
+| find next / previous | trova successivo / precedente | Jump to the next or previous match; help dialog rows (gh-34). |
+| regexp | espressione regolare | Search pattern in the source code editor search bar (gh-34). |
