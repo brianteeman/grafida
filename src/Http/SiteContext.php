@@ -136,6 +136,13 @@ final class SiteContext
      * webservice exposes the category only as a JSON:API relationship — both are
      * accepted. An id the cache does not know leaves `categoryTitle` null.
      *
+     * The category lookup is deliberately **best-effort**: a title is a
+     * decoration on a list that is already in hand, so an unreachable site must
+     * never fail the list itself. This is what let an offline machine take the
+     * whole Articles screen down — `GET /api/sites/{id}/drafts` lists purely
+     * local drafts, but a strict lookup here threw before it could answer, so
+     * even the Local Articles tab was unreachable without a network (gh-29).
+     *
      * @param list<array<string, mixed>> $articles
      *
      * @return list<array<string, mixed>>
@@ -143,7 +150,7 @@ final class SiteContext
     public function withCategoryTitles(array $articles, Site $site): array
     {
         $titles = [];
-        foreach ($this->references->categories($site) as $cat) {
+        foreach ($this->references->categories($site, false, true) as $cat) {
             $id = $cat['id'] ?? null;
             if (is_numeric($id)) {
                 $titleVal        = $cat['title'] ?? null;

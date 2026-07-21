@@ -68,7 +68,19 @@ window-free in tests (a null dialog makes the endpoint return 503).
 - `src/Http/` — `HttpClient` (curl/stream transport to Joomla), `Json`, and the internal API.
   `ApiController` is now only a **dispatcher** (~120 lines): it assembles a `Router` from the
   controllers and maps exceptions to responses (`PublishBlockedException` → 422,
-  `SecureStoreUnavailableException` → 409, `ApiException` → 502, `\Throwable` → 500).
+  `SecureStoreUnavailableException` → 409, `ApiException` → 502, `HttpException` → 503,
+  `\Throwable` → 500).
+  ⚠️ **A transport failure is not one error, but two** (gh-29). `HttpClient::requestCurl()` now
+  passes `curl_errno()` through on `HttpException`, and `isConnectivityFailure()` checks it
+  against the errnos that mean "never reached a server" (DNS failure, refused/unreachable
+  connection, timeout — `6`/`7`/`28`, plus the send/recv/proxy variants). `ApiController::dispatch()`
+  maps a connectivity failure to `{code: "network_unreachable"}` / HTTP 503 with the raw cURL text
+  demoted to a `detail` field, and anything else (a TLS handshake failure, say) to
+  `{code: "transport"}` / 503 — deliberately **not** the friendly wording, since telling someone to
+  check their internet connection over a bad certificate would be actively misleading. The
+  stream-wrapper fallback (`requestStream()`, used when ext-curl is absent) always constructs with
+  `curlErrno = 0`, so it degrades to the generic `transport` code — it has no machine-readable cause
+  to classify.
   `Router` holds a real route table — `{name}` placeholders compile to anchored regexes, and
   handlers resolve their controller **from the container on match**, so a request builds one
   controller, not nine. A path that matches with an unregistered method returns **405**; an
@@ -82,6 +94,14 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `withCategoryTitles`, the JSON:API relationship readers) live in `Grafida\Http\SiteContext`,
   an injected collaborator — composition, not a god base class. Controllers must never call
   each other; share through the injected services.
+  ⚠️ **`SiteContext::withCategoryTitles()` looks the categories up best-effort** (`categories($site,
+  false, true)`), and must stay that way (gh-29). A category *title* is a decoration on a list that
+  is already in hand, so a site we cannot reach must never fail the list itself — and one of its two
+  callers, `DraftController::listDrafts()`, is otherwise a **purely local** read. A strict lookup
+  there is what took the whole Articles screen down on an offline machine with a cold reference
+  cache: the Local Articles tab needs no network at all, but the screen-level fetch threw before it
+  could render, so only the error block was left. Offline, the drafts tab must work and only the
+  Remote Articles tab may show an error.
   ⚠️ **Nothing the internal API answers may be cached by the webview** (gh-35). `boson://app/api/…`
   is an ordinary URL as far as WKWebView/WebView2 are concerned, so a GET whose response says
   nothing about freshness is cached heuristically — in a **disk-backed, app-scoped** cache that
@@ -108,6 +128,10 @@ window-free in tests (a null dialog makes the endpoint return 503).
   dialog, so the filename (`grafida-request-log-<timestamp>.json`) is derived and the file
   written server-side instead.
 - `src/Joomla/ApiClient.php` — Joomla REST client: base-URL normalisation + probing, JSON:API.
+  `probeApiBase()` remembers the first **connectivity** `HttpException` across the candidate bases
+  and, when no candidate ever answers, rethrows it rather than reporting "no working API endpoint
+  found" (gh-29) — offline must not be blamed on the URL. An auth failure (401/403 from a candidate
+  that did answer) still takes priority over a transport failure on another candidate.
 - `src/Secret/` — OS secret stores (macOS `security`, Linux `secret-tool`, Windows DPAPI) + factory.
   Windows DPAPI runs through **`WindowsDpapi`** (a direct FFI call into `crypt32.dll`), **not** a
   `powershell.exe` spawn — see the Windows build note below for why (the multi-second UI stall).
@@ -656,7 +680,27 @@ window-free in tests (a null dialog makes the endpoint return 503).
   UI icons use the **FontAwesome 7 Free** solid font (`css/fontawesome.min.css`
   + `css/solid.min.css` + `webfonts/fa-solid-900.woff2`) — never images/emoji. Action
   buttons carry a leading `<i class="fa-solid fa-…" aria-hidden="true">` before the label;
-  in `app.js` use the `icon()` / `iconBtn()` helpers. Source-code editing uses vendored
+  in `app.js` use the `icon()` / `iconBtn()` helpers.
+  ⚠️ **Every pane-level error/empty placeholder goes through `stateBlock()` / `errorState()`**
+  (gh-29), never a hand-rolled `<div class="alert alert-error">` or a bespoke class: before this,
+  the same caught error rendered three different ways — a narrow square in the Media Manager's CSS
+  grid, a full-width bar with no icon in the Articles list, and unstyled centred text (a different
+  class entirely) in the media browser modal. `errorState(err, {onRetry})` is the one call site an
+  API-fetch `catch` should use; it reads `err.code === 'network_unreachable'` (see `src/Http/`) to
+  show `GRAFIDA_MSG_OFFLINE` with the raw server message demoted to a muted `.state-block-detail`
+  line, or the server's own message unchanged for anything else, so it can never swallow a real
+  error. `.state-block`'s `grid-column: 1 / -1` is **load-bearing, unconditionally** — several of
+  these are appended straight into an `auto-fill` CSS grid (the Media Manager grid, the media
+  browser modal's grid), where a plain block would occupy a single `minmax()` column and render as a
+  narrow square; the rule is inert (a no-op) in a non-grid parent, so one helper serves both shapes.
+  An `onRetry` callback is attached only where the enclosing loader is idempotent and safe to
+  re-run wholesale — never where a candidate handler mutates shared state before fetching, in which
+  case either the outer loader is used instead or the retry is omitted entirely (an error block with
+  no retry button is fine; a retry that leaves the screen half-built is not). Deliberately **left
+  alone**: the Request Log's per-entry error line (a field inside a rendered record, not a pane
+  placeholder), the connection-test result panel (an inline form result with its own layout), and
+  the `typeof tinymce === 'undefined'` fatal (a full-page condition, not a list/grid item).
+  Source-code editing uses vendored
   **CodeMirror 5** (`js/codemirror/`: `lib/` + `mode/{xml,javascript,css,htmlmixed}` +
   `addon/edit/{matchbrackets,closetag}` + `addon/dialog` + `addon/search/{search,searchcursor,
   jump-to-line}` + the `material-darker` dark theme) instead of

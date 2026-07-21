@@ -32,6 +32,9 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | delete local article | Eliminar artículo local | Acción para eliminar definitivamente un artículo local. |
 | back | Atrás | Botón para salir del editor y volver a la lista de artículos. |
 | refresh | Actualizar | Botón para recargar los datos de referencia (categorías, etiquetas, etc.). |
+| retry | Reintentar | Botón que repite una solicitud fallida (gh-29). |
+| offline / site unreachable | No se pudo contactar con el sitio | Fallo de transporte (DNS/conexión/tiempo de espera), distinto de un token de API rechazado. GRAFIDA_MSG_OFFLINE. |
+| internet connection | conexión a Internet | La conexión de red del dispositivo, distinta de la «conexión» con la API del sitio. |
 | local storage | almacenamiento local | Los datos SQLite locales de la app en el equipo (sitios, artículos locales, tokens, caché). |
 | database | base de datos | La base de datos SQLite local. |
 | folder | carpeta | Directorio del sistema de archivos; «carpeta contenedora» = la carpeta que contiene el archivo de la base de datos. |

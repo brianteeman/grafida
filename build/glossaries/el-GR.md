@@ -32,6 +32,9 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | delete local article | Διαγραφή τοπικού άρθρου | Action to permanently remove a local article. |
 | back | Πίσω | Button to leave the editor and return to the article list. |
 | refresh | Ανανέωση | Button to reload reference data (categories, tags, etc.). |
+| retry | Επανάληψη | Button that re-runs a failed request (gh-29). |
+| offline / site unreachable | Δεν ήταν δυνατή η πρόσβαση στον ιστότοπο | Transport-level failure (DNS/connection/timeout), distinct from a rejected API token. GRAFIDA_MSG_OFFLINE. |
+| internet connection | σύνδεση στο διαδίκτυο | The device's own network connection, distinct from the "σύνδεση" to the site's API. |
 | local storage | τοπικός χώρος αποθήκευσης | The app's local SQLite data on the computer (sites, local articles, tokens, cache). |
 | database | βάση δεδομένων | The local SQLite database. |
 | folder | φάκελος | A file-system directory; "containing folder" = the folder holding the database file. |

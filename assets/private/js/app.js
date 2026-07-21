@@ -265,6 +265,61 @@ function setIconBtnLabel(b, iconName, label) {
 }
 
 /**
+ * Builds a full-width placeholder block for a pane that has nothing to show.
+ *
+ * Every list, grid and panel goes through this, so an error looks the same
+ * whether it lands in the Articles list, the Media Manager's CSS grid or the
+ * media-browser modal — which is exactly what gh-29 was about. The
+ * `.state-block` rule spans grid columns unconditionally, so a caller never has
+ * to know whether its container is a grid.
+ *
+ * @param {string}       variant       'error' | 'info'
+ * @param {string}       iconName      FontAwesome name, without the `fa-` prefix.
+ * @param {string}       message       The (already localised) sentence to show.
+ * @param {object}      [opts]
+ * @param {string}      [opts.detail]  Secondary technical text, rendered muted.
+ * @param {HTMLElement} [opts.action]  A button appended below the text.
+ * @returns {HTMLElement}
+ */
+function stateBlock(variant, iconName, message, opts = {}) {
+    const body = el('div', 'state-block-body', el('p', 'state-block-message', message));
+    if (opts.detail) body.appendChild(el('p', 'state-block-detail', opts.detail));
+    if (opts.action) body.appendChild(el('div', 'state-block-actions', opts.action));
+    return el('div', 'state-block state-' + variant, icon(iconName), body);
+}
+
+/**
+ * The state block for a caught API error.
+ *
+ * A connectivity failure (`code === 'network_unreachable'`, see
+ * ApiController::dispatch()) gets a sentence the user can act on, with the raw
+ * cURL diagnostic demoted to the muted detail line; anything else keeps showing
+ * the server's own message, so this can never swallow a real error.
+ *
+ * @param {object}      err
+ * @param {object}     [opts]
+ * @param {Function}   [opts.onRetry]  Attach a Retry button that re-runs the fetch.
+ * @returns {HTMLElement}
+ */
+function errorState(err, opts = {}) {
+    const offline = err && err.code === 'network_unreachable';
+    let action;
+    if (opts.onRetry) {
+        action = iconBtn('rotate-right', t('GRAFIDA_BTN_RETRY'), 'btn', 'btn-sm', 'btn-secondary');
+        action.addEventListener('click', opts.onRetry);
+    }
+    return stateBlock(
+        'error',
+        offline ? 'plug-circle-xmark' : 'triangle-exclamation',
+        offline ? t('GRAFIDA_MSG_OFFLINE') : String(err && err.message ? err.message : err),
+        {
+            detail: offline ? String(err.message || '') : undefined,
+            action,
+        },
+    );
+}
+
+/**
  * The inline font style needed to render a FontAwesome glyph inside TinyMCE's
  * toolbar/menu UI, harvested once from the loaded FontAwesome stylesheet.
  *
@@ -1621,7 +1676,7 @@ async function loadArticlesScreen() {
         await reloadRemoteArticles();
     } catch (err) {
         clearNode(container);
-        container.appendChild(el('div', 'alert alert-error', String(err.message)));
+        container.appendChild(errorState(err, { onRetry: () => loadArticlesScreen() }));
     }
 }
 
@@ -2334,7 +2389,7 @@ async function reloadRemoteArticles() {
         renderRemoteArticles();
     } catch (err) {
         clearNode(list);
-        list.appendChild(el('div', 'alert alert-error', String(err.message)));
+        list.appendChild(errorState(err, { onRetry: () => reloadRemoteArticles() }));
     }
 }
 
@@ -4251,7 +4306,7 @@ function openMediaBrowser(siteId, opts = {}) {
                 data = await api.browseMedia(siteId, path);
             } catch (err) {
                 clearNode(grid);
-                grid.appendChild(el('div', 'media-browser-error', err.message));
+                grid.appendChild(errorState(err, { onRetry: () => load(path) }));
                 return;
             }
 
@@ -4492,7 +4547,7 @@ async function loadSiteMediaTab() {
         } catch (err) {
             if (State.currentSiteId !== siteId) return;
             clearNode(panel);
-            panel.appendChild(el('div', 'alert alert-error', String(err.message)));
+            panel.appendChild(errorState(err, { onRetry: () => loadMediaScreen() }));
             return;
         }
         if (State.currentSiteId !== siteId) return;
@@ -4532,7 +4587,7 @@ async function loadLocalMediaTab() {
     } catch (err) {
         if (State.currentSiteId !== siteId || State.mediaTab !== 'local') return;
         clearNode(panel);
-        panel.appendChild(el('div', 'alert alert-error', String(err.message)));
+        panel.appendChild(errorState(err));
         return;
     }
     if (State.currentSiteId !== siteId || State.mediaTab !== 'local') return;
@@ -4588,7 +4643,7 @@ async function reloadMediaManager(path) {
     } catch (err) {
         if (State.currentSiteId !== siteId || State.mediaPath !== path) return;
         clearNode(grid);
-        grid.appendChild(el('div', 'alert alert-error', String(err.message)));
+        grid.appendChild(errorState(err, { onRetry: () => reloadMediaManager(path) }));
         return;
     }
     if (State.currentSiteId !== siteId || State.mediaPath !== path) return;
@@ -6133,7 +6188,7 @@ async function renderRequestLogScreen() {
         const result = await api.getRequestLog();
         entries = result.entries || [];
     } catch (err) {
-        list.appendChild(el('p', 'alert alert-error', icon('triangle-exclamation'), txt(' ' + err.message)));
+        list.appendChild(errorState(err, { onRetry: () => renderRequestLogScreen() }));
         return;
     }
 

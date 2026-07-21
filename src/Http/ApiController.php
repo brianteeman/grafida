@@ -70,6 +70,18 @@ final class ApiController
             return Json::error($e->getMessage(), 409, ['code' => 'secure_store_unavailable']);
         } catch (ApiException $e) {
             return Json::error($e->getMessage(), 502, ['code' => 'joomla_api', 'status' => $e->status]);
+        } catch (HttpException $e) {
+            // A transport failure the user can act on ("you are offline / the site is
+            // down") versus one they cannot ("TLS handshake failed"). Only the former
+            // gets the friendly code; the rest stay a generic transport error so we
+            // never tell someone to check their internet connection over a bad
+            // certificate. See gh-29.
+            $connectivity = $e->isConnectivityFailure();
+
+            return Json::error($e->getMessage(), 503, [
+                'code'   => $connectivity ? 'network_unreachable' : 'transport',
+                'detail' => $e->getMessage(),
+            ]);
         } catch (\Throwable $e) {
             return Json::error($e->getMessage(), 500, ['code' => 'internal']);
         }

@@ -24,8 +24,11 @@ final class FakeTransport implements Transport
     /** @var array<string, HttpResponse> */
     private array $byUrl = [];
 
-    /** @var list<string> */
+    /** @var array<string, int> URL => cURL errno (0 when unspecified). */
     private array $throwForUrls = [];
+
+    /** cURL errno every request fails with, or null when only $throwForUrls applies. */
+    private ?int $throwForEverything = null;
 
     /** @var list<array{method: string, url: string, headers: array<string,string>, body: ?string}> */
     public array $requests = [];
@@ -41,9 +44,33 @@ final class FakeTransport implements Transport
         return $this;
     }
 
-    public function throwFor(string $url): self
+    /**
+     * Makes a request to $url throw an {@see HttpException} instead of
+     * returning a response.
+     *
+     * @param int $curlErrno The cURL error number to report on the thrown
+     *                       exception. Defaults to 0 (not a connectivity
+     *                       failure); pass a connectivity errno (e.g. 6 for
+     *                       CURLE_COULDNT_RESOLVE_HOST) to simulate an offline
+     *                       machine or unreachable site (gh-29).
+     */
+    public function throwFor(string $url, int $curlErrno = 0): self
     {
-        $this->throwForUrls[] = $url;
+        $this->throwForUrls[$url] = $curlErrno;
+
+        return $this;
+    }
+
+    /**
+     * Makes *every* request throw — the machine is offline, rather than one
+     * particular URL being unreachable. Use this when the route under test may
+     * call out more than once and the point is that none of them can succeed.
+     *
+     * @param int $curlErrno See {@see throwFor()}.
+     */
+    public function throwForAll(int $curlErrno = 0): self
+    {
+        $this->throwForEverything = $curlErrno;
 
         return $this;
     }
@@ -52,8 +79,12 @@ final class FakeTransport implements Transport
     {
         $this->requests[] = ['method' => $method, 'url' => $url, 'headers' => $headers, 'body' => $body];
 
-        if (in_array($url, $this->throwForUrls, true)) {
-            throw new HttpException('Simulated transport failure for ' . $url);
+        if ($this->throwForEverything !== null) {
+            throw new HttpException('Simulated offline machine for ' . $url, $this->throwForEverything);
+        }
+
+        if (array_key_exists($url, $this->throwForUrls)) {
+            throw new HttpException('Simulated transport failure for ' . $url, $this->throwForUrls[$url]);
         }
 
         return $this->byUrl[$url] ?? $this->default;

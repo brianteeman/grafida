@@ -71,6 +71,9 @@
 :root[data-theme="light"] .alert-warning { color: #8a5800; }
 :root[data-theme="light"] .alert-info    { color: #15509c; }
 
+:root[data-theme="light"] .state-error { color: #b02525; }
+:root[data-theme="light"] .state-info  { color: #15509c; }
+
 :root[data-theme="light"] .spinner {
     border-color: rgba(17, 24, 39, 0.15);
     border-top-color: var(--color-accent);
@@ -762,6 +765,56 @@ input[type="color"].form-control {
 }
 
 .alert-info {
+    background: rgba(48, 128, 224, 0.12);
+    border-color: var(--color-info);
+    color: #80b0f0;
+}
+
+/* ------------------------------------------------------------------ */
+/*  State blocks (empty / error / loading placeholders)                */
+/* ------------------------------------------------------------------ */
+
+/*
+ * One presentation for "this pane has nothing to show". `grid-column` is
+ * unconditional and load-bearing: several of these blocks are appended
+ * straight into an `auto-fill` CSS grid (the Media Manager grid, the media
+ * browser modal's grid), where without it the block occupies a single
+ * minmax() column and renders as a narrow square (gh-29). It is inert in a
+ * non-grid parent.
+ */
+.state-block {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 20px;
+    border-radius: var(--radius);
+    border-left: 3px solid transparent;
+    font-size: 13px;
+    text-align: left;
+}
+
+.state-block .state-block-body { flex: 1 1 auto; min-width: 0; }
+
+.state-block .state-block-message { margin: 0; }
+
+/* The raw transport diagnostic under a friendly sentence. */
+.state-block .state-block-detail {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--color-text-muted);
+    word-break: break-word;
+}
+
+.state-block .state-block-actions { margin-top: 12px; }
+
+.state-error {
+    background: rgba(224, 48, 48, 0.12);
+    border-color: var(--color-danger);
+    color: #f08080;
+}
+
+.state-info {
     background: rgba(48, 128, 224, 0.12);
     border-color: var(--color-info);
     color: #80b0f0;
@@ -1668,7 +1721,6 @@ input[type="color"].form-control {
 }
 
 .media-browser-empty,
-.media-browser-error,
 .media-browser-loading {
     grid-column: 1 / -1;
     padding: 24px;

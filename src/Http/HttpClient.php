@@ -89,7 +89,7 @@ final class HttpClient implements Transport
         // No curl_close(): the handle is freed when it goes out of scope. The call has
         // been a no-op since PHP 8.0 and is deprecated as of 8.5.
         if ($result === false) {
-            throw new HttpException('HTTP request failed: ' . curl_error($ch));
+            throw new HttpException('HTTP request failed: ' . curl_error($ch), curl_errno($ch));
         }
 
         $status = (int) curl_getinfo($ch, \CURLINFO_RESPONSE_CODE);

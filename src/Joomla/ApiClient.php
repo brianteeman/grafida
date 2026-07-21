@@ -91,18 +91,31 @@ final class ApiClient
      * Probes the candidate API bases and returns the first one that responds as
      * a working Joomla API endpoint for the given token.
      *
-     * @throws ApiException If a base is reachable but authentication/permissions
-     *                      fail (so the user gets a useful message), or if no
-     *                      candidate behaves like a Joomla API endpoint.
+     * @throws ApiException  If a base is reachable but authentication/permissions
+     *                       fail (so the user gets a useful message), or if no
+     *                       candidate behaves like a Joomla API endpoint.
+     * @throws HttpException If every candidate failed to be reached at all
+     *                       (offline machine, dead DNS, site down) — rethrown
+     *                       rather than reported as "no working API endpoint",
+     *                       since that would blame the URL for a network outage
+     *                       (gh-29).
      */
     public function probeApiBase(string $root, string $token): string
     {
-        $authError = null;
+        $authError    = null;
+        $transportErr = null;
 
         foreach (self::candidateBases($root) as $base) {
             try {
                 $response = $this->raw('GET', $base . '/v1/users/levels', $token);
-            } catch (HttpException) {
+            } catch (HttpException $e) {
+                // Remember the first "could not reach the host at all" failure: if no
+                // candidate base ever answers, that is the honest explanation, not
+                // "this URL is not a Joomla API endpoint" (gh-29).
+                if ($transportErr === null && $e->isConnectivityFailure()) {
+                    $transportErr = $e;
+                }
+
                 continue; // transport failure: try the next candidate
             }
 
@@ -122,6 +135,10 @@ final class ApiClient
 
         if ($authError !== null) {
             throw $authError;
+        }
+
+        if ($transportErr !== null) {
+            throw $transportErr;
         }
 
         throw new ApiException('Could not find a working Joomla Web Services API endpoint at this URL.');

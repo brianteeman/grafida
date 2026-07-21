@@ -38,6 +38,9 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | delete local article | Lokalen Artikel löschen | Aktion zum endgültigen Entfernen eines lokalen Artikels. |
 | back | Zurück | Schaltfläche, um den Editor zu verlassen und zur Beitragsliste zurückzukehren. |
 | refresh | Aktualisieren | Schaltfläche zum erneuten Laden der Referenzdaten (Kategorien, Schlagwörter usw.). |
+| retry | Wiederholen | Schaltfläche, die einen fehlgeschlagenen Abruf erneut versucht (gh-29). |
+| offline / site unreachable | Website konnte nicht erreicht werden | Verbindungsfehler auf Transportebene (DNS/Verbindung/Timeout), nicht ein abgelehntes API-Token. GRAFIDA_MSG_OFFLINE. |
+| internet connection | Internetverbindung | Netzwerkverbindung des Geräts, im Unterschied zur „Verbindung" zur Website-API. |
 | local storage | Lokaler Speicher | Die lokalen SQLite-Daten der App auf dem Computer (Websites, lokale Artikel, Token, Cache). |
 | database | Datenbank | Die lokale SQLite-Datenbank. |
 | folder | Ordner | Verzeichnis im Dateisystem; „enthaltender Ordner" = der Ordner, der die Datenbankdatei enthält. |
