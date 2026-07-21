@@ -25,6 +25,7 @@ use Grafida\Http\Router;
 use Grafida\I18n\LanguageService;
 use Grafida\I18n\UiStrings;
 use Grafida\Markdown\MarkdownService;
+use Grafida\Reference\MetadataCacheService;
 use Grafida\Site\LastSiteService;
 use Grafida\Storage\StorageService;
 use Grafida\Support\App;
@@ -51,6 +52,7 @@ final class SettingsController extends Controller
         private readonly StorageService $storage,
         private readonly RequestLog $requestLog,
         private readonly RequestLogService $requestLogService,
+        private readonly MetadataCacheService $metadataCache,
         private readonly ?DialogApiInterface $dialog = null,
     ) {}
 
@@ -64,6 +66,7 @@ final class SettingsController extends Controller
         $router->add('POST', '/api/settings/spell-check', fn (RouteContext $ctx): ResponseInterface => $this->setSpellCheck($ctx->body()));
         $router->add('POST', '/api/settings/last-site', fn (RouteContext $ctx): ResponseInterface => $this->setLastSite($ctx->body()));
         $router->add('POST', '/api/settings/request-log', fn (RouteContext $ctx): ResponseInterface => $this->setRequestLog($ctx->body()));
+        $router->add('POST', '/api/settings/metadata-cache', fn (RouteContext $ctx): ResponseInterface => $this->setMetadataCache($ctx->body()));
         $router->add('GET', '/api/request-log', fn (RouteContext $ctx): ResponseInterface => $this->requestLog());
         $router->add('POST', '/api/request-log/clear', fn (RouteContext $ctx): ResponseInterface => $this->clearRequestLog());
         $router->add('POST', '/api/request-log/export', fn (RouteContext $ctx): ResponseInterface => $this->exportRequestLog($ctx->body()));
@@ -278,6 +281,32 @@ final class SettingsController extends Controller
         }
 
         return Json::ok(['requestLog' => $enabled]);
+    }
+
+    /**
+     * Updates either or both of the site-metadata cache preferences (gh-42
+     * round 2). Each field is applied only when present in the body, so the
+     * SPA can send one without clobbering the other — the two selectors in
+     * Settings fire independent `change` events. Responds with the
+     * **effective** (clamped) values rather than echoing the request, which is
+     * what lets the SPA see a server-side clamp happen.
+     *
+     * @param array<string, mixed> $body
+     */
+    public function setMetadataCache(array $body): ResponseInterface
+    {
+        if (\array_key_exists('resetOnStart', $body)) {
+            $this->metadataCache->setResetOnStart($this->bool($body, 'resetOnStart'));
+        }
+
+        if (\array_key_exists('ttlMinutes', $body)) {
+            $this->metadataCache->setTtlMinutes($this->int($body, 'ttlMinutes', MetadataCacheService::DEFAULT_TTL_MINUTES));
+        }
+
+        return Json::ok([
+            'metadataResetOnStart' => $this->metadataCache->resetOnStart(),
+            'metadataCacheTtl'     => $this->metadataCache->ttlMinutes(),
+        ]);
     }
 
     /** The Request Log screen's data: whether it is enabled and every entry currently stored, newest first. */

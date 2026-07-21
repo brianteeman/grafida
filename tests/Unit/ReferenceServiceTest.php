@@ -127,6 +127,36 @@ final class ReferenceServiceTest extends TestCase
         self::assertSame('2026-01-01 00:00:00', $this->service->fetchedAt($site));
     }
 
+    /**
+     * gh-42 round 2: {@see ReferenceRepository::clearAll()} backs the opt-in
+     * "reset site metadata cache on startup" preference. It must be a real,
+     * unconditional delete across every site and kind, and must leave
+     * `editor_css_cache` alone — that cache has its own refresh path and cost
+     * profile and is not part of this preference.
+     */
+    public function testClearAllDropsEveryRowAcrossSitesButLeavesEditorCssCacheAlone(): void
+    {
+        $siteA = $this->seedSite();
+        $siteB = $this->seedSite();
+
+        $this->repository->put((int) $siteA->id, ReferenceService::KIND_CATEGORIES, []);
+        $this->repository->put((int) $siteA->id, ReferenceService::KIND_TAGS, []);
+        $this->repository->put((int) $siteB->id, ReferenceService::KIND_LEVELS, []);
+        $this->repository->putEditorCss((int) $siteA->id, 'body { color: red; }');
+        $this->repository->putEditorCss((int) $siteB->id, 'body { color: blue; }');
+
+        $this->repository->clearAll();
+
+        self::assertNull($this->repository->get((int) $siteA->id, ReferenceService::KIND_CATEGORIES));
+        self::assertNull($this->repository->get((int) $siteA->id, ReferenceService::KIND_TAGS));
+        self::assertNull($this->repository->get((int) $siteB->id, ReferenceService::KIND_LEVELS));
+
+        // Untouched: editor.css has its own refresh path (the manual Refresh
+        // button), not the metadata cache reset.
+        self::assertSame('body { color: red; }', $this->repository->getEditorCss((int) $siteA->id));
+        self::assertSame('body { color: blue; }', $this->repository->getEditorCss((int) $siteB->id));
+    }
+
     private function setFetchedAt(int $siteId, string $kind, string $fetchedAt): void
     {
         TestDatabase::connection($this->db)

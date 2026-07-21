@@ -45,6 +45,7 @@ use Grafida\Media\MediaRepository;
 use Grafida\Media\SiteImageFetcher;
 use Grafida\Publish\PublishService;
 use Grafida\Reference\EditorCssService;
+use Grafida\Reference\MetadataCacheService;
 use Grafida\Reference\ReferenceService;
 use Grafida\Site\ConnectionDiagnostics;
 use Grafida\Site\FaviconService;
@@ -80,6 +81,7 @@ final class ControllerProvider implements ServiceProviderInterface
                 aiTools: $c->get(AiToolRepository::class),
                 requestLog: $c->get(RequestLog::class),
                 requestLogService: $c->get(RequestLogService::class),
+                metadataCache: $c->get(MetadataCacheService::class),
             );
         });
 
@@ -155,6 +157,7 @@ final class ControllerProvider implements ServiceProviderInterface
                 storage: $c->get(StorageService::class),
                 requestLog: $c->get(RequestLog::class),
                 requestLogService: $c->get(RequestLogService::class),
+                metadataCache: $c->get(MetadataCacheService::class),
                 dialog: $dialog,
             );
         });

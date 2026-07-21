@@ -42,6 +42,13 @@ const State = {
     // Unlike slashTools/spellCheck this defaults OFF — it is an opt-in diagnostic
     // aid with a memory cost, not something every user wants running.
     requestLog: false,
+    // Delete the cached site metadata at startup, so it is refetched fresh.
+    // Defaults OFF — like requestLog and unlike slashTools/spellCheck — because
+    // on a slow link an unconditional refetch at launch looks like a hang (gh-42).
+    metadataResetOnStart: false,
+    // How long cached site metadata may be reused before a background refresh,
+    // in minutes. 0 means never refresh automatically. Default 1 hour.
+    metadataCacheTtl: 60,
     secureStore: true,
     supportedFieldTypes: [],
     app: {},
@@ -92,11 +99,13 @@ const State = {
     // in a single slot, so every reader must check this before trusting it
     // (see cachedReferences(), gh-42).
     referencesSiteId: null,
-    // Sites whose reference data has already been freshened from the network
-    // in this app session. `reference_cache` is permanent server-side, so
-    // without this a category added on the site would stay invisible until
-    // the user found the manual Reload metadata button (gh-42).
-    referencesFreshened: new Set(),
+    // Sites with a background reference refresh currently in flight. Guards
+    // against two callers firing the same refresh at once, and against the
+    // re-entrancy loop ensureFreshReferences() → applyRefreshedReferences() →
+    // loadArticlesScreen() → loadArticleFilterRefs() → ensureFreshReferences().
+    // NOT a "refreshed this session" marker: refreshing once per launch
+    // regardless of the TTL is the opt-in startup reset's job (gh-42).
+    referencesRefreshing: new Set(),
     editorCss: null,
     tinyMCEEditor: null,
     activeScreen: 'sites',
@@ -649,6 +658,7 @@ const api = {
     resetStorage: () => apiFetch('POST', '/api/settings/storage/reset'),
     openUrl: (url) => apiFetch('POST', '/api/open-url', { url }),
     setRequestLog: (enabled) => apiFetch('POST', '/api/settings/request-log', { enabled }),
+    setMetadataCache: (payload) => apiFetch('POST', '/api/settings/metadata-cache', payload),
     getRequestLog: () => apiFetch('GET', '/api/request-log'),
     clearRequestLog: () => apiFetch('POST', '/api/request-log/clear'),
     exportRequestLog: (directory) => apiFetch('POST', '/api/request-log/export', { directory }),
@@ -1146,15 +1156,21 @@ function renderSitesScreen() {
  * custom fields) from the site, bypassing the local cache. Goes through
  * applyRefreshedReferences(), which invalidates every SPA-side cache of that
  * site's reference data and repaints whichever screen is showing it —
- * including the editor sidebar, preserving unsaved edits (gh-42). The
- * optional button is disabled while the request is in flight.
+ * including the editor sidebar, preserving unsaved edits, and the Articles
+ * screen's filter bars, reconciling their filters against the refreshed
+ * lists (gh-42). The optional button is disabled while the request is in
+ * flight.
+ *
+ * @returns {{remote: boolean, drafts: boolean}|false} the reset flags from
+ *   applyRefreshedReferences() on success (so a caller can tell the user a
+ *   filter was cleared), or false on failure.
  */
 async function reloadSiteMetadata(siteId, button) {
     if (!siteId) return false;
     if (button) button.disabled = true;
     try {
         const refs = await api.refreshReferences(siteId);
-        await applyRefreshedReferences(siteId, refs);
+        const reset = await applyRefreshedReferences(siteId, refs);
 
         // The refresh re-downloads the favicon; reflect it on the Sites list and
         // in the sidebar without a full reload.
@@ -1169,7 +1185,7 @@ async function reloadSiteMetadata(siteId, button) {
 
         showToast(t('GRAFIDA_MSG_REFS_REFRESHED'), 'success');
 
-        return true;
+        return reset;
     } catch (err) {
         showToast(err.message, 'error');
         return false;
@@ -1637,8 +1653,14 @@ function invalidateSiteReferences(siteId) {
     if (State.articleListRefs && State.articleListRefs.siteId === siteId) State.articleListRefs = null;
 }
 
-/** How old cached site reference data may get before it is quietly refreshed (gh-42). */
-const REFERENCES_MAX_AGE_MS = 15 * 60 * 1000;
+/**
+ * How old cached site reference data may get before it is quietly refreshed, in
+ * milliseconds — or 0 when the user has turned automatic refreshing off (gh-42).
+ */
+function referencesMaxAgeMs() {
+    const minutes = Number(State.metadataCacheTtl);
+    return Number.isFinite(minutes) && minutes > 0 ? minutes * 60 * 1000 : 0;
+}
 
 /** `Y-m-d H:i:s` in UTC, N ms ago — comparable as a plain string (see CLAUDE.md). */
 function utcStampAgo(ms) {
@@ -1653,22 +1675,139 @@ function utcStampAgo(ms) {
  * per-screen caches, re-seeds the shared slot, and repaints whichever screen
  * is showing data derived from it (gh-42).
  *
+ * The Articles screen is repainted **surgically**, not by tearing the whole
+ * screen down via loadArticlesScreen(): that would refetch drafts *and* the
+ * remote page and reset scroll on every refresh, which is fine for an
+ * explicit button press but jarring for a quiet background refresh. Instead
+ * this re-seeds State.articleListRefs straight from the payload already in
+ * hand, reconciles both tabs' filters against it (reconcileArticleFilters()),
+ * rebuilds just the two filter bars in place, and reloads the remote list
+ * only when its own filters actually changed.
+ *
  * The editor is repainted through its own form-preserving path — a re-render
  * that dropped the user's unsaved selections would be a far worse bug than a
  * stale category list.
+ *
+ * @returns {{remote: boolean, drafts: boolean}} which tab's query was reset
+ *   by reconciliation (both false when the refresh did not touch the active
+ *   site/screen at all).
  */
 async function applyRefreshedReferences(siteId, refs) {
     invalidateSiteReferences(siteId);
     setCachedReferences(siteId, refs);
 
-    if (siteId === State.currentSiteId && State.activeScreen === 'articles') {
-        await loadArticlesScreen();
+    let reset = { remote: false, drafts: false };
+
+    if (siteId === State.currentSiteId) {
+        // Re-seed the Articles filter cache straight from the payload we
+        // already have rather than letting loadArticleFilterRefs() refetch it.
+        State.articleListRefs = {
+            siteId,
+            categories: refs.categories || [],
+            tags: refs.tags || [],
+            languages: refs.languages || [],
+            fetchedAt: refs.fetchedAt || null,
+        };
+        reset = reconcileArticleFilters();
+    }
+
+    if (State.activeScreen === 'articles' && siteId === State.currentSiteId) {
+        rebuildArticleFilterBars();
+        renderDraftsTab();
+        if (reset.remote) await reloadRemoteArticles();
     }
 
     if (State.activeScreen === 'editor' && State.currentDraft && State.currentDraft.siteId === siteId) {
         const current = collectDraftFormData();
         renderEditorSidebar({ ...State.currentDraft, ...current });
     }
+
+    return reset;
+}
+
+/**
+ * Clears any Articles filter whose selected value no longer exists in the
+ * site's refreshed reference data, on both tabs.
+ *
+ * A filter pinned to a category or tag the site no longer has would silently
+ * match nothing, with no visible option to clear it — the drop-down cannot
+ * show a selection it has no option for. Resetting it is the only honest
+ * outcome (gh-42).
+ *
+ * ⚠️ If State.articleListRefs is missing or a list within it is *empty*, this
+ * does nothing. An empty list almost always means the refresh could not read
+ * the site (an unreachable site, or the startup reset racing an offline
+ * network) — clearing the user's filters because a fetch failed would be a
+ * bug of its own, and a far worse one than a stale drop-down.
+ *
+ * Reads State.articleListRefs, so call it *after* that has been re-seeded.
+ *
+ * @returns {{remote: boolean, drafts: boolean}} which tab's query changed.
+ */
+function reconcileArticleFilters() {
+    const refs = State.articleListRefs;
+    const noResult = { remote: false, drafts: false };
+
+    if (!refs) return noResult;
+
+    const categories = refs.categories || [];
+    const tags = refs.tags || [];
+    const languages = refs.languages || [];
+    if (!categories.length || !tags.length || !languages.length) return noResult;
+
+    const categoryIds = new Set(categories.map(c => String(c.id)));
+    const tagIds = new Set(tags.map(tg => String(tg.id)));
+    const tagTitles = new Set(tags.map(tg => tg.title));
+    // languageFilterOptions() always synthesises an 'All' option with value
+    // '*' regardless of the site's language list, so '*' is always valid.
+    const languageTags = new Set(['*', ...languages.map(l => l.lang_code)]);
+
+    let remoteChanged = false;
+    let draftsChanged = false;
+
+    const q = State.articleQuery;
+    if (q) {
+        const patch = {};
+        if (q.category !== '' && !categoryIds.has(String(q.category))) patch.category = '';
+        if (q.tag !== '' && !tagIds.has(String(q.tag))) patch.tag = '';
+        if (q.language !== '' && !languageTags.has(q.language)) patch.language = '';
+        if (Object.keys(patch).length) {
+            State.articleQuery = { ...q, ...patch, page: 1 };
+            remoteChanged = true;
+        }
+    }
+
+    const dq = State.draftQuery;
+    if (dq) {
+        const patch = {};
+        if (dq.category !== '' && !categoryIds.has(String(dq.category))) patch.category = '';
+        // Drafts store tag *titles*, not ids — matches drafts' own filtering
+        // (filteredSortedDrafts()) and buildDraftFilterBar()'s tag options.
+        if (dq.tag !== '' && !tagTitles.has(dq.tag)) patch.tag = '';
+        if (dq.language !== '' && !languageTags.has(dq.language)) patch.language = '';
+        if (Object.keys(patch).length) {
+            State.draftQuery = { ...dq, ...patch, page: 1 };
+            draftsChanged = true;
+        }
+    }
+
+    return { remote: remoteChanged, drafts: draftsChanged };
+}
+
+/**
+ * Replaces both tabs' filter bars in place, so the drop-downs pick up
+ * refreshed categories/tags/languages while the surrounding list and scroll
+ * position stay put. A no-op when the Articles screen is not mounted.
+ */
+function rebuildArticleFilterBars() {
+    [['articles-tab-drafts', buildDraftFilterBar],
+     ['articles-tab-remote', buildArticleFilterBar]].forEach(([panelId, build]) => {
+        const panel = document.getElementById(panelId);
+        if (!panel) return;
+        const oldBar = panel.querySelector('.articles-filter-bar');
+        if (!oldBar) return;
+        panel.replaceChild(build(), oldBar);
+    });
 }
 
 /**
@@ -1676,25 +1815,29 @@ async function applyRefreshedReferences(siteId, refs) {
  *
  * Fire-and-forget: the caller has already rendered from the cache, so a slow
  * or failed refresh changes nothing. An error is swallowed — an offline site
- * must behave exactly as it did before this existed (gh-42).
+ * must behave exactly as it did before this existed (gh-42). Driven entirely
+ * by the configurable TTL (State.metadataCacheTtl, 0 = never) — there is no
+ * "once per session" rule any more; that behaviour is now the opt-in startup
+ * cache reset's job (see MetadataCacheService / BootstrapController).
  *
  * Re-entrancy note: applyRefreshedReferences() may call loadArticlesScreen(),
  * which calls loadArticleFilterRefs(), which calls this function again. The
- * "mark before fetching" guard below is what stops that from looping: the
- * second call sees the site already freshened *and* a fetchedAt that is now
- * only seconds old, so it returns immediately.
+ * in-flight guard below is what stops that from looping, and also stops two
+ * overlapping callers from both firing a refresh for the same site.
  */
 function ensureFreshReferences(siteId, fetchedAt) {
     if (!siteId) return;
-    if (State.referencesFreshened.has(siteId) && fetchedAt && fetchedAt >= utcStampAgo(REFERENCES_MAX_AGE_MS)) return;
 
-    // Mark before the request, not after, so two overlapping callers do not
-    // both fire; if the request fails, leave it marked — retrying on every
-    // screen visit against a dead site is worse than waiting for the TTL or
-    // the manual button.
-    State.referencesFreshened.add(siteId);
+    const maxAge = referencesMaxAgeMs();
+    if (maxAge === 0) return;                                   // automatic refreshing switched off
+    if (State.referencesRefreshing.has(siteId)) return;
+    if (fetchedAt && fetchedAt >= utcStampAgo(maxAge)) return;   // still fresh
 
-    api.refreshReferences(siteId).then(refs => applyRefreshedReferences(siteId, refs)).catch(() => {});
+    State.referencesRefreshing.add(siteId);
+    api.refreshReferences(siteId)
+        .then(refs => applyRefreshedReferences(siteId, refs))
+        .catch(() => {})
+        .finally(() => State.referencesRefreshing.delete(siteId));
 }
 
 /** Loads (and caches per-site) the categories/tags/languages for the filter bar. */
@@ -1736,16 +1879,44 @@ function buildArticlesTabs() {
     tabs.appendChild(mk('drafts', 'GRAFIDA_LBL_LOCAL_DRAFTS'));
     tabs.appendChild(mk('remote', 'GRAFIDA_LBL_REMOTE_ARTICLES'));
 
+    // Right-hand group: Reload metadata (serves both tabs, since they share
+    // State.articleListRefs) then the network-activity indicator, which stays
+    // last so it remains the right-most element (gh-42).
+    const rightGroup = el('div', 'articles-tabs-right');
+
+    const reloadBtn = iconBtn('arrows-rotate', t('GRAFIDA_BTN_RELOAD_METADATA'), 'btn', 'btn-sm', 'btn-secondary');
+    reloadBtn.id = 'articles-reload-metadata';
+    reloadBtn.addEventListener('click', () => reloadArticlesMetadata(reloadBtn));
+    rightGroup.appendChild(reloadBtn);
+
     // Network-activity indicator: visible (via updateNetActivityIndicator) only
     // while one or more apiFetch() requests are in flight.
     const indicator = el('span', 'articles-net-indicator',
         el('span', 'spinner'),
         el('span', null, t('GRAFIDA_MSG_LOADING')));
     indicator.id = 'articles-net-indicator';
-    tabs.appendChild(indicator);
+    rightGroup.appendChild(indicator);
+
+    tabs.appendChild(rightGroup);
     updateNetActivityIndicator();
 
     return tabs;
+}
+
+/**
+ * Refreshes the site's reference data from the Articles screen, keeping the
+ * current filters. Any filter whose selected category/tag/language no longer
+ * exists is cleared by reconcileArticleFilters() (via reloadSiteMetadata() /
+ * applyRefreshedReferences()) and the affected list reloaded; the user is
+ * told, because a filter silently resetting itself is otherwise baffling
+ * (gh-42).
+ */
+async function reloadArticlesMetadata(button) {
+    if (!State.currentSiteId) return;
+    const reset = await reloadSiteMetadata(State.currentSiteId, button);
+    if (reset && (reset.remote || reset.drafts)) {
+        showToast(t('GRAFIDA_MSG_FILTERS_RESET'), 'info');
+    }
 }
 
 /** Shows the active tab's panel (and highlights its button), hides the other. */
@@ -2446,6 +2617,19 @@ function renderEditorSidebar(draft) {
     // Tags
     sidebar.appendChild(formGroup(t('GRAFIDA_LBL_TAGS'), buildTagsInput(refs.tags, draft.tags || [])));
 
+    // Reload the site's reference metadata (categories, tags, access levels,
+    // languages, custom fields). Sits directly under Tags — close to the
+    // Category / Access / Language / Tags group it refreshes above, and the
+    // custom-field definitions below, rather than being promoted out of
+    // proportion to its importance by sitting at the very top (gh-42).
+    // applyRefreshedReferences() (called from reloadSiteMetadata()) re-renders
+    // the sidebar afterwards, preserving the current unsaved selections.
+    const reloadBtn = iconBtn('arrows-rotate', t('GRAFIDA_BTN_RELOAD_METADATA'), 'btn', 'btn-sm', 'btn-secondary');
+    reloadBtn.addEventListener('click', async () => {
+        await reloadSiteMetadata(draft.siteId, reloadBtn);
+    });
+    sidebar.appendChild(el('div', 'sidebar-reload', reloadBtn));
+
     // Custom fields (supported)
     if (refs.fields.supported && refs.fields.supported.length > 0) {
         const sec = el('div', null);
@@ -2496,16 +2680,6 @@ function renderEditorSidebar(draft) {
 
     // Intro / full-text article images (Joomla's "Images and Links" tab).
     sidebar.appendChild(renderImagesSection(draft.siteId));
-
-    // Reload the site's reference metadata (categories, tags, access levels,
-    // languages, custom fields). applyRefreshedReferences() (called from
-    // reloadSiteMetadata()) re-renders the sidebar afterwards, preserving the
-    // current unsaved selections (gh-42).
-    const reloadBtn = iconBtn('arrows-rotate', t('GRAFIDA_BTN_RELOAD_METADATA'), 'btn', 'btn-sm', 'btn-secondary');
-    reloadBtn.addEventListener('click', async () => {
-        await reloadSiteMetadata(draft.siteId, reloadBtn);
-    });
-    sidebar.appendChild(el('div', 'sidebar-reload', reloadBtn));
 }
 
 // Site picker for the open draft. Changing it moves the draft to another site;
@@ -5679,6 +5853,8 @@ function renderSettingsScreen() {
     renderSlashToolsSetting();
     renderSpellCheckSetting();
     renderRequestLogSetting();
+    renderMetadataTtlSetting();
+    renderMetadataResetSetting();
     renderStorageSettings();
     renderAiServicesCard();
     loadAiToolsData();
@@ -5731,6 +5907,60 @@ function renderSpellCheckSetting() {
         opt.value = value;
         opt.textContent = t(key);
         if ((State.spellCheck !== false) === (value === '1')) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+/**
+ * Cache lifetime choices offered in Settings, in minutes, paired with their
+ * language keys. ⚠️ Must stay in step with `MetadataCacheService::TTL_CHOICES`
+ * in PHP — a value offered here that PHP's clamp does not recognise would
+ * silently snap back to the 1-hour default with no explanation (gh-42).
+ */
+const METADATA_TTL_CHOICES = [
+    [0, 'GRAFIDA_OPT_METADATA_TTL_NEVER'],
+    [15, 'GRAFIDA_OPT_METADATA_TTL_15M'],
+    [30, 'GRAFIDA_OPT_METADATA_TTL_30M'],
+    [60, 'GRAFIDA_OPT_METADATA_TTL_1H'],
+    [360, 'GRAFIDA_OPT_METADATA_TTL_6H'],
+    [720, 'GRAFIDA_OPT_METADATA_TTL_12H'],
+    [1440, 'GRAFIDA_OPT_METADATA_TTL_1D'],
+];
+
+/**
+ * Populates the metadata cache-time selector. 0 means "never refresh
+ * automatically" and is offered first, since it is the choice a user on a
+ * slow or metered connection is looking for (gh-42).
+ */
+function renderMetadataTtlSetting() {
+    const sel = document.getElementById('settings-metadata-ttl-select');
+    if (!sel) return;
+    clearNode(sel);
+
+    METADATA_TTL_CHOICES.forEach(([minutes, key]) => {
+        const opt = document.createElement('option');
+        opt.value = String(minutes);
+        opt.textContent = t(key);
+        if (Number(State.metadataCacheTtl) === minutes) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+/**
+ * Populates the "reload site metadata on startup" selector. Like the Request
+ * Log and unlike slash commands / spell checking, this defaults to **No** —
+ * see the State.metadataResetOnStart note.
+ */
+function renderMetadataResetSetting() {
+    const sel = document.getElementById('settings-metadata-reset-select');
+    if (!sel) return;
+    clearNode(sel);
+
+    [['1', 'GRAFIDA_BTN_YES'], ['0', 'GRAFIDA_BTN_NO']].forEach(([value, key]) => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = t(key);
+        if ((State.metadataResetOnStart === true) === (value === '1')) opt.selected = true;
         sel.appendChild(opt);
     });
 }
@@ -7045,6 +7275,44 @@ async function applyRequestLogChange(enabled) {
     }
 }
 
+/**
+ * Persists the metadata cache-time preference. Sends only this field (the
+ * backend applies only what is present in the body — see
+ * SettingsController::setMetadataCache()) and writes back the *effective*
+ * value from the response, so a server-side clamp is visible rather than
+ * silently reverted on the next render (gh-42). Both selectors are
+ * re-rendered — two lines, and it keeps the pair honest if the backend ever
+ * adjusts one in response to the other.
+ */
+async function applyMetadataTtlChange(minutes) {
+    try {
+        const result = await api.setMetadataCache({ ttlMinutes: minutes });
+        if (typeof result.metadataCacheTtl === 'number') State.metadataCacheTtl = result.metadataCacheTtl;
+        if (typeof result.metadataResetOnStart === 'boolean') State.metadataResetOnStart = result.metadataResetOnStart;
+        renderMetadataTtlSetting();
+        renderMetadataResetSetting();
+        showToast(t('GRAFIDA_MSG_SAVED'), 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+        renderMetadataTtlSetting();
+    }
+}
+
+/** Persists the "reload site metadata on startup" preference. See applyMetadataTtlChange() for the shared shape. */
+async function applyMetadataResetChange(enabled) {
+    try {
+        const result = await api.setMetadataCache({ resetOnStart: enabled });
+        if (typeof result.metadataResetOnStart === 'boolean') State.metadataResetOnStart = result.metadataResetOnStart;
+        if (typeof result.metadataCacheTtl === 'number') State.metadataCacheTtl = result.metadataCacheTtl;
+        renderMetadataTtlSetting();
+        renderMetadataResetSetting();
+        showToast(t('GRAFIDA_MSG_SAVED'), 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+        renderMetadataResetSetting();
+    }
+}
+
 // Keep "auto" mode in step with the OS as it changes at runtime.
 const onSystemThemeChange = () => {
     if ((State.displayMode || 'auto') === 'auto') applyTheme(true);
@@ -7095,6 +7363,9 @@ async function bootstrap() {
         State.spellCheck = data.spellCheck !== false;
         // Inverted default vs. the two flags above: Request Log defaults OFF.
         State.requestLog = data.requestLog === true;
+        // Inverted default, like requestLog: the startup reset is opt-in (gh-42).
+        State.metadataResetOnStart = data.metadataResetOnStart === true;
+        if (typeof data.metadataCacheTtl === 'number') State.metadataCacheTtl = data.metadataCacheTtl;
         State.secureStore = data.secureStore !== false;
         State.supportedFieldTypes = data.supportedFieldTypes || [];
         State.app = data.app || {};
@@ -7385,6 +7656,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (requestLogSel) {
         requestLogSel.addEventListener('change', () => applyRequestLogChange(requestLogSel.value === '1'));
     }
+
+    const metaTtlSel = document.getElementById('settings-metadata-ttl-select');
+    if (metaTtlSel) metaTtlSel.addEventListener('change', () => applyMetadataTtlChange(Number(metaTtlSel.value)));
+
+    const metaResetSel = document.getElementById('settings-metadata-reset-select');
+    if (metaResetSel) metaResetSel.addEventListener('change', () => applyMetadataResetChange(metaResetSel.value === '1'));
 
     const btnModalClose = document.getElementById('btn-modal-close');
     if (btnModalClose) btnModalClose.addEventListener('click', closeModal);

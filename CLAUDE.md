@@ -163,11 +163,26 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `KIND_CONFIG`, whose route needs `core.admin` and would otherwise report "never fetched"
   forever on most sites), or `null` when any of those five has never been cached — a partially
   warmed cache is, for freshness purposes, no cache. `SiteController::references()` sends it as
-  the payload's `fetchedAt` key. The SPA reads it to decide whether to quietly refresh a site's
-  reference data in the background, once per site per session and again after a 15-minute TTL
-  (`REFERENCES_MAX_AGE_MS`, `ensureFreshReferences()` in `app.js`) — fire-and-forget, no toast, no
-  error surfaced, so an offline site keeps opening from cache exactly as before. See the
-  `assets/private/` SPA notes below for the front-end half.
+  the payload's `fetchedAt` key. Invalidation is now **three** things (gh-42 round 2): the manual
+  Refresh/Reload metadata buttons; a **configurable TTL** (`Reference\MetadataCacheService`'s
+  `metadata_cache_ttl` setting, default 60 minutes, `0` = never) driving the SPA's fire-and-forget
+  background refresh (`ensureFreshReferences()` in `app.js`, no toast, no error surfaced, so an
+  offline site keeps opening from cache exactly as before); and an **opt-in startup cache reset**
+  (`metadata_reset_on_start`, **default off**) which *deletes every row* in `reference_cache` (via
+  `ReferenceRepository::clearAll()`, leaving `editor_css_cache` alone — that cache has its own
+  refresh path) at process start, through `MetadataCacheService::resetIfRequested()` called once
+  per process from `BootstrapController::bootstrap()`. ⚠️ It defaults **off** because an
+  unconditional refetch at launch reads as a hang on a slow or unstable connection — the same
+  real-world constraint that keeps `request_log` off by default — and because the delete is real:
+  an unreachable site then renders empty category/tag/language lists until it can be reached, not
+  a stale-but-usable cache. Both preferences live in the generic `settings` key/value store, so
+  neither needed a migration; `MetadataCacheService::TTL_CHOICES` in PHP and
+  `METADATA_TTL_CHOICES` in `app.js` must stay in step, or a value the SPA offers would silently
+  snap back to the 1-hour default with no explanation. `MetadataCacheService` is a **container
+  singleton** (registered in `SiteProvider` with `share()`) — load-bearing, not stylistic, since
+  `resetIfRequested()`'s once-per-process guard depends on every `container->get()` call within a
+  process returning the same instance. See the `assets/private/` SPA notes below for the
+  front-end half.
   `unicodeSlugs()` caches one Global Configuration value under the `config` kind — `unicodeslugs`,
   the "Unicode Aliases" option, which the alias preview needs (see `src/Article/`). It is the one
   thing here that is **never strict**, whatever the caller asks: `GET v1/config/application` needs
@@ -824,27 +839,59 @@ window-free in tests (a null dialog makes the endpoint return 503).
   through `cachedReferences(siteId)`, which returns `null` unless the slot's tag matches, and every
   writer goes through `setCachedReferences(siteId, refs)`. This is what stops the editor from ever
   reusing another site's categories, which the previous untagged slot could not rule out. A
-  metadata reload (the Sites-screen button, the editor sidebar's own button, or the background
-  freshening below) always goes through **`invalidateSiteReferences(siteId)`** — the single place
-  that drops **both** per-site caches of the site's reference data, `State.references` *and* the
-  Articles screen's independent `State.articleListRefs` (whose omission from the reload path was
-  the gh-42 bug: the category/tag/language filter drop-downs kept whatever they were first built
-  with for the whole session, even after a successful refresh) — followed by
-  **`applyRefreshedReferences(siteId, refs)`**, which re-seeds the slot and repaints whichever
-  screen is showing data derived from it: it reloads the Articles screen when that is the active
-  one, and re-renders the editor sidebar through its own form-preserving path
-  (`collectDraftFormData()` merged back over the draft) when the editor is open on that site —
-  never TinyMCE itself. Because `reference_cache` is otherwise permanent server-side (see
-  `src/Reference/`), **`ensureFreshReferences(siteId, fetchedAt)`** quietly calls
-  `applyRefreshedReferences()` in the background after the screen has already rendered from cache
-  — once per site per session (`State.referencesFreshened`, a `Set`; marked *before* the request
-  fires, so an unreachable site is not retried on every visit) and again once `fetchedAt` is older
-  than `REFERENCES_MAX_AGE_MS` (15 minutes). It is fire-and-forget: no toast, no error surfaced,
-  and a failure leaves the site marked freshened anyway, so an offline site opens exactly as it did
-  before this existed. ⚠️ `fetchedAt` is a naive UTC `Y-m-d H:i:s` string (see `src/Reference/`)
-  and is compared **as a string** against `utcStampAgo()`'s own naive UTC stamp, never via
-  `Date.parse()` — the same WKWebView mishandling already documented for `ai_chats.last_response_at`
-  and `drafts.updated_at`.
+  metadata reload (the Sites-screen button, the editor sidebar's own button — which sits directly
+  below **Tags**, next to the Category/Access/Language/Tags group it refreshes, not at the
+  sidebar's bottom — the Articles screen's own **Reload metadata** button next to its tab strip, or
+  the background freshening below) always goes through **`invalidateSiteReferences(siteId)`** —
+  the single place that drops **both** per-site caches of the site's reference data,
+  `State.references` *and* the Articles screen's independent `State.articleListRefs` (whose
+  omission from the reload path was the gh-42 bug: the category/tag/language filter drop-downs kept
+  whatever they were first built with for the whole session, even after a successful refresh) —
+  followed by **`applyRefreshedReferences(siteId, refs)`**, which re-seeds the slot and repaints
+  whichever screen is showing data derived from it. For the Articles screen this is now a
+  **surgical** repaint rather than a full `loadArticlesScreen()` teardown (which would refetch
+  drafts *and* the remote page and reset scroll on every background refresh): it re-seeds
+  `State.articleListRefs` straight from the payload in hand, calls
+  **`reconcileArticleFilters()`** to clear any selected category/tag/language that no longer exists
+  in the refreshed lists (drafts' tag filter matches on **title**, the remote tab's on **id** — both
+  are checked), rebuilds just the two filter bars in place via **`rebuildArticleFilterBars()`**, and
+  reloads the remote list only when its own filters actually changed (the drafts list is always
+  cheap to re-render, being pure client-side filtering). ⚠️ `reconcileArticleFilters()` treats an
+  **empty** refreshed category/tag/language list as "could not read the site" and clears nothing —
+  an unreachable site or a startup reset racing an offline network must never look like every
+  filter silently vanished. The Articles reload button (`reloadArticlesMetadata()`) shows an extra
+  `GRAFIDA_MSG_FILTERS_RESET` toast when reconciliation actually cleared something, since a filter
+  resetting itself with no explanation would otherwise look like a bug. The editor is re-rendered
+  through its own form-preserving path (`collectDraftFormData()` merged back over the draft) when
+  it is open on that site — never TinyMCE itself. `reloadSiteMetadata()` now returns the
+  `{remote, drafts}` reset-flags object (or `false` on failure) instead of a bare boolean, so a
+  caller can tell whether a filter was cleared.
+  Because `reference_cache` is otherwise permanent server-side (see `src/Reference/`),
+  **`ensureFreshReferences(siteId, fetchedAt)`** quietly calls `applyRefreshedReferences()` in the
+  background after the screen has already rendered from cache, once `fetchedAt` is older than the
+  **configurable TTL** (`State.metadataCacheTtl`, minutes; `referencesMaxAgeMs()` converts it, `0`
+  meaning automatic refreshing is switched off entirely) — mirroring
+  `Reference\MetadataCacheService::TTL_CHOICES` in PHP via `METADATA_TTL_CHOICES` in `app.js`, which
+  must be kept in step. ⚠️ **There is no "once per session" rule any more** (gh-42 round 2 removed
+  it): round 1's `State.referencesFreshened` unconditionally refreshed every site once per launch
+  regardless of the TTL, which is exactly the always-on startup refresh the issue says must be
+  opt-in — that behaviour is now `Reference\MetadataCacheService`'s `metadata_reset_on_start`
+  preference (default off, see `src/Reference/`), a real server-side cache delete, not an SPA
+  refresh. `State.referencesRefreshing` (a `Set`) replaces it purely as an **in-flight guard**:
+  it stops two overlapping callers firing the same refresh, and breaks the re-entrancy loop
+  `ensureFreshReferences()` → `applyRefreshedReferences()` → (Articles screen) →
+  `loadArticleFilterRefs()` → `ensureFreshReferences()` again. It is fire-and-forget: no toast, no
+  error surfaced, and a failure simply leaves the site available to retry on the next stale check —
+  so an offline site opens exactly as it did before any of this existed. ⚠️ `fetchedAt` is a naive
+  UTC `Y-m-d H:i:s` string (see `src/Reference/`) and is compared **as a string** against
+  `utcStampAgo()`'s own naive UTC stamp, never via `Date.parse()` — the same WKWebView mishandling
+  already documented for `ai_chats.last_response_at` and `drafts.updated_at`. Both
+  `metadataResetOnStart` and `metadataCacheTtl` ride in the `bootstrap` payload and are editable
+  from the Settings screen's **Site metadata** card (`renderMetadataTtlSetting()` /
+  `renderMetadataResetSetting()`, `POST /api/settings/metadata-cache` — sending only the field that
+  changed, so the two selectors' independent `change` events never clobber each other; the response
+  carries the **effective**, clamped values, which the SPA writes back so a server-side clamp is
+  visible rather than silently reverted on the next render).
   **Collapsible/resizable layout** (`initLayoutControls()` in `app.js`): the left **`#sidebar`**
   and the editor metadata **`#editor-sidebar`** ("Article properties") each carry an `.icon-toggle`
   button (`#sidebar-toggle` / `#editor-sidebar-toggle`) that toggles a `.collapsed` class — the left

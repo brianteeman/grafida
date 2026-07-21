@@ -147,3 +147,6 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | save to disk | Guardar no disco | Writes a local media blob's bytes to disk via the native folder picker (Boson has no Save-As dialog). GRAFIDA_BTN_SAVE_TO_DISK. |
 | used by (article) | Usada por «%s» | Shows which local article references a local image. GRAFIDA_LBL_MEDIA_USED_BY. |
 | revision (of a local image) | (sem termo dedicado) | The internal revision token in the local media URL (`rev` parameter); never appears in UI text. |
+| site metadata | Metadados do site | The locally cached categories, tags, access levels, languages and custom fields of a site (gh-42). GRAFIDA_LBL_METADATA_CACHE. |
+| cache (noun) | cache | Kept as-is (technical loanword, common in pt-PT); «Tempo de cache» = cache time. GRAFIDA_LBL_METADATA_CACHE_TIME. |
+| startup (reload on) | ao iniciar | The moment Grafida starts; «Recarregar ao iniciar» = reload on startup. GRAFIDA_LBL_METADATA_RESET_ON_START. |

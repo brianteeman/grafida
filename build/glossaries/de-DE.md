@@ -154,3 +154,6 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | save to disk | Auf Datenträger speichern | Aktion, die die Bytes eines lokalen Medienobjekts über den nativen Ordnerdialog auf die Festplatte schreibt (kein Save-As-Dialog in Boson). GRAFIDA_BTN_SAVE_TO_DISK. |
 | used by (article) | Verwendet von „%s" | Zeigt an, welcher lokale Artikel ein lokales Bild referenziert. GRAFIDA_LBL_MEDIA_USED_BY. |
 | revision (of a local image) | (kein eigener Begriff) | Die interne Revisionskennung in der lokalen Bild-URL (`rev`-Parameter); erscheint nicht im UI-Text. |
+| site metadata | Website-Metadaten | Die lokal zwischengespeicherten Kategorien, Schlagwörter, Zugriffsebenen, Sprachen und benutzerdefinierten Felder einer Website (gh-42). GRAFIDA_LBL_METADATA_CACHE. |
+| cache (noun) | Cache | Als Anglizismus beibehalten, wie im technischen Kontext üblich; „Cache-Dauer" = cache time. GRAFIDA_LBL_METADATA_CACHE_TIME. |
+| startup (reload on) | Beim Start | Zeitpunkt, zu dem Grafida gestartet wird; „Beim Start neu laden" = reload on startup. GRAFIDA_LBL_METADATA_RESET_ON_START. |

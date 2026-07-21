@@ -27,6 +27,7 @@ use Grafida\Http\Router;
 use Grafida\Http\SiteContext;
 use Grafida\I18n\LanguageService;
 use Grafida\I18n\UiStrings;
+use Grafida\Reference\MetadataCacheService;
 use Grafida\Site\LastSiteService;
 use Grafida\Site\SiteService;
 use Grafida\Support\App;
@@ -47,6 +48,7 @@ final class BootstrapController extends Controller
         private readonly AiToolRepository $aiTools,
         private readonly RequestLog $requestLog,
         private readonly RequestLogService $requestLogService,
+        private readonly MetadataCacheService $metadataCache,
     ) {}
 
     public function registerRoutes(Router $router): void
@@ -59,6 +61,11 @@ final class BootstrapController extends Controller
         // Starting the application clears the Request Log before any new
         // requests are sent to the site — this is the SPA's first call.
         $this->requestLog->clear();
+
+        // The app-start hook for the opt-in "reset site metadata cache on
+        // startup" preference (gh-42). A no-op unless the user turned it on,
+        // and only ever fires once per process even across a webview reload.
+        $this->metadataCache->resetIfRequested();
 
         // The AI subsystem is optional: a failure assembling it (e.g. a missing
         // bundled resource in a build) must never blank the rest of the app, so
@@ -75,6 +82,8 @@ final class BootstrapController extends Controller
             'slashTools'          => $this->slashTools->current(),
             'spellCheck'          => $this->spellCheck->current(),
             'requestLog'          => $this->requestLogService->current(),
+            'metadataResetOnStart' => $this->metadataCache->resetOnStart(),
+            'metadataCacheTtl'     => $this->metadataCache->ttlMinutes(),
             'secureStore'         => $this->sites->hasSecureStore(),
             'supportedFieldTypes' => FieldSupport::SUPPORTED,
             'sites'               => array_map($this->siteContext->siteArray(...), $this->sites->list()),

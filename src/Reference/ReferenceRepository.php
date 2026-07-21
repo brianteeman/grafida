@@ -109,4 +109,25 @@ final class ReferenceRepository
 
         $this->db->setQuery($query)->execute();
     }
+
+    /**
+     * Drops every site's cached reference data.
+     *
+     * Used by the opt-in "reset site metadata cache on startup" preference. This
+     * is a real delete, not an expiry: nothing is retained to fall back on, so
+     * the next read refetches from the network and an unreachable site renders
+     * empty lists until it can be reached. That is the whole point of the
+     * option, and the reason it is off by default (gh-42).
+     *
+     * Leaves `editor_css_cache` alone: this preference is about *metadata*
+     * (categories, tags, access levels, languages, custom fields), not the
+     * editor stylesheet, which has its own refresh path and its own cost
+     * profile.
+     */
+    public function clearAll(): void
+    {
+        $query = $this->db->createQuery()->delete($this->qn('reference_cache'));
+
+        $this->db->setQuery($query)->execute();
+    }
 }

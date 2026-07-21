@@ -215,6 +215,57 @@ final class ApiRoutingTest extends TestCase
         self::assertTrue($boot['data']['spellCheck']);
     }
 
+    /** gh-42 round 2: both site-metadata cache defaults ship in the bootstrap payload. */
+    public function testBootstrapCarriesMetadataCacheDefaults(): void
+    {
+        [, $boot] = $this->call($this->kernel(), 'GET', '/api/bootstrap');
+
+        self::assertFalse($boot['data']['metadataResetOnStart']);
+        self::assertSame(60, $boot['data']['metadataCacheTtl']);
+    }
+
+    /** Sending only `ttlMinutes` must not clobber `resetOnStart` — the two selectors fire independent change events. */
+    public function testMetadataCachePersistsTtlWithoutTouchingResetOnStart(): void
+    {
+        $kernel = $this->kernel();
+
+        [$status, $json] = $this->call($kernel, 'POST', '/api/settings/metadata-cache', json_encode(['ttlMinutes' => 360]));
+
+        self::assertSame(200, $status);
+        self::assertSame(360, $json['data']['metadataCacheTtl']);
+        self::assertFalse($json['data']['metadataResetOnStart']);
+
+        [, $boot] = $this->call($kernel, 'GET', '/api/bootstrap');
+        self::assertSame(360, $boot['data']['metadataCacheTtl']);
+    }
+
+    /** The important one: sending only `resetOnStart` must not clobber the TTL. */
+    public function testMetadataCachePersistsResetOnStartWithoutTouchingTtl(): void
+    {
+        $kernel = $this->kernel();
+
+        [$status, $json] = $this->call($kernel, 'POST', '/api/settings/metadata-cache', json_encode(['resetOnStart' => true]));
+
+        self::assertSame(200, $status);
+        self::assertTrue($json['data']['metadataResetOnStart']);
+        self::assertSame(60, $json['data']['metadataCacheTtl']);
+
+        [, $boot] = $this->call($kernel, 'GET', '/api/bootstrap');
+        self::assertTrue($boot['data']['metadataResetOnStart']);
+        self::assertSame(60, $boot['data']['metadataCacheTtl']);
+    }
+
+    /** An out-of-range ttlMinutes comes back clamped to the 60-minute default, not echoed. */
+    public function testMetadataCacheClampsAnOutOfRangeTtl(): void
+    {
+        $kernel = $this->kernel();
+
+        [$status, $json] = $this->call($kernel, 'POST', '/api/settings/metadata-cache', json_encode(['ttlMinutes' => 7]));
+
+        self::assertSame(200, $status);
+        self::assertSame(60, $json['data']['metadataCacheTtl']);
+    }
+
     public function testLastSiteDefaultsToNull(): void
     {
         [, $boot] = $this->call($this->kernel(), 'GET', '/api/bootstrap');

@@ -941,9 +941,19 @@ input[type="color"].form-control {
     border-bottom-color: var(--color-accent);
 }
 
+/* Right-hand group of the tab strip: the Reload metadata button then the
+   network-activity indicator (gh-42). The group as a whole is pushed to the
+   right; the indicator no longer carries its own margin-left: auto, or it
+   would push a gap between it and the button instead of sitting beside it. */
+.articles-tabs-right {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
 /* Network-activity indicator, pinned to the right of the tab strip. */
 .articles-net-indicator {
-    margin-left: auto;
     align-self: center;
     display: flex;
     align-items: center;

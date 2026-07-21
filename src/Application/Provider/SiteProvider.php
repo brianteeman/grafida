@@ -24,6 +24,7 @@ use Grafida\Media\MediaRepository;
 use Grafida\Media\SiteImageFetcher;
 use Grafida\Publish\PublishService;
 use Grafida\Reference\EditorCssService;
+use Grafida\Reference\MetadataCacheService;
 use Grafida\Reference\TemplateDiscovery;
 use Grafida\Reference\ReferenceRepository;
 use Grafida\Reference\ReferenceService;
@@ -35,6 +36,7 @@ use Grafida\Site\FaviconRepository;
 use Grafida\Site\FaviconService;
 use Grafida\Site\SiteRepository;
 use Grafida\Site\SiteService;
+use Grafida\Storage\SettingsRepository;
 use Joomla\DI\ServiceProviderInterface;
 
 /**
@@ -89,6 +91,13 @@ final class SiteProvider implements ServiceProviderInterface
             $api = $c->get('api.client.reference');
 
             return new ReferenceService($c->get(ReferenceRepository::class), $c->get(SiteService::class), $api);
+        });
+
+        // share() is load-bearing, not stylistic: resetIfRequested()'s
+        // once-per-process guard only holds if this is the same instance on
+        // every container->get() (gh-42).
+        $container->share(MetadataCacheService::class, static function (Container $c): MetadataCacheService {
+            return new MetadataCacheService($c->get(SettingsRepository::class), $c->get(ReferenceRepository::class));
         });
 
         $container->share(TemplateDiscovery::class, static function (Container $c): TemplateDiscovery {
