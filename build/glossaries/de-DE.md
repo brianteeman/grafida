@@ -88,6 +88,7 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | rotate left/right | Nach links/rechts drehen | Image-editor rotation. |
 | flip horizontally/vertically | Horizontal/Vertikal spiegeln | Image-editor flip. |
 | crop | Zuschneiden | Image-editor crop; „Zuschnitt anwenden"/„Zuschnitt abbrechen". |
+| selection (crop) | Auswahl | Das Zuschnitt-Rechteck; „Auswahl: B × H" in der Statusleiste des Bildeditors. |
 | resize | Größe ändern | Image-editor resize action. |
 | width / height | Breite / Höhe | Image dimension fields. |
 | aspect ratio | Seitenverhältnis | „Seitenverhältnis sperren" = lock aspect ratio. |

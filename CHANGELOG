@@ -2,6 +2,7 @@ Grafida 0.3
 ================================================================================
 + Diagnose Connection: see the exact request and response when a site connection fails (gh-37)
 + Optional Request Log: record the last 20 requests to the site, with JSON export (gh-37)
+~ Image editor: pressing Crop now visibly arms the tool, and the crop selection's size is shown as you drag (gh-31)
 # [HIGH] Editor content stuck in dark mode when the site's editor.css switches on prefers-color-scheme (gh-38)
 # [MEDIUM] The webview could cache Grafida's own API responses, showing stale data even after a restart (gh-35)
 

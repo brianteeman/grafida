@@ -230,6 +230,17 @@ function iconBtn(iconName, label, ...classes) {
 }
 
 /**
+ * Re-label an iconBtn() in place, for a button whose meaning flips with the
+ * state it controls (e.g. Crop ⇄ Cancel crop). The element itself is kept, so
+ * its listeners, classes and keyboard focus survive the change.
+ */
+function setIconBtnLabel(b, iconName, label) {
+    clearNode(b);
+    b.appendChild(icon(iconName));
+    b.appendChild(txt(label));
+}
+
+/**
  * The inline font style needed to render a FontAwesome glyph inside TinyMCE's
  * toolbar/menu UI, harvested once from the loaded FontAwesome stylesheet.
  *
@@ -4355,7 +4366,11 @@ function buildImageEditor(entry, img) {
 
     const canvas = el('canvas', 'img-editor-canvas');
     const selBox = el('div', 'img-editor-selection hidden');
-    const stage = el('div', 'img-editor-stage', canvas, selBox);
+    // Shown over the image while crop mode is armed but nothing has been drawn
+    // yet — the visible answer to "did pressing Crop do anything?" (gh-31).
+    const cropPrompt = el('div', 'img-editor-prompt hidden',
+        icon('crop-simple'), el('span', null, t('GRAFIDA_MSG_CROP_ARMED')));
+    const stage = el('div', 'img-editor-stage', canvas, selBox, cropPrompt);
 
     const dims = el('div', 'img-editor-dims');
     const wIn = el('input', 'form-control img-editor-num');
@@ -4372,6 +4387,43 @@ function buildImageEditor(entry, img) {
     function clearSelection() {
         sel = null;
         selBox.classList.add('hidden');
+        updateCropUi();
+    }
+
+    /**
+     * Reflect crop mode and the current selection across the whole editor.
+     *
+     * Arming crop mode used to change nothing but the mouse cursor, so the
+     * button looked inert until you happened to hover the image (gh-31). Now
+     * the image itself dims behind a "drag a rectangle" prompt, the button
+     * flips to Cancel crop, and the hint line becomes a live size readout —
+     * so the state is legible without touching the mouse.
+     */
+    function updateCropUi() {
+        const usable = !!(sel && sel.w >= 2 && sel.h >= 2);
+        stage.classList.toggle('cropping', cropping);
+        // The prompt covers the armed-but-empty state only; once a rectangle
+        // exists, the selection box's own scrim takes over as the highlight.
+        cropPrompt.classList.toggle('hidden', !cropping || !!sel);
+        setIconBtnLabel(cropBtn, cropping ? 'xmark' : 'crop-simple',
+            t(cropping ? 'GRAFIDA_BTN_CANCEL_CROP' : 'GRAFIDA_BTN_CROP'));
+        cropBtn.classList.toggle('active', cropping);
+        cropBtn.setAttribute('aria-pressed', cropping ? 'true' : 'false');
+        // Applying without a usable rectangle silently did nothing; say so.
+        applyCropBtn.disabled = !usable;
+        hint.classList.toggle('img-editor-hint-active', cropping);
+        if (usable) {
+            const scale = State.imgEditorScale || 1;
+            hint.textContent = formatText(t('GRAFIDA_LBL_CROP_SELECTION'),
+                String(Math.round(sel.w / scale)), String(Math.round(sel.h / scale)));
+        } else {
+            hint.textContent = t(cropping ? 'GRAFIDA_MSG_CROP_ARMED' : 'GRAFIDA_MSG_CROP_HINT');
+        }
+    }
+
+    function setCropping(on) {
+        cropping = on;
+        if (!on) clearSelection(); else updateCropUi();
     }
 
     function render() {
@@ -4405,12 +4457,13 @@ function buildImageEditor(entry, img) {
         };
     }
     function drawSel() {
-        if (!sel) { selBox.classList.add('hidden'); return; }
+        if (!sel) { selBox.classList.add('hidden'); updateCropUi(); return; }
         selBox.classList.remove('hidden');
         selBox.style.left = sel.x + 'px';
         selBox.style.top = sel.y + 'px';
         selBox.style.width = sel.w + 'px';
         selBox.style.height = sel.h + 'px';
+        updateCropUi();
     }
     stage.addEventListener('mousedown', (e) => {
         if (!cropping) return;
@@ -4436,6 +4489,10 @@ function buildImageEditor(entry, img) {
     function onStageDragEnd() {
         if (!stage.isConnected) { window.removeEventListener('mouseup', onStageDragEnd); return; }
         dragStart = null;
+        // A bare click leaves a zero-sized rectangle that cannot be applied;
+        // drop it so the "drag a rectangle" prompt comes back rather than
+        // leaving the stage looking armed but unexplained.
+        if (cropping && (!sel || sel.w < 2 || sel.h < 2)) clearSelection();
     }
     window.addEventListener('mouseup', onStageDragEnd);
 
@@ -4484,8 +4541,6 @@ function buildImageEditor(entry, img) {
         c.getContext('2d').drawImage(work, x, y, w, h, 0, 0, w, h);
         work = c;
         cropping = false;
-        stage.classList.remove('cropping');
-        cropBtn.classList.remove('active');
         render();
     }
 
@@ -4507,13 +4562,9 @@ function buildImageEditor(entry, img) {
         b.addEventListener('click', handler);
         return b;
     };
-    const cropBtn = mkTool('crop-simple', t('GRAFIDA_BTN_CROP'), () => {
-        cropping = !cropping;
-        stage.classList.toggle('cropping', cropping);
-        cropBtn.classList.toggle('active', cropping);
-        if (!cropping) clearSelection();
-    });
+    const cropBtn = mkTool('crop-simple', t('GRAFIDA_BTN_CROP'), () => setCropping(!cropping));
     const applyCropBtn = mkTool('check', t('GRAFIDA_BTN_APPLY_CROP'), applyCrop);
+    applyCropBtn.disabled = true;
 
     const transformRow = el('div', 'img-editor-row',
         mkTool('rotate-left', t('GRAFIDA_BTN_ROTATE_LEFT'), () => rotate(270)),
