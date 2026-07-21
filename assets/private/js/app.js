@@ -1753,14 +1753,26 @@ function reconcileArticleFilters() {
     const categories = refs.categories || [];
     const tags = refs.tags || [];
     const languages = refs.languages || [];
-    if (!categories.length || !tags.length || !languages.length) return noResult;
+
+    // ⚠️ An empty category list means "we could not read it", not "the site has
+    // none": every Joomla site has at least Uncategorised, and a references
+    // payload for a site with no stored token comes back as empty lists with a
+    // perfectly successful 200. Clearing the user's filters because a fetch
+    // quietly returned nothing would be a worse bug than a stale drop-down, so
+    // bail out entirely. The tag and language lists get no such treatment —
+    // plenty of real sites genuinely have no tags and no content languages, and
+    // a filter on one that has since been deleted must still be cleared.
+    if (!categories.length) return noResult;
 
     const categoryIds = new Set(categories.map(c => String(c.id)));
     const tagIds = new Set(tags.map(tg => String(tg.id)));
     const tagTitles = new Set(tags.map(tg => tg.title));
-    // languageFilterOptions() always synthesises an 'All' option with value
-    // '*' regardless of the site's language list, so '*' is always valid.
-    const languageTags = new Set(['*', ...languages.map(l => l.lang_code)]);
+    // Mirror languageFilterOptions() exactly, or a filter could survive with no
+    // option to show it: it drops unpublished languages, and always synthesises
+    // an 'All' option with value '*' regardless of the site's language list.
+    const languageTags = new Set(['*', ...languages
+        .filter(l => l.published === undefined || Number(l.published) === 1)
+        .map(l => l.lang_code)]);
 
     let remoteChanged = false;
     let draftsChanged = false;

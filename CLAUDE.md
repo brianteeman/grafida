@@ -857,9 +857,14 @@ window-free in tests (a null dialog makes the endpoint return 503).
   are checked), rebuilds just the two filter bars in place via **`rebuildArticleFilterBars()`**, and
   reloads the remote list only when its own filters actually changed (the drafts list is always
   cheap to re-render, being pure client-side filtering). ⚠️ `reconcileArticleFilters()` treats an
-  **empty** refreshed category/tag/language list as "could not read the site" and clears nothing —
-  an unreachable site or a startup reset racing an offline network must never look like every
-  filter silently vanished. The Articles reload button (`reloadArticlesMetadata()`) shows an extra
+  **empty refreshed category list** as "could not read the site" and clears nothing — every Joomla
+  site has at least Uncategorised, and a references payload for a site with no stored token comes
+  back as empty lists with a perfectly successful 200, so an unreachable site or a startup reset
+  racing an offline network must never look like every filter silently vanished. The **tag and
+  language** lists get no such treatment: plenty of real sites genuinely have neither, and a filter
+  on one that has since been deleted must still be cleared. Its language check also mirrors
+  `languageFilterOptions()`'s own `published` filter, or a filter could survive with no option left
+  to display it. The Articles reload button (`reloadArticlesMetadata()`) shows an extra
   `GRAFIDA_MSG_FILTERS_RESET` toast when reconciliation actually cleared something, since a filter
   resetting itself with no explanation would otherwise look like a bug. The editor is re-rendered
   through its own form-preserving path (`collectDraftFormData()` merged back over the draft) when
