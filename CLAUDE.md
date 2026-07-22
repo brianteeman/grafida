@@ -856,7 +856,7 @@ window-free in tests (a null dialog makes the endpoint return 503).
   reachable by Alt+0 alone), and `help_tabs` (`editorHelpTabs()` in `app.js`) adds a **Grafida**
   tab listing the app's own shortcuts plus, when an AI service is configured, an **AI assistant**
   tab (gh-13). Two traps: `help_tabs` **replaces** the default tab list rather than extending it,
-  so the built-in names (`shortcuts`, `keyboardnav`, `plugins`, `versions`) must be repeated to
+  so the built-in names (`shortcuts`, `keyboardnav`, `versions`) must be repeated to
   keep them; and the built-in "Handy Shortcuts" tab is a **hard-coded table** — it does not read
   the editor's shortcut registry, which is why an `addShortcut()` never appears there and Grafida
   needs a tab of its own. A dialog `table` cell and an `htmlpanel` are both set via **innerHTML**,
@@ -864,6 +864,14 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `helpShortcutText()` mirrors the help plugin's own `convertText()` so our rows render as
   ⌘/⌃/⇧ glyphs on macOS and `Ctrl + …` elsewhere, and its output is therefore HTML (escape a
   sentence *before* interpolating a shortcut into its `%s`).
+  ⚠️ **The built-in `plugins` tab is deliberately *not* in that list** (gh-21). A link in a TinyMCE
+  dialog is a `target="_blank"` anchor, and nothing in this app can open one: Boson's webview opens
+  no new window, and the SPA routes every external URL through `api.openUrl()` explicitly. That tab
+  is a list of links and nothing else — including TinyMCE's advertisement for the premium plugins we
+  neither ship nor can load — so every last item in it is inert. (This replaced a first attempt at
+  gh-21 that registered Grafida's own editor features — the slash-command menu, the AI assistant —
+  as empty plugins answering `getMetadata()` so they would be *named* there; with the tab gone, so
+  is that machinery. Should the tab ever come back, the same applies to any other dialog link.)
   ⚠️ **A shortcut's modifier gate is `hasPrimaryModifier()`, never `e.ctrlKey || e.metaKey`**: on
   Windows `metaKey` is the **Windows key**, whose chords belong to the OS (Win+S opens Windows
   Search), so accepting either key on every platform binds us to a chord we don't own (gh-13). It

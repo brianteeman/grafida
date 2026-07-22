@@ -3273,11 +3273,19 @@ function aiHelpTab() {
 /**
  * The Help dialog's tab list. help_tabs *replaces* the default list rather than
  * extending it, so the built-in names have to be repeated to keep them.
+ *
+ * The built-in "Plugins" tab is deliberately absent (gh-21). It is a list of
+ * links and nothing else, and a link in a TinyMCE dialog is a target="_blank"
+ * anchor: Boson's webview opens no new window, and the SPA routes every
+ * external URL through api.openUrl() explicitly, so not one of them does
+ * anything when clicked. What it does show is TinyMCE's advertisement for the
+ * premium plugins we neither ship nor can load — an unclickable price list is
+ * worse than no tab at all.
  */
 function editorHelpTabs(hasAiService) {
     const tabs = ['shortcuts', grafidaHelpTab()];
     if (hasAiService) tabs.push(aiHelpTab());
-    return tabs.concat(['keyboardnav', 'plugins', 'versions']);
+    return tabs.concat(['keyboardnav', 'versions']);
 }
 
 /**
