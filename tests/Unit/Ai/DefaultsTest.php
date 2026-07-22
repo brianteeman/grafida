@@ -256,8 +256,10 @@ final class DefaultsTest extends TestCase
             'DB override must replace the bundled tone');
         self::assertSame(['temperature' => 0.5], $byKey['proofread']['params'],
             'DB override must replace the bundled params');
-        // Title and icon stay as bundled values (not in the override set)
-        self::assertSame('check',  $byKey['proofread']['icon']);
+        self::assertSame('Proofread Override', $byKey['proofread']['title'],
+            'DB override must replace the bundled title');
+        self::assertSame('fa-check', $byKey['proofread']['icon'],
+            'DB override must replace the bundled icon');
         // The DB record id should be present
         self::assertNotNull($byKey['proofread']['id'], 'effectiveTools must carry the DB id for an overridden tool');
     }
@@ -287,6 +289,40 @@ final class DefaultsTest extends TestCase
         }
 
         self::assertFalse($byKey['gen']['enabled'], 'DB override must be able to disable a built-in tool');
+    }
+
+    public function testPre03ToggleOnlyRowKeepsTheBundledPresentation(): void
+    {
+        // Exactly the row a pre-0.3 enable/disable toggle wrote on a built-in
+        // that had no override yet: the title is the tool key and everything the
+        // edit form authors is blank. It must not surface as the tool's identity.
+        $repo = $this->toolRepo();
+        $repo->upsert(new AiTool(
+            id: null,
+            toolKey: 'gen',
+            title: 'gen',
+            icon: '',
+            prompt: '',
+            overrideSystem: false,
+            tone: '',
+            params: [],
+            serviceId: null,
+            isCustom: false,
+            enabled: false,
+            sortOrder: 0,
+        ));
+
+        $byKey = [];
+
+        foreach ($this->defaults()->effectiveTools($repo) as $t) {
+            $byKey[$t['toolKey']] = $t;
+        }
+
+        self::assertSame('Generate', $byKey['gen']['title']);
+        self::assertSame('laptop-code', $byKey['gen']['icon']);
+        self::assertNotSame('', $byKey['gen']['prompt'], 'the bundled prompt must survive a toggle-only row');
+        self::assertSame(10, $byKey['gen']['sortOrder']);
+        self::assertFalse($byKey['gen']['enabled'], 'the enabled flag is the one thing such a row does carry');
     }
 
     // -----------------------------------------------------------------------

@@ -246,14 +246,23 @@ final class Defaults
             ];
 
             if (isset($overrides[$key])) {
-                $override           = $overrides[$key];
-                $row['id']          = $override->id;
-                $row['prompt']      = $override->prompt;
-                $row['tone']        = $override->tone;
-                $row['params']      = $override->params;
-                $row['serviceId']   = $override->serviceId;
-                $row['enabled']     = $override->enabled;
-                $row['sortOrder']   = $override->sortOrder;
+                $override  = $overrides[$key];
+                $row['id'] = $override->id;
+
+                // The enabled flag is the one thing every override row carries
+                // honestly, whichever path wrote it.
+                $row['enabled'] = $override->enabled;
+
+                if (!self::isToggleOnlyRow($override)) {
+                    $row['title']          = $override->title;
+                    $row['icon']           = $override->icon;
+                    $row['prompt']         = $override->prompt;
+                    $row['overrideSystem'] = $override->overrideSystem;
+                    $row['tone']           = $override->tone;
+                    $row['params']         = $override->params;
+                    $row['serviceId']      = $override->serviceId;
+                    $row['sortOrder']      = $override->sortOrder;
+                }
             }
 
             $result[] = $row;
@@ -290,6 +299,26 @@ final class Defaults
         );
 
         return $result;
+    }
+
+    /**
+     * Is this built-in override a row the enable/disable toggle wrote on its own?
+     *
+     * Before 0.3 a PATCH carrying nothing but `enabled` still rewrote every
+     * column, filling the ones the body omitted from an override row that did
+     * not exist yet — so toggling a bundled tool off and on again stored its
+     * title as the tool key, with no icon, no prompt and no tone. Those columns
+     * were then ignored by {@see self::effectiveTools()}, which is why the tool
+     * kept working and the damage went unnoticed; now that the override's title
+     * and icon are honoured (gh-28), such a row would surface as a tool called
+     * `gen` with no icon. The controller no longer writes one, and this
+     * recognises the ones already in the wild: a title equal to the tool key (or
+     * empty) is never something the edit form sends, since it always posts the
+     * title it displayed, which for a built-in is the bundled one.
+     */
+    private static function isToggleOnlyRow(AiTool $tool): bool
+    {
+        return $tool->title === '' || $tool->title === $tool->toolKey;
     }
 
     // -----------------------------------------------------------------------

@@ -184,6 +184,24 @@ final class AiServiceController extends Controller
     }
 
     /**
+     * The tool a given key currently resolves to — the bundled default for a
+     * built-in, with any stored override already applied — or null for a key
+     * that names neither.
+     *
+     * @return array{id: int|null, toolKey: string, title: string, icon: string, prompt: string, overrideSystem: bool, tone: string, params: array<string, mixed>, serviceId: int|null, isCustom: bool, enabled: bool, sortOrder: int}|null
+     */
+    private function effectiveTool(string $key): ?array
+    {
+        foreach ($this->aiDefaults->effectiveTools($this->aiTools) as $tool) {
+            if ($tool['toolKey'] === $key) {
+                return $tool;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Stores or clears a system-prompt override.
      *
      * An empty/omitted `prompt` key restores the bundled default (the stored
@@ -218,33 +236,42 @@ final class AiServiceController extends Controller
         // is_custom = false (PATCH is for built-ins only; POST creates custom tools).
         $existing = $this->aiTools->findByKey($key);
 
+        // A PATCH may carry any subset of the fields, but the row it writes is
+        // whole — so whatever the body omits has to come from the tool as it
+        // stands *right now*, bundled defaults included. Falling back to the
+        // override row alone is what let a body carrying only `enabled` (the
+        // list's toggle button) blank a bundled tool's title, icon, prompt and
+        // tone the first time it was pressed — invisible until gh-28 made the
+        // stored title and icon authoritative.
+        $current = $this->effectiveTool($key);
+
         $paramsRaw = $body['params'] ?? null;
         /** @var array<string, mixed> $params */
-        $params = is_array($paramsRaw) ? $paramsRaw : ($existing !== null ? $existing->params : []);
+        $params = is_array($paramsRaw) ? $paramsRaw : ($current['params'] ?? []);
 
         $serviceIdRaw = $body['serviceId'] ?? null;
-        $serviceId    = is_numeric($serviceIdRaw) ? (int) $serviceIdRaw : ($existing !== null ? $existing->serviceId : null);
+        $serviceId    = is_numeric($serviceIdRaw) ? (int) $serviceIdRaw : ($current['serviceId'] ?? null);
 
         $enabledRaw = $body['enabled'] ?? null;
-        $enabled    = $enabledRaw !== null ? (bool) $enabledRaw : ($existing !== null ? $existing->enabled : true);
+        $enabled    = $enabledRaw !== null ? (bool) $enabledRaw : ($current['enabled'] ?? true);
 
         $sortOrderRaw = $body['sortOrder'] ?? null;
-        $sortOrder    = is_numeric($sortOrderRaw) ? (int) $sortOrderRaw : ($existing !== null ? $existing->sortOrder : 0);
+        $sortOrder    = is_numeric($sortOrderRaw) ? (int) $sortOrderRaw : ($current['sortOrder'] ?? 0);
 
         $titleRaw = $body['title'] ?? null;
-        $title    = is_string($titleRaw) ? $titleRaw : ($existing !== null ? $existing->title : $key);
+        $title    = is_string($titleRaw) ? $titleRaw : ($current['title'] ?? $key);
 
         $iconRaw = $body['icon'] ?? null;
-        $icon    = is_string($iconRaw) ? $iconRaw : ($existing !== null ? $existing->icon : '');
+        $icon    = is_string($iconRaw) ? $iconRaw : ($current['icon'] ?? '');
 
         $promptRaw = $body['prompt'] ?? null;
-        $prompt    = is_string($promptRaw) ? $promptRaw : ($existing !== null ? $existing->prompt : '');
+        $prompt    = is_string($promptRaw) ? $promptRaw : ($current['prompt'] ?? '');
 
         $toneRaw = $body['tone'] ?? null;
-        $tone    = is_string($toneRaw) ? $toneRaw : ($existing !== null ? $existing->tone : '');
+        $tone    = is_string($toneRaw) ? $toneRaw : ($current['tone'] ?? '');
 
         $overrideSystemRaw = $body['overrideSystem'] ?? null;
-        $overrideSystem    = $overrideSystemRaw !== null ? (bool) $overrideSystemRaw : ($existing !== null ? $existing->overrideSystem : false);
+        $overrideSystem    = $overrideSystemRaw !== null ? (bool) $overrideSystemRaw : ($current['overrideSystem'] ?? false);
 
         $tool = new AiTool(
             id: $existing !== null ? $existing->id : null,
@@ -256,7 +283,11 @@ final class AiServiceController extends Controller
             tone: $tone,
             params: $params,
             serviceId: $serviceId,
-            isCustom: false,
+            // PATCH edits a tool, it never changes what kind of tool it is: a
+            // custom tool stays custom (demoting one to a built-in override
+            // would leave it matching no bundled key, i.e. gone from the list),
+            // and a body for a key with no row yet is a built-in's override.
+            isCustom: $existing !== null && $existing->isCustom,
             enabled: $enabled,
             sortOrder: $sortOrder,
         );

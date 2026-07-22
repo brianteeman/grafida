@@ -199,6 +199,84 @@ final class AiToolsRoutingTest extends TestCase
         self::assertFalse($byKey['gen']['enabled']);
     }
 
+    public function testPatchAiToolOverridesTitleAndIcon(): void
+    {
+        $kernel = $this->kernel();
+
+        [$status, $json] = $this->call($kernel, 'PATCH', '/api/ai/tools/proofread', json_encode([
+            'title' => 'Check my spelling',
+            'icon'  => 'spell-check',
+        ]));
+
+        self::assertSame(200, $status);
+        self::assertSame('spell-check', $json['data']['icon']);
+
+        [, $list] = $this->call($kernel, 'GET', '/api/ai/tools');
+        $byKey = [];
+
+        foreach ($list['data']['tools'] as $t) {
+            $byKey[$t['toolKey']] = $t;
+        }
+
+        self::assertSame('Check my spelling', $byKey['proofread']['title'], 'a saved title must take effect');
+        self::assertSame('spell-check', $byKey['proofread']['icon'], 'a saved icon must take effect');
+    }
+
+    public function testPatchAiToolKeepsWhatTheBodyDoesNotCarry(): void
+    {
+        $kernel = $this->kernel();
+
+        // The list's toggle button sends nothing but `enabled`. Everything else
+        // must survive it — bundled defaults included, for a tool that has no
+        // override row yet.
+        $this->call($kernel, 'PATCH', '/api/ai/tools/gen', json_encode(['enabled' => false]));
+        $this->call($kernel, 'PATCH', '/api/ai/tools/gen', json_encode(['enabled' => true]));
+
+        [, $list] = $this->call($kernel, 'GET', '/api/ai/tools');
+        $byKey = [];
+
+        foreach ($list['data']['tools'] as $t) {
+            $byKey[$t['toolKey']] = $t;
+        }
+
+        self::assertTrue($byKey['gen']['enabled']);
+        self::assertSame('Generate', $byKey['gen']['title']);
+        self::assertSame('laptop-code', $byKey['gen']['icon']);
+        self::assertNotSame('', $byKey['gen']['prompt']);
+        self::assertSame(10, $byKey['gen']['sortOrder']);
+    }
+
+    public function testPatchAiToolKeepsACustomToolCustom(): void
+    {
+        $kernel = $this->kernel();
+
+        $this->call($kernel, 'POST', '/api/ai/tools', json_encode([
+            'toolKey' => 'my_tool',
+            'title'   => 'My Tool',
+            'icon'    => 'star',
+            'prompt'  => 'Do it.',
+        ]));
+
+        [$status, $json] = $this->call($kernel, 'PATCH', '/api/ai/tools/my_tool', json_encode([
+            'title' => 'My Tool',
+            'icon'  => 'wand-magic-sparkles',
+            'prompt' => 'Do it.',
+        ]));
+
+        self::assertSame(200, $status);
+        self::assertTrue($json['data']['isCustom'], 'editing a custom tool must not demote it to a built-in override');
+
+        [, $list] = $this->call($kernel, 'GET', '/api/ai/tools');
+        $byKey = [];
+
+        foreach ($list['data']['tools'] as $t) {
+            $byKey[$t['toolKey']] = $t;
+        }
+
+        self::assertArrayHasKey('my_tool', $byKey, 'an edited custom tool must still be listed');
+        self::assertSame('wand-magic-sparkles', $byKey['my_tool']['icon']);
+    }
+
     public function testPatchAiToolInvalidKeyIs405ForWrongMethod(): void
     {
         // PUT /api/ai/tools/somekey should be 405 (only PATCH/DELETE).

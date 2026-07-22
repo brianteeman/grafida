@@ -709,7 +709,19 @@ window-free in tests (a null dialog makes the endpoint return 503).
   is **never persisted**: `ai_services` stores only the provider *key*, and chat-path/auth/models-path/
   dialect are derived from `providers.json` at runtime, so changing the table needs no DB migration.
   `effectiveTools()` overlays the code defaults with `ai_tools` DB overrides
-  + custom tools; **each tool may target its own service** (`service_id`). `AiChatRepository` persists
+  + custom tools; **each tool may target its own service** (`service_id`).
+  ⚠️ **An override row is written whole, but a PATCH may carry any subset of the fields** (gh-28), so
+  `AiServiceController::updateAiTool()` fills what the body omits from `effectiveTool($key)` — the
+  tool *as it currently resolves*, bundled defaults included — never from the override row alone.
+  Falling back to the row alone is what let the list's enable/disable toggle (which sends nothing but
+  `enabled`) blank a bundled tool's title, icon, prompt and tone the first time it was pressed; and
+  `isCustom` is likewise preserved from the existing row, since a custom tool demoted to a built-in
+  override matches no bundled key and disappears from the list entirely. That damage went unnoticed
+  because `effectiveTools()` used to **ignore** an override's `title`/`icon`/`override_system` — which
+  was the reported bug: a saved icon never took effect. Those three are authoritative now, so a
+  pre-0.3 toggle-written row (recognised by `Defaults::isToggleOnlyRow()`: a title equal to the tool
+  key, or empty — never something the edit form sends) contributes **only** its `enabled` flag.
+  `AiChatRepository` persists
   **saved chats** (`ai_chats` + `ai_chat_messages`) linked to a draft; deleting the draft cascades
   them away. `ai_chats` also carries the Responses-API conversation chain
   (`previous_response_id` + `last_response_at`, the latter **ISO-8601 UTC** — unlike the other
