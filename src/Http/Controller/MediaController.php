@@ -19,6 +19,7 @@ use Grafida\Http\Router;
 use Grafida\Http\SiteContext;
 use Grafida\Joomla\ApiClient;
 use Grafida\Media\ImageInfo;
+use Grafida\Media\LocalMediaSync;
 use Grafida\Media\LocalMediaUrl;
 use Grafida\Media\MediaRepository;
 use Grafida\Media\SiteImageException;
@@ -55,6 +56,7 @@ final class MediaController extends Controller
         private readonly ApiClient $apiClient,
         private readonly MediaRepository $media,
         private readonly SiteImageFetcher $siteImages,
+        private readonly LocalMediaSync $localMediaSync,
     ) {}
 
     public function registerRoutes(Router $router): void
@@ -291,16 +293,37 @@ final class MediaController extends Controller
         return Json::ok();
     }
 
-    /** Returns the data: URI of a stored offline image blob (for editor previews). */
+    /**
+     * Returns the data: URI of a stored offline image blob (for editor
+     * previews), plus its filename/mime/dimensions — additively (gh-43): the
+     * AI panel's per-image fetch and the intro/full-text preview only ever
+     * consumed `dataUri`, so this stays compatible with them, while the
+     * live-open-editor resize step (which needs the *old* dimensions before
+     * an in-place edit changes them) can now get them from the same call
+     * instead of re-deriving them from a decoded image client-side.
+     */
     public function mediaBlob(int $id): ResponseInterface
     {
+        $meta = $this->media->findMeta($id);
+
+        if ($meta === null) {
+            return Json::error('Media not found', 404);
+        }
+
         $dataUri = $this->media->dataUri($id);
 
         if ($dataUri === null) {
             return Json::error('Media not found', 404);
         }
 
-        return Json::ok(['id' => $id, 'dataUri' => $dataUri]);
+        return Json::ok([
+            'id'       => $id,
+            'dataUri'  => $dataUri,
+            'filename' => $meta['filename'],
+            'mime'     => $meta['mime'],
+            'width'    => $meta['width'],
+            'height'   => $meta['height'],
+        ]);
     }
 
     /**
@@ -485,6 +508,18 @@ final class MediaController extends Controller
      * the article editor. Dimensions are re-derived from the new bytes
      * rather than trusted from the caller.
      *
+     * ⚠️ **gh-43**: the blob's *old* width/height are captured **before**
+     * `replaceData()` overwrites them, then handed to
+     * {@see LocalMediaSync::resync()} together with the newly derived size
+     * and the freshly built URL — this is what rewrites the baked-in `width`/
+     * `height` attributes on every `<img>` in a **closed** draft that
+     * references this blob, so a crop/resize does not silently distort the
+     * picture the next time that article is opened. The response also
+     * carries `oldWidth`/`oldHeight` (alongside the existing `width`/
+     * `height`) so the SPA can apply the identical rule live to an
+     * **already-open** editor, via `assets/private/js/editor/localmedia.js`'s
+     * `fitDimensions()`.
+     *
      * @param array<string, mixed> $body
      */
     public function updateLocalMediaContent(int $id, array $body): ResponseInterface
@@ -501,6 +536,9 @@ final class MediaController extends Controller
             return Json::error('Invalid image data', 400);
         }
 
+        $oldWidth  = $meta['width'];
+        $oldHeight = $meta['height'];
+
         $mime              = $this->str($body, 'mime', $meta['mime']);
         [$width, $height]  = ImageInfo::dimensions($raw);
 
@@ -509,11 +547,17 @@ final class MediaController extends Controller
         $updated = $this->media->findMeta($id);
         \assert($updated !== null);
 
+        $newSrc = LocalMediaUrl::build($id, $updated['updated_at'] ?? $updated['created_at']);
+
+        $this->localMediaSync->resync($meta['site_id'], $id, $newSrc, $oldWidth, $oldHeight, $width, $height);
+
         return Json::ok([
-            'id'     => $id,
-            'url'    => LocalMediaUrl::build($id, $updated['updated_at'] ?? $updated['created_at']),
-            'width'  => $updated['width'],
-            'height' => $updated['height'],
+            'id'        => $id,
+            'url'       => $newSrc,
+            'width'     => $updated['width'],
+            'height'    => $updated['height'],
+            'oldWidth'  => $oldWidth,
+            'oldHeight' => $oldHeight,
         ]);
     }
 

@@ -41,6 +41,7 @@ use Grafida\I18n\LanguageService;
 use Grafida\Joomla\ApiClient;
 use Grafida\Markdown\MarkdownService;
 use Grafida\Media\InlineImageExtractor;
+use Grafida\Media\LocalMediaSync;
 use Grafida\Media\MediaRepository;
 use Grafida\Media\SiteImageFetcher;
 use Grafida\Publish\PublishService;
@@ -121,6 +122,7 @@ final class ControllerProvider implements ServiceProviderInterface
                 apiClient: $c->get(ApiClient::class),
                 media: $c->get(MediaRepository::class),
                 siteImages: $c->get(SiteImageFetcher::class),
+                localMediaSync: $c->get(LocalMediaSync::class),
             );
         });
 

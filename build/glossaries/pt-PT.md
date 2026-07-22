@@ -153,3 +153,4 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | site metadata | Metadados do site | The locally cached categories, tags, access levels, languages and custom fields of a site (gh-42). GRAFIDA_LBL_METADATA_CACHE. |
 | cache (noun) | cache | Kept as-is (technical loanword, common in pt-PT); «Tempo de cache» = cache time. GRAFIDA_LBL_METADATA_CACHE_TIME. |
 | startup (reload on) | ao iniciar | The moment Grafida starts; «Recarregar ao iniciar» = reload on startup. GRAFIDA_LBL_METADATA_RESET_ON_START. |
+| reset size (article image) | Repor tamanho | Article image context-toolbar action that restores an `<img>`'s natural (undistorted) width/height (gh-43). GRAFIDA_BTN_RESET_SIZE. |

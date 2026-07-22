@@ -6,6 +6,8 @@ Grafida 0.3
 + Reload metadata button on the Articles page, keeping your filters (gh-42)
 + Settings: how long site metadata is cached, and whether to reload it on startup (gh-42)
 + Light / dark / follow-system switch in the sidebar, so you can change it without leaving the open article (gh-41)
++ Right-click an image in the editor for Edit image (crop/resize/rotate/flip a local picture), CSS class and Reset size (gh-43)
++ The in-article media browser can now also pick a Local media image, not yet published (gh-43)
 ~ Pasted and dropped images are stored locally and referenced, not embedded in the article; existing articles are converted when first opened (gh-36)
 ~ Image editor: pressing Crop now visibly arms the tool, and the crop selection's size is shown as you drag (gh-31)
 ~ Site metadata is refreshed automatically once it goes stale, not only when you press Reload metadata (gh-42)
@@ -16,6 +18,7 @@ Grafida 0.3
 # [MEDIUM] Offline, the whole Articles screen was replaced by an error — even the Local articles tab, which needs no network (gh-29)
 # [MEDIUM] The webview could cache Grafida's own API responses, showing stale data even after a restart (gh-35)
 # [MEDIUM] The Articles list's category, tag and language filters never picked up reloaded site metadata (gh-42)
+# [MEDIUM] Cropping or resizing a local image already used in an article distorted it the next time the article was opened (gh-43)
 # [LOW] The Category drop-downs showed a flat list instead of the category tree (gh-40)
 
 Grafida 0.2

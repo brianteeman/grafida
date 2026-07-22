@@ -6,7 +6,7 @@
  * Builds and parses the `boson://app/api/media/{id}/raw?rev=…` URL a local
  * (not-yet-published) media blob is referenced by in the article HTML
  * (gh-36). Exposes window.GrafidaLocalMedia = { url, idFromUrl, token,
- * PREFIX }.
+ * fitDimensions, PREFIX }.
  *
  * Mirrors `Grafida\Media\LocalMediaUrl` (URL shape + rev token) and
  * `Grafida\Html\InlineMedia::LOCAL_URL_PREFIX`/`idFromLocalUrl()` (parsing) on
@@ -21,6 +21,17 @@
  * a fresh URL client-side after the bytes change, without a round trip just to
  * learn the new `rev` — hence it lives here now rather than being bolted on
  * later.
+ *
+ * `fitDimensions()` is the gh-43 sizing rule (see `.plans/00-overview.md`'s
+ * truth table): when a local blob's bytes are edited in place (crop/resize/
+ * rotate/flip), TinyMCE's own baked-in `width`/`height` attributes on any
+ * `<img>` referencing it go stale — they still describe the *old* intrinsic
+ * size, so simply swapping the `src` (as `url()` above does) distorts the
+ * picture. This mirrors `Grafida\Media\ImageDimensions::fit()` byte-for-byte
+ * (same argument order, same rounding); it is used both live in an already-
+ * open editor (step 3) and, in spirit, by the PHP side when resyncing a
+ * *closed* draft's stored HTML (`Html\InlineMedia::resyncLocalImage()`) — two
+ * implementations of one rule, so a fix to one without the other is a bug.
  *
  * A pure module (no app.js/window.State/DOM dependency beyond `window`
  * itself), which is what makes it cheaply unit-testable
@@ -162,5 +173,76 @@
         return m ? parseInt(m[1], 10) : null;
     }
 
-    global.GrafidaLocalMedia = { PREFIX, url, idFromUrl, token };
+    /**
+     * Coerces a DOM-attribute-or-database value to a positive integer, or
+     * null when it is missing, unparsable, zero or negative — "not a usable
+     * pixel dimension" is treated as "absent" throughout this rule, matching
+     * `ImageDimensions::positive()` on the PHP side.
+     */
+    function toPositiveInt(value) {
+        if (value === null || value === undefined) return null;
+
+        const n = parseInt(value, 10);
+
+        return Number.isFinite(n) && n > 0 ? n : null;
+    }
+
+    /**
+     * The gh-43 dimension rule (see the module doc comment and
+     * `.plans/00-overview.md`'s truth table). Given an `<img>`'s current
+     * `width`/`height` attributes and a blob's old/new intrinsic size,
+     * decides what the attributes should become — never distorting the
+     * picture and never silently reverting a deliberate in-article resize.
+     *
+     * @param {?string|?number} attrW the `<img>`'s current `width` attribute
+     * @param {?string|?number} attrH the `<img>`'s current `height` attribute
+     * @param {?string|?number} oldW  the blob's intrinsic width before the edit
+     * @param {?string|?number} oldH  the blob's intrinsic height before the edit
+     * @param {?string|?number} newW  the blob's intrinsic width after the edit
+     * @param {?string|?number} newH  the blob's intrinsic height after the edit
+     * @return {?{width: number, height: number}} null when nothing should
+     *         change (no attributes to resync, unknown intrinsics, or the
+     *         computed values already match the current ones)
+     */
+    function fitDimensions(attrW, attrH, oldW, oldH, newW, newH) {
+        const aw = toPositiveInt(attrW);
+        const ah = toPositiveInt(attrH);
+
+        // Neither attribute present: nothing on the tag to resync.
+        if (aw === null && ah === null) return null;
+
+        const ow = toPositiveInt(oldW);
+        const oh = toPositiveInt(oldH);
+        const nw = toPositiveInt(newW);
+        const nh = toPositiveInt(newH);
+
+        // Any intrinsic dimension unknown: cannot compute a faithful ratio.
+        if (ow === null || oh === null || nw === null || nh === null) return null;
+
+        let width;
+        let height;
+
+        if (aw !== null && aw === ow && (ah === null || ah === oh)) {
+            // The tag's size still matches the blob's OLD intrinsic size, i.e.
+            // it was never hand-resized in the article — adopt the new
+            // intrinsic size wholesale.
+            width = nw;
+            height = nh;
+        } else if (aw !== null) {
+            // A deliberate in-article width: keep it, re-ratio the height so
+            // the picture is never distorted.
+            width = aw;
+            height = Math.max(1, Math.round((aw * nh) / nw));
+        } else {
+            // width absent, height present: keep the height, re-ratio the width.
+            height = ah;
+            width = Math.max(1, Math.round((ah * nw) / nh));
+        }
+
+        if (width === aw && height === ah) return null;
+
+        return { width, height };
+    }
+
+    global.GrafidaLocalMedia = { PREFIX, url, idFromUrl, token, fitDimensions };
 }(typeof window !== 'undefined' ? window : this));

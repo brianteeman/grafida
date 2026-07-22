@@ -1768,6 +1768,23 @@ input[type="color"].form-control {
     line-height: 1.3;
 }
 
+/* Local Media tab's width×height caption (gh-43) — same spot as
+   .media-item-name, one size down, so a filename + dimensions pair reads as
+   one caption block rather than two competing labels. */
+.media-item-dims {
+    font-size: 10px;
+    color: var(--color-text-muted);
+    text-align: center;
+}
+
+/* In-article media browser's Site media / Local media tab panels (gh-43):
+   each hosts its own .media-browser-grid, so only .hidden (toggled by
+   applyTab()) needs to say anything here — this selector exists purely so a
+   reader searching the CSS for "media-browser-tab-panel" finds it. */
+.media-browser-tab-panel {
+    display: contents;
+}
+
 /* ===== Media Manager screen ===== */
 .media-mgr-toolbar {
     display: flex;

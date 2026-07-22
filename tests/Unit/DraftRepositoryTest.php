@@ -130,6 +130,61 @@ final class DraftRepositoryTest extends TestCase
         self::assertCount(1, $repo->forSite(2));
     }
 
+    public function testListReferencingMediaMatchesOnRawUrlAndSite(): void
+    {
+        $repo = $this->repo();
+
+        $draft = $this->sample();
+        $draft->html = '<p><img src="boson://app/api/media/1/raw?rev=abc"></p>';
+        $id = $repo->insert($draft);
+
+        // A trailing "/raw" on a DIFFERENT id must not be matched by a "%1%"
+        // substring search — this is the trap the needle's trailing "/raw"
+        // exists to close.
+        $other = $this->sample();
+        $other->html = '<p><img src="boson://app/api/media/11/raw?rev=xyz"></p>';
+        $repo->insert($other);
+
+        $unrelated = $this->sample();
+        $unrelated->html = '<p>No images here.</p>';
+        $repo->insert($unrelated);
+
+        // Same reference, but on a different site — must not match either.
+        $elsewhere = $this->sample();
+        $elsewhere->siteId = 2;
+        $elsewhere->html   = '<p><img src="boson://app/api/media/1/raw?rev=abc"></p>';
+        $repo->insert($elsewhere);
+
+        $found = $repo->listReferencingMedia(1, 1);
+
+        self::assertCount(1, $found);
+        self::assertSame($id, $found[0]->id);
+    }
+
+    public function testListReferencingMediaReturnsEmptyWhenNothingMatches(): void
+    {
+        self::assertSame([], $this->repo()->listReferencingMedia(1, 999));
+    }
+
+    public function testUpdateHtmlOverwritesHtmlAndBumpsUpdatedAt(): void
+    {
+        $repo = $this->repo();
+        $id   = $repo->insert($this->sample());
+
+        $before = $repo->find($id);
+        self::assertNotNull($before);
+
+        $repo->updateHtml($id, '<p>Resynced</p>');
+
+        $after = $repo->find($id);
+        self::assertNotNull($after);
+        self::assertSame('<p>Resynced</p>', $after->html);
+        self::assertNotNull($after->updatedAt);
+        // Every other column is left exactly as it was.
+        self::assertSame($before->title, $after->title);
+        self::assertSame($before->fields, $after->fields);
+    }
+
     public function testSetRemoteIdAndDelete(): void
     {
         $repo = $this->repo();

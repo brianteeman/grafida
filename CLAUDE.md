@@ -403,12 +403,47 @@ window-free in tests (a null dialog makes the endpoint return 503).
   dimensions, size, which local draft (if any) uses it, and a "Published" badge once `remote_url`
   is set — and offers the same in-app crop/resize/rotate/flip editor the Site Media tab's entries
   get (`openImageEditor()` now takes a small `{name, mime, loadDataUri(), save()}` descriptor so
-  one implementation serves both tabs), plus rename, save-to-disk
+  one implementation serves both tabs, and — since gh-43 — the article editor's own image
+  context toolbar too, via `localMediaEditorDescriptorBase(entry, afterSave)`, which factors out
+  everything but what happens after a successful save: the grid re-renders itself, an in-article
+  edit has no grid on screen to touch), plus rename, save-to-disk
   (`POST /api/media/{id}/save-to-disk`, folder picker + server write, since Boson has no Save-As
-  dialog) and delete. Editing a Local Media entry's bytes calls
-  `refreshLocalMediaReferences(id, newUrl)`, the one chokepoint that rewrites any matching
-  `<img data-grafida-media-id>` in an already-open editor and refreshes the intro/full-text
-  preview cache, so a crop is visible without reopening the article.
+  dialog) and delete.
+  ⚠️ **Editing a blob's bytes in place leaves every `<img>` that references it wearing a stale,
+  possibly-distorted `width`/`height`** (gh-43) — TinyMCE bakes the *intrinsic* size onto every
+  inserted image (its paste/drop path inserts `<img width="…" height="…">`, and the Insert/Edit
+  Image dialog auto-fills Dimensions from `naturalWidth`/`naturalHeight`), so a crop/resize
+  changes the blob's real dimensions but nothing revisits the tag's already-baked-in attributes,
+  and a plain `src` swap alone stretches/squashes the old picture into the old aspect ratio. The
+  fix is one rule, `Grafida\Media\ImageDimensions::fit(attrW, attrH, oldW, oldH, newW, newH)` —
+  see its doc comment (and `.plans/00-overview.md`'s truth table) for the exact cases: no
+  attributes → leave alone; the tag's size still matches the blob's *old* intrinsic size (never
+  hand-resized) → adopt the new intrinsic size wholesale; otherwise a deliberate in-article size →
+  keep the attribute that is present and re-ratio the other so the picture is never distorted;
+  any dimension unknown → leave alone — **implemented twice, and the two must stay in step**:
+  `ImageDimensions::fit()` in PHP and `assets/private/js/editor/localmedia.js`'s
+  `GrafidaLocalMedia.fitDimensions()` in JS (same argument order, same rounding), because the rule
+  has to apply in two different runtimes. The **server** half runs even with the article
+  **closed** — the reported bug crops a blob from the Local Media tab, then reopens an article
+  that never had TinyMCE running to fix itself — via `Grafida\Media\LocalMediaSync::resync()`
+  (a container-registered service, `DraftRepository::listReferencingMedia()` finds every draft on
+  the blob's site whose `html` LIKEs its `…/media/{id}/raw` URL) calling
+  `Html\InlineMedia::resyncLocalImage()`, which walks every matching `<img>` (matched the same
+  tolerant way `rewriteOfflineImages()` is — by `src` or by the `data-grafida-media-id` tag,
+  whichever resolves), rewrites `src` to the freshly built URL and applies `ImageDimensions::fit()`
+  to `width`/`height`, and returns the HTML byte-identical when nothing matched so an unaffected
+  draft is never even written back (`DraftRepository::updateHtml()` bumps `updated_at`, since the
+  rendered content genuinely changed). `MediaController::updateLocalMediaContent()` captures the
+  blob's *old* width/height **before** `replaceData()` overwrites them, calls `resync()` with old
+  + new, and now answers `{id, url, width, height, oldWidth, oldHeight}` — the two `old*` fields
+  are additive, purely so the **live** half, `refreshLocalMediaReferences(id, result)` in
+  `app.js`, can run the identical rule against an **already-open** editor's DOM (one undo step:
+  every `img[data-grafida-media-id="N"]`'s `src` *and*, via `fitDimensions()`, `width`/`height`)
+  without a second round trip to fetch them. `GET /api/media/{id}` (`mediaBlob()`) grew the same
+  way — additively — from `{id, dataUri}` to `{id, dataUri, filename, mime, width, height}`: the
+  AI panel's per-image fetch and the intro/full-text preview cache only ever read `dataUri`, so
+  they are unaffected, while the new fields let a caller (the context toolbar's **Edit image**
+  item, below) build an image-editor descriptor without a second request.
   **Legacy drafts** (saved before gh-36, still carrying real `data:` images in `html`) are
   converted the first time they are opened: `DraftController::getDraft()` runs
   `Grafida\Media\InlineImageExtractor::extract()`, which decodes each `data:` image into a fresh
@@ -488,7 +523,35 @@ window-free in tests (a null dialog makes the endpoint return 503).
   toolbar/Insert-menu **Image** button work too. The same context toolbar's **CSS class…** item
   (`imageclass` button) opens a small prompt to set any free-text CSS class(es) on the image (the
   Insert/Edit Image dialog has no class field); it pre-fills the current `class` and writes it back in one
-  undo step (empty clears it). The editor `content_style` also forces
+  undo step (empty clears it). The toolbar gained two more items in gh-43: **Edit image**
+  (`localimageedit`) reopens the same crop/resize/rotate/flip editor the Media Manager's Local
+  Media tab uses (see `src/Media/` above) on the selected `<img>`'s own blob, so a picture pasted
+  straight into the article can be touched up without leaving it; it is enabled only when the
+  selected node resolves to a **local** blob id — read the self-healing way the tagging hook
+  already does (the `data-grafida-media-id` attribute first, falling back to parsing the id out of
+  the local URL) — so a site-media or external `<img>` (neither) leaves the button disabled rather
+  than doing nothing on click. **Reset size** (`resetsize`) restores the selected `<img>`'s
+  `width`/`height` to its own decoded `naturalWidth`/`naturalHeight` — the issue's secondary
+  complaint, "no way to reset the dimensions" — and is deliberately generic (it reads the
+  *displayed* image, no fetch needed) so it works for a local blob, a published site-media image
+  or an external URL alike, unlike Edit image which only makes sense for a local one.
+  ⚠️ **All three of those items live on the right-click menu as well, and that is the route users
+  actually take** — the floating toolbar alone was rightly called unusable: it only appears once the
+  image is *selected*, and right-clicking an unselected image opens the context menu instead, so
+  reaching **Edit image** meant right-click → Escape → click → toolbar. They are therefore also
+  registered as a `grafidaimage` **context-menu section** (`addContextMenu`) and the `contextmenu`
+  init option is set to `'link image grafidaimage table'` so the section renders directly below the
+  stock **Image** item. Two things follow from that: each action is a plain function taking the
+  `<img>` it acts on (`promptImageClass`/`editLocalImage`/`resetImageSize` in `initTinyMCE()`'s
+  `setup`) rather than reading `editor.selection.getNode()` itself, since the context menu hands its
+  `update()` the clicked element outright; and because `update()` re-runs per right-click with that
+  element in hand, **Edit image** is simply *omitted* there for a non-local image, where the toolbar
+  button — registered once, for every image — has to be shown disabled instead. Setting
+  `contextmenu` explicitly **replaces** the stock list rather than extending it (same trap as
+  `menu.tools` and `help_tabs`); the names dropped from it — `linkchecker`, `editimage`,
+  `spellchecker`, `configurepermanentpen` — are all premium plugins Grafida does not load, and an
+  unregistered section is skipped anyway, so listing them would only imply we ship them.
+  The editor `content_style` also forces
   `img { max-width: 100%; height: auto }`: Joomla bakes a photo's full intrinsic size into the tag (e.g.
   `width="4032"`), and without a constraining rule the picture overflows the editor's scroll box and becomes
   un-clickable in the WKWebView (broken hit-testing) — scaling it to fit keeps it selectable/editable, and
@@ -984,6 +1047,19 @@ window-free in tests (a null dialog makes the endpoint return 503).
   three triggers to fire on its own. ⚠️ The `hidden` attribute alone does **not** hide it: the UA's
   `[hidden] { display: none }` loses to `app.css`'s `nav#main-nav a { display: flex }`, so the rule
   is restated as `nav#main-nav a[hidden]` — without it the item shows even with the setting off.
+  **The in-article media browser (`openMediaBrowser()`) grew a second tab** (gh-43), mirroring the
+  Media Manager screen's own `buildMediaTabs()`/`applyMediaTab()` pattern (same
+  `articles-tabs`/`articles-tab` classes): **Site media** is the original online Joomla Media
+  Manager browse, unchanged; **Local media** lists offline `media_blobs` (`GET
+  /api/sites/{id}/local-media`) — an image already pasted/dropped/picked into *some* draft but not
+  yet published — so it can be reused elsewhere without leaving the editor to go find it, and,
+  reading nothing but local SQLite, it **works with the site unreachable**, independently of
+  whatever the Site tab's own fetch is doing. Tab state is a plain closure variable local to the
+  modal instance, not `State` — `State.mediaTab` belongs to the Media Manager screen, a different
+  UI the modal can be open over. Both tabs resolve the picker with the same `{url, name, mediaId?}`
+  shape, so `file_picker_callback`/`browseImageMedia()` need not know which tab a pick came from;
+  a Local entry's `url` is used exactly as returned (it already carries its own `rev`
+  cache-buster, see `src/Media/LocalMediaUrl` above), unlike the Site tab's `mediaDisplayUrl(f)`.
 - `language/<tag>/<tag>.ini` — translations, one file per language (e.g. `language/de-DE/de-DE.ini`).
   (There is **no** Joomla `.sys.ini` or `language/grafida.xml` manifest, and the files are **not**
   named `<tag>.com_grafida.ini` — Grafida is a desktop app, not a Joomla component. `LanguageService`
@@ -1173,7 +1249,9 @@ without that flag PHPUnit fails the whole run on an empty suite before the featu
   the SPA, see the AI facts), `assets/private/js/editor/slashtools.js` (the slash-command menu),
   `assets/private/js/editor/csstheme.js` (the editor colour-scheme rewriter, gh-38), and
   `assets/private/js/editor/localmedia.js` (the `boson://app/api/media/{id}/raw?rev=…` URL
-  builder/parser, gh-36 — its own synchronous SHA-1 is what the rev token is verified against).
+  builder/parser, gh-36 — its own synchronous SHA-1 is what the rev token is verified against —
+  **plus**, since gh-43, `fitDimensions()`, the JS half of the image-resync sizing rule whose PHP
+  twin is `Grafida\Media\ImageDimensions::fit()`, see `src/Media/` above).
   For all four it is the only automated coverage. It uses node's built-in test runner and loads the
   browser IIFE in a `vm` context with fakes for the globals app.js supplies (`window`/`fetch`/`api`,
   or `State`/`t`/`editor`); no bundler and no new dependency (node is already a build prerequisite).

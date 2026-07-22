@@ -133,6 +133,61 @@ final class DraftRepository
         $this->db->setQuery($query)->execute();
     }
 
+    /**
+     * Drafts on a site whose stored `html` references a given local media
+     * blob's raw URL (gh-43's server-side resync: the reported workflow edits
+     * a blob's bytes with the article **closed**, so the fix has to reach
+     * this column — see {@see \Grafida\Media\LocalMediaSync}, the caller).
+     *
+     * Matches on the literal path segment `api/media/{id}/raw`, not merely
+     * `%api/media/{id}%` — the trailing `/raw` is what stops blob id `1`
+     * matching a reference to blob `11` (`…/media/11/raw`), since a bare `%1%`
+     * needle would happily match "11" as a substring.
+     *
+     * @return list<Draft>
+     */
+    public function listReferencingMedia(int $siteId, int $mediaId): array
+    {
+        $needle = '%api/media/' . $mediaId . '/raw%';
+
+        $query = $this->db->createQuery()
+            ->select('*')
+            ->from($this->qn('drafts'))
+            ->where($this->qn('site_id') . ' = :site')
+            ->where($this->qn('html') . ' LIKE :needle')
+            ->bind(':site', $siteId, ParameterType::INTEGER)
+            ->bind(':needle', $needle, ParameterType::STRING);
+
+        /** @var list<array{id?: int|string|null, site_id: int|string, remote_id: int|string|null, title: string, alias: string, catid: int|string|null, access: int|string, language: string, state: int|string, html: string, fields_json: string, tags_json: string, images_json: string, metadesc?: string, metakey?: string, created_by_alias?: string}> $rows */
+        $rows = $this->db->setQuery($query)->loadAssocList();
+
+        return array_values(array_map(static fn (array $r): Draft => Draft::fromRow($r), $rows));
+    }
+
+    /**
+     * Overwrites a draft's stored HTML in place — used by
+     * {@see \Grafida\Media\LocalMediaSync} to persist the resynced markup
+     * without going through the full {@see update()} (which would also
+     * rewrite every other column from a caller's in-memory `Draft`, none of
+     * which the resync has or needs). Bumps `updated_at` like `update()`
+     * does: the article's rendered content really did change.
+     */
+    public function updateHtml(int $id, string $html): void
+    {
+        $now = gmdate('Y-m-d H:i:s');
+
+        $query = $this->db->createQuery()
+            ->update($this->qn('drafts'))
+            ->set($this->qn('html') . ' = :html')
+            ->set($this->qn('updated_at') . ' = :now')
+            ->where($this->qn('id') . ' = :id')
+            ->bind(':html', $html, ParameterType::STRING)
+            ->bind(':now', $now, ParameterType::STRING)
+            ->bind(':id', $id, ParameterType::INTEGER);
+
+        $this->db->setQuery($query)->execute();
+    }
+
     public function setRemoteId(int $id, int $remoteId): void
     {
         $now = gmdate('Y-m-d H:i:s');

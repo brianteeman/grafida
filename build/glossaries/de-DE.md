@@ -160,3 +160,4 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | site metadata | Website-Metadaten | Die lokal zwischengespeicherten Kategorien, Schlagwörter, Zugriffsebenen, Sprachen und benutzerdefinierten Felder einer Website (gh-42). GRAFIDA_LBL_METADATA_CACHE. |
 | cache (noun) | Cache | Als Anglizismus beibehalten, wie im technischen Kontext üblich; „Cache-Dauer" = cache time. GRAFIDA_LBL_METADATA_CACHE_TIME. |
 | startup (reload on) | Beim Start | Zeitpunkt, zu dem Grafida gestartet wird; „Beim Start neu laden" = reload on startup. GRAFIDA_LBL_METADATA_RESET_ON_START. |
+| reset size (article image) | Größe zurücksetzen | Article image context-toolbar action that restores an `<img>`'s natural (undistorted) width/height (gh-43). GRAFIDA_BTN_RESET_SIZE. |

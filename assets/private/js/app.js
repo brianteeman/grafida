@@ -3431,6 +3431,19 @@ async function initTinyMCE(draft) {
         // so it survives save/getContent and reaches PublishService.
         extended_valid_elements: 'img[src|alt|title|class|style|width|height|loading|data-path|data-grafida-media-id]',
         menubar: 'file edit insert view format tools table',
+        // Right-click menu sections, in order. Grafida's own image actions
+        // ("Edit image", "CSS class…", "Reset size" — registered in setup as
+        // the `grafidaimage` section) sit directly below the stock "Image"
+        // item, which is where a user looks for them: the floating context
+        // toolbar needs the image *selected* first, and a right-click on an
+        // unselected image opens this menu instead, so without these the only
+        // route was right-click → Escape → click → toolbar (gh-43 follow-up).
+        // The stock list also names `linkchecker`, `spellchecker` and
+        // `configurepermanentpen`, all premium plugins Grafida does not load —
+        // an unregistered section is simply skipped, but listing them here
+        // would suggest we ship them. `editimage` is likewise premium; our
+        // `grafidaimage` section is the offline-first answer to it.
+        contextmenu: 'link image grafidaimage table',
         // The built-in "code" plugin opens raw HTML in a plain textarea; we
         // replace it with our own CodeMirror-backed "sourcecode" item (registered
         // in setup) for syntax highlighting, so the plugin is intentionally absent.
@@ -3573,36 +3586,137 @@ async function initTinyMCE(draft) {
                 },
             });
 
-            // "CSS class…" action: set any CSS class(es) on the selected image.
+            // ------------------------------------------------------------------
+            //  Image actions (gh-43)
+            //
+            //  Each action is a plain function taking the <img> it acts on,
+            //  rather than reading editor.selection.getNode() itself, because
+            //  each has *two* entry points: the floating context toolbar
+            //  (grafidaImageTools, further down) and the right-click context
+            //  menu (grafidaimage, right after it). The context menu hands its
+            //  update() the element that was right-clicked, which is the
+            //  authoritative node there — TinyMCE does move the selection onto
+            //  it first, but depending on that is a needless indirection when
+            //  the node is already in hand.
+            // ------------------------------------------------------------------
+
+            const selectedImage = () => {
+                const node = editor.selection.getNode();
+                return node && node.nodeName.toLowerCase() === 'img' ? node : null;
+            };
+
+            // "CSS class…" action: set any CSS class(es) on the image.
             // TinyMCE's image dialog has no free-text class field, so we add a
             // small prompt that pre-fills the image's current class and writes it
             // back in one undo step. Empty input clears the attribute.
+            const promptImageClass = (node) => {
+                if (!node || node.nodeName.toLowerCase() !== 'img') return;
+                editor.windowManager.open({
+                    title: t('GRAFIDA_LBL_IMAGE_CLASS'),
+                    body: {
+                        type: 'panel',
+                        items: [{ type: 'input', name: 'cls', label: t('GRAFIDA_LBL_IMAGE_CLASS') }],
+                    },
+                    initialData: { cls: node.getAttribute('class') || '' },
+                    buttons: [
+                        { type: 'cancel', text: t('GRAFIDA_BTN_CANCEL') },
+                        { type: 'submit', text: t('GRAFIDA_BTN_SAVE'), primary: true },
+                    ],
+                    onSubmit: (dialog) => {
+                        const cls = (dialog.getData().cls || '').trim().replace(/\s+/g, ' ');
+                        editor.undoManager.transact(() => {
+                            editor.dom.setAttrib(node, 'class', cls || null);
+                        });
+                        editor.nodeChanged();
+                        dialog.close();
+                    },
+                });
+            };
+
+            // The offline-blob id an <img> references, or null when it is not a
+            // local image at all (a published site-media picture, an external
+            // URL). Read the same self-healing way the tagging hook above derives
+            // it — the data-grafida-media-id attribute first (the common case,
+            // since NodeChange usually tags it long before any of this runs),
+            // falling back to parsing the id straight out of the local URL.
+            const localImageBlobId = (node) => {
+                if (!node || node.nodeName.toLowerCase() !== 'img') return null;
+                const attr = node.getAttribute(GRAFIDA_MEDIA_ATTR);
+                if (attr) {
+                    const n = parseInt(attr, 10);
+                    if (n > 0) return n;
+                }
+                return localMediaIdFromUrl(node.getAttribute('src'));
+            };
+
+            // "Edit image…" action: crop/resize/rotate/flip a LOCAL (not yet
+            // published) blob without leaving the article (gh-43). Reuses the
+            // exact same in-app image editor as the Media Manager's Local
+            // Media tab, via the descriptor builder both now share
+            // (`localMediaEditorDescriptorBase()`) — the only difference is
+            // there is no grid here to re-render after a successful save.
+            // Offered only for a local blob: there is nothing this editor could
+            // save an already-published or external image back to.
+            const editLocalImage = async (node) => {
+                const id = localImageBlobId(node);
+                if (!id) return;
+                try {
+                    const blob = await api.getMediaBlob(id);
+                    await openImageEditor(localMediaEditorDescriptorBase(
+                        { id, filename: blob.filename, mime: blob.mime },
+                        // No grid on screen to refresh here — the reference
+                        // rewrite inside the descriptor's save() already
+                        // updates the open editor.
+                        () => {},
+                    ));
+                } catch (err) {
+                    showToast(err.message, 'error');
+                }
+            };
+
+            // "Reset size" action: restores an <img>'s width/height to its
+            // own naturalWidth/naturalHeight (gh-43's secondary complaint —
+            // "there doesn't appear to be a way to reset the dimensions").
+            // Deliberately generic: it reads the *displayed* image's decoded
+            // natural size, already available in the editor iframe with no
+            // fetch needed, so it works equally for a local blob, a
+            // published site-media image or an external URL — unlike
+            // "Edit image" above, which only makes sense for a local blob.
+            const resetImageSize = (node) => {
+                if (!node || node.nodeName.toLowerCase() !== 'img') return;
+                const w = node.naturalWidth;
+                const h = node.naturalHeight;
+                if (!w || !h) return;
+                editor.undoManager.transact(() => {
+                    editor.dom.setAttrib(node, 'width', String(w));
+                    editor.dom.setAttrib(node, 'height', String(h));
+                });
+                editor.nodeChanged();
+            };
+
             editor.ui.registry.addButton('imageclass', {
                 text: t('GRAFIDA_BTN_IMAGE_CLASS'),
                 tooltip: t('GRAFIDA_BTN_IMAGE_CLASS'),
-                onAction: () => {
-                    const node = editor.selection.getNode();
-                    if (!node || node.nodeName.toLowerCase() !== 'img') return;
-                    editor.windowManager.open({
-                        title: t('GRAFIDA_LBL_IMAGE_CLASS'),
-                        body: {
-                            type: 'panel',
-                            items: [{ type: 'input', name: 'cls', label: t('GRAFIDA_LBL_IMAGE_CLASS') }],
-                        },
-                        initialData: { cls: node.getAttribute('class') || '' },
-                        buttons: [
-                            { type: 'cancel', text: t('GRAFIDA_BTN_CANCEL') },
-                            { type: 'submit', text: t('GRAFIDA_BTN_SAVE'), primary: true },
-                        ],
-                        onSubmit: (dialog) => {
-                            const cls = (dialog.getData().cls || '').trim().replace(/\s+/g, ' ');
-                            editor.undoManager.transact(() => {
-                                editor.dom.setAttrib(node, 'class', cls || null);
-                            });
-                            editor.nodeChanged();
-                            dialog.close();
-                        },
-                    });
+                onAction: () => promptImageClass(selectedImage()),
+            });
+            editor.ui.registry.addButton('resetsize', {
+                text: t('GRAFIDA_BTN_RESET_SIZE'),
+                tooltip: t('GRAFIDA_BTN_RESET_SIZE'),
+                onAction: () => resetImageSize(selectedImage()),
+            });
+            editor.ui.registry.addButton('localimageedit', {
+                text: t('GRAFIDA_BTN_EDIT_IMAGE'),
+                tooltip: t('GRAFIDA_BTN_EDIT_IMAGE'),
+                onAction: () => { editLocalImage(selectedImage()); },
+                // `buttonApi`, not `api`: the app's own `api` object (the whole
+                // internal REST client) is a module-level global this callback's
+                // body still needs — `editLocalImage` reaches for it — so naming
+                // TinyMCE's per-button handle `api` would shadow it.
+                onSetup: (buttonApi) => {
+                    const update = () => buttonApi.setEnabled(!!localImageBlobId(selectedImage()));
+                    update();
+                    editor.on('NodeChange', update);
+                    return () => editor.off('NodeChange', update);
                 },
             });
 
@@ -3610,12 +3724,57 @@ async function initTinyMCE(draft) {
             // image's properties (size, alt, alignment, class) is discoverable: the
             // "image" item re-opens TinyMCE's Insert/Edit Image dialog — where the
             // Dimensions (width/height), description and Advanced (CSS, border,
-            // spacing) fields live — and "imageclass" sets free-text CSS classes.
+            // spacing) fields live — "localimageedit" reopens the crop/resize/
+            // rotate/flip editor for a local (not yet published) blob, "imageclass"
+            // sets free-text CSS classes, and "resetsize" restores the image's
+            // natural (undistorted) dimensions.
             editor.ui.registry.addContextToolbar('grafidaImageTools', {
                 predicate: (node) => node.nodeName.toLowerCase() === 'img',
                 position: 'node',
                 scope: 'node',
-                items: 'image imageclass | alignleft aligncenter alignright',
+                items: 'image localimageedit imageclass resetsize | alignleft aligncenter alignright',
+            });
+
+            // The same three actions on the **right-click context menu**, which
+            // is where a user actually looks for them (gh-43 follow-up). The
+            // floating toolbar above only appears once the image is *selected*,
+            // and right-clicking an unselected image shows the context menu
+            // instead — so reaching "Edit image" meant right-clicking, dismissing
+            // the menu with Escape, then clicking the image again. Registering
+            // these here makes the first right-click enough; the toolbar stays as
+            // the second, equally valid, route.
+            //
+            // update() returns the items to *append* under the section's slot in
+            // the `contextmenu` list below, and is re-run per right-click with the
+            // clicked element in hand — which is why "Edit image" can simply be
+            // omitted for a non-local image rather than shown disabled, as the
+            // toolbar button (registered once, for every image) has to.
+            editor.ui.registry.addContextMenu('grafidaimage', {
+                update: (element) => {
+                    const node = element && element.nodeName.toLowerCase() === 'img' ? element : null;
+                    if (!node) return [];
+
+                    const items = [];
+                    if (localImageBlobId(node)) {
+                        items.push({
+                            type: 'item',
+                            text: t('GRAFIDA_BTN_EDIT_IMAGE'),
+                            onAction: () => { editLocalImage(node); },
+                        });
+                    }
+                    items.push({
+                        type: 'item',
+                        text: t('GRAFIDA_BTN_IMAGE_CLASS'),
+                        onAction: () => promptImageClass(node),
+                    });
+                    items.push({
+                        type: 'item',
+                        text: t('GRAFIDA_BTN_RESET_SIZE'),
+                        onAction: () => resetImageSize(node),
+                    });
+
+                    return items;
+                },
             });
 
             // ------------------------------------------------------------------
@@ -4274,19 +4433,69 @@ function openSourceCodeEditor(editor) {
 }
 
 /**
- * Modal browser over the site's Media Manager. Resolves with the chosen file
- * entry, or null if the user cancels / closes the dialog.
+ * Modal browser over the site's media. Resolves with the chosen file entry,
+ * or null if the user cancels / closes the dialog.
  *
  * With `opts.allowUpload`, a "Choose file…" button uploads a local image as an
  * offline blob and resolves with a synthetic entry `{url, name, mediaId}` —
  * `url` is the local boson://…/media/{id}/raw URL, not a data: URI (gh-36) —
  * the caller tags it so it is uploaded to the site on publish.
+ *
+ * This is the modal behind TinyMCE's `file_picker_callback`, the intro/full-text
+ * "Browse" button and the AI-free image paths. Two tabs, mirroring the Media
+ * Manager screen's own `buildMediaTabs()`/`applyMediaTab()` pattern and
+ * reusing its `articles-tabs`/`articles-tab` classes (gh-43): **Site media**
+ * browses the site's online Joomla Media Manager (the original, only,
+ * behaviour); **Local media** lists offline `media_blobs` — an image already
+ * pasted/dropped/picked into *some* draft but not yet published — so it can
+ * be reused in another spot (or another article) without leaving the editor
+ * to go find it. Tab state is local to this modal instance (a plain closure
+ * variable, not `State`): `State.mediaTab` belongs to the Media Manager
+ * screen, a different UI entirely, and this modal can be opened while that
+ * screen is showing something else. Resolves with the same `{url, name,
+ * mediaId?}` shape either tab can produce — `file_picker_callback` and
+ * `browseImageMedia()` neither know nor care which tab it came from.
  */
 function openMediaBrowser(siteId, opts = {}) {
     return new Promise(resolve => {
+        let activeTab = 'site';
+        let localLoaded = false;
+
         const crumb = el('div', 'media-browser-path');
         const grid = el('div', 'media-browser-grid');
-        const container = el('div', 'media-browser', crumb, grid);
+        const sitePanel = el('div', 'media-browser-tab-panel', crumb, grid);
+        sitePanel.id = 'media-browser-tab-site';
+
+        const localGrid = el('div', 'media-browser-grid');
+        const localPanel = el('div', 'media-browser-tab-panel hidden', localGrid);
+        localPanel.id = 'media-browser-tab-local';
+
+        const tabsBar = el('div', 'articles-tabs');
+        const mkTab = (id, key) => {
+            const b = el('button', 'articles-tab', t(key));
+            b.type = 'button';
+            b.dataset.tab = id;
+            if (activeTab === id) b.classList.add('active');
+            b.addEventListener('click', () => {
+                if (activeTab === id) return;
+                activeTab = id;
+                applyTab();
+                if (id === 'local' && !localLoaded) loadLocal();
+            });
+            return b;
+        };
+        tabsBar.appendChild(mkTab('site', 'GRAFIDA_TAB_SITE_MEDIA'));
+        tabsBar.appendChild(mkTab('local', 'GRAFIDA_TAB_LOCAL_MEDIA'));
+
+        function applyTab() {
+            sitePanel.classList.toggle('hidden', activeTab !== 'site');
+            localPanel.classList.toggle('hidden', activeTab !== 'local');
+            tabsBar.querySelectorAll('.articles-tab').forEach(b => {
+                b.classList.toggle('active', b.dataset.tab === activeTab);
+            });
+        }
+
+        const container = el('div', 'media-browser', tabsBar, sitePanel, localPanel);
 
         let settled = false;
         const escHandler = (e) => { if (e.key === 'Escape') finish(null); };
@@ -4346,6 +4555,51 @@ function openMediaBrowser(siteId, opts = {}) {
                 item.appendChild(el('span', 'media-item-name', f.name || ''));
                 item.addEventListener('click', () => finish(f));
                 grid.appendChild(item);
+            });
+        }
+
+        /**
+         * Local media reads nothing but local SQLite (`GET
+         * /api/sites/{id}/local-media`), so it must work regardless of
+         * whether the site is reachable — a Site-media fetch failure stays
+         * inside `grid` above and never touches this panel, and vice versa.
+         * `entry.url` is used exactly as returned, unlike the Site tab's
+         * `mediaDisplayUrl(f)`: a local URL already carries its own `rev`
+         * cache-busting token (see `src/Media/LocalMediaUrl`), so stamping
+         * another cache-buster on top would be redundant, not wrong.
+         */
+        async function loadLocal() {
+            clearNode(localGrid);
+            localGrid.appendChild(el('div', 'media-browser-loading', '…'));
+            let data;
+            try {
+                data = await api.getLocalMedia(siteId);
+            } catch (err) {
+                clearNode(localGrid);
+                localGrid.appendChild(errorState(err, { onRetry: loadLocal }));
+                return;
+            }
+            localLoaded = true;
+
+            clearNode(localGrid);
+            const entries = Array.isArray(data.entries) ? data.entries : [];
+            if (entries.length === 0) {
+                localGrid.appendChild(el('div', 'media-browser-empty', t('GRAFIDA_MSG_LOCAL_MEDIA_EMPTY')));
+                return;
+            }
+            entries.forEach(entry => {
+                const item = el('button', 'media-item media-item-file');
+                item.type = 'button';
+                const im = document.createElement('img');
+                im.src = entry.url;
+                im.alt = '';
+                item.appendChild(im);
+                item.appendChild(el('span', 'media-item-name', entry.filename || ''));
+                if (entry.width && entry.height) {
+                    item.appendChild(el('span', 'media-item-dims', entry.width + ' × ' + entry.height));
+                }
+                item.addEventListener('click', () => finish({ url: entry.url, name: entry.filename, mediaId: entry.id }));
+                localGrid.appendChild(item);
             });
         }
 
@@ -4911,25 +5165,54 @@ async function localMediaDelete(entry) {
 /**
  * After a Local Media blob's bytes change (the image editor's crop/resize
  * save), every existing reference to it carries a stale `rev` in its cached
- * URL. Single chokepoint so the editor's inline `<img>`s and the intro/
- * full-text preview cannot drift out of sync with each other (gh-36):
+ * URL — and, since gh-43, a possibly stale `width`/`height` baked onto the
+ * `<img>` tag by TinyMCE at insertion time. Single chokepoint so the
+ * editor's inline `<img>`s and the intro/full-text preview cannot drift out
+ * of sync with each other (gh-36):
  *  1. the caller re-renders the Local Media grid from the fresh list
  *     payload (new `url`s) — not done here, since not every caller has a
  *     grid on screen (e.g. re-editing an image from inside the article
- *     editor, once that entry point exists);
- *  2. every `img[data-grafida-media-id="N"]` in the open editor is
- *     rewritten to the new URL in one undo step, and the draft is forced
- *     dirty (the content changed, but not through TinyMCE's own input path);
+ *     editor via the context toolbar's "Edit image" item);
+ *  2. every `img[data-grafida-media-id="N"]` in the open editor has its
+ *     `src` rewritten to the new URL, and — via
+ *     `window.GrafidaLocalMedia.fitDimensions()`, the gh-43 sizing rule
+ *     (see `.plans/00-overview.md`'s truth table and
+ *     `assets/private/js/editor/localmedia.js`'s doc comment) — its
+ *     `width`/`height` re-fitted to the new intrinsic size without ever
+ *     distorting the picture or silently reverting a deliberate in-article
+ *     resize. Both happen in one undo step, and the draft is forced dirty
+ *     (the content changed, but not through TinyMCE's own input path);
  *  3. the intro/full-text preview cache is refreshed and the Images section
  *     re-rendered, if this id is the one currently referenced there.
+ *
+ * @param {number} id
+ * @param {{url: string, width: ?number, height: ?number, oldWidth: ?number,
+ *          oldHeight: ?number}} result the `POST /api/media/{id}/content`
+ *        response — the blob's new URL plus its old/new intrinsic size.
  */
-function refreshLocalMediaReferences(id, newUrl) {
+function refreshLocalMediaReferences(id, result) {
     const editor = State.tinyMCEEditor;
     if (editor) {
         const imgs = editor.dom.select('img[' + GRAFIDA_MEDIA_ATTR + '="' + id + '"]');
         if (imgs.length) {
             editor.undoManager.transact(() => {
-                imgs.forEach(img => editor.dom.setAttrib(img, 'src', newUrl));
+                imgs.forEach(img => {
+                    editor.dom.setAttrib(img, 'src', result.url);
+                    // Guarded the same way localMediaIdFromUrl() is: the
+                    // module is a plain <script> loaded after app.js, but a
+                    // missing/failed load must never break the src rewrite
+                    // above, which is the load-bearing half of this step.
+                    if (window.GrafidaLocalMedia) {
+                        const fit = window.GrafidaLocalMedia.fitDimensions(
+                            img.getAttribute('width'), img.getAttribute('height'),
+                            result.oldWidth, result.oldHeight, result.width, result.height,
+                        );
+                        if (fit) {
+                            editor.dom.setAttrib(img, 'width', String(fit.width));
+                            editor.dom.setAttrib(img, 'height', String(fit.height));
+                        }
+                    }
+                });
             });
             State.editorForceDirty = true;
         }
@@ -4939,7 +5222,7 @@ function refreshLocalMediaReferences(id, newUrl) {
     let touchedPreview = false;
     ['image_intro', 'image_fulltext'].forEach(key => {
         if (State.editorImages && State.editorImages[key] === ref) {
-            State.mediaPreviews[ref] = newUrl;
+            State.mediaPreviews[ref] = result.url;
             touchedPreview = true;
         }
     });
@@ -4965,18 +5248,39 @@ function siteMediaEditorDescriptor(entry) {
     };
 }
 
-/** Image-editor descriptor for a Local Media (offline media_blobs) entry. */
-function localMediaEditorDescriptor(entry) {
+/**
+ * Builds the `{name, mime, loadDataUri, save}` descriptor `openImageEditor()`
+ * expects, for a Local Media (offline `media_blobs`) entry — the part shared
+ * by every place a local blob's bytes can be edited: the Media Manager's
+ * Local Media tab grid (`localMediaEditorDescriptor()` below) and, since
+ * gh-43, the article editor's own image context toolbar ("Edit image", see
+ * `initTinyMCE()`'s `localimageedit` button). Both save the exact same way —
+ * `api.updateLocalMediaContent()` then `refreshLocalMediaReferences()`, which
+ * is what keeps every reference to the blob (inline `<img>`s, the intro/
+ * full-text preview) in sync — and differ only in what happens *after* a
+ * successful save: the grid re-renders itself, an in-article edit has no
+ * grid on screen to refresh. That difference is exactly what `afterSave`
+ * parameterises, rather than duplicating the save logic per caller.
+ *
+ * @param {{id: number, filename?: string, mime?: string}} entry
+ * @param {() => (void|Promise<void>)} afterSave
+ */
+function localMediaEditorDescriptorBase(entry, afterSave) {
     return {
         name: entry.filename || '',
         mime: entry.mime || 'image/png',
         loadDataUri: async () => (await api.getMediaBlob(entry.id)).dataUri,
         save: async (dataBase64) => {
             const result = await api.updateLocalMediaContent(entry.id, dataBase64);
-            refreshLocalMediaReferences(entry.id, result.url);
-            await loadLocalMediaTab();
+            refreshLocalMediaReferences(entry.id, result);
+            await afterSave();
         },
     };
+}
+
+/** Image-editor descriptor for a Local Media (offline media_blobs) entry. */
+function localMediaEditorDescriptor(entry) {
+    return localMediaEditorDescriptorBase(entry, loadLocalMediaTab);
 }
 
 /** Picks a local file via the native dialog and uploads it to the current folder. */

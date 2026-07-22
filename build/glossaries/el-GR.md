@@ -160,3 +160,4 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | site metadata | Μεταδεδομένα ιστότοπου | The locally cached categories, tags, access levels, languages and custom fields of a site (gh-42). GRAFIDA_LBL_METADATA_CACHE. |
 | cache (noun) | cache | Kept as an English loanword, as is common in technical Greek; «Χρόνος cache» = cache time. GRAFIDA_LBL_METADATA_CACHE_TIME. |
 | startup (reload on) | κατά την εκκίνηση | The moment Grafida starts; «Επαναφόρτωση κατά την εκκίνηση» = reload on startup. GRAFIDA_LBL_METADATA_RESET_ON_START. |
+| reset size (article image) | Επαναφορά μεγέθους | Article image context-toolbar action that restores an `<img>`'s natural (undistorted) width/height (gh-43). GRAFIDA_BTN_RESET_SIZE. |

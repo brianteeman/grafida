@@ -11,6 +11,8 @@ declare(strict_types=1);
 
 namespace Grafida\Html;
 
+use Grafida\Media\ImageDimensions;
+
 /**
  * Handles images that were inserted while editing offline.
  *
@@ -140,6 +142,78 @@ final class InlineMedia
             $mediaId = $idAttr !== '' && is_numeric($idAttr) ? (int) $idAttr : null;
 
             $this->applyResult($img, $convert($mediaId, $src));
+
+            $changed = true;
+        }
+
+        return $changed ? HtmlDocument::innerHtml($dom) : $html;
+    }
+
+    /**
+     * Resyncs every `<img>` referencing a specific local media blob after its
+     * bytes have changed **in place** (the Local Media tab's crop/resize/
+     * rotate/flip editor, gh-43) — the fix for the reported workflow, which
+     * edits the blob with the article **closed**: this is what reaches a
+     * draft's stored `html` column. {@see \Grafida\Media\LocalMediaSync} finds
+     * the affected drafts and persists what this method returns; the
+     * live-open-editor counterpart of the same rule is
+     * `assets/private/js/editor/localmedia.js`'s `fitDimensions()`.
+     *
+     * An `<img>` "belongs" to the blob when either its `src` parses (via
+     * {@see idFromLocalUrl()}) to `$mediaId`, or its {@see ATTRIBUTE} tag
+     * equals it — the same two ways of linking an image to a blob that
+     * {@see rewriteOfflineImages()} already tolerates, since the tag can
+     * survive a legacy-draft migration or a stale `src` even when one of the
+     * two has drifted. Only `src` and — per
+     * {@see \Grafida\Media\ImageDimensions::fit()} — the `width`/`height`
+     * attributes are ever touched; everything else about the tag (alt text,
+     * class, alignment…) is left exactly as the article author set it.
+     *
+     * Mirrors {@see rewriteToLocalUrls()}'s shape (a plain per-`<img>` walk,
+     * the same `$changed` guard so an untouched document is returned
+     * byte-identical rather than round-tripped through the DOM serialiser for
+     * nothing).
+     */
+    public function resyncLocalImage(
+        string $html,
+        int $mediaId,
+        string $newSrc,
+        ?int $oldW,
+        ?int $oldH,
+        ?int $newW,
+        ?int $newH,
+    ): string {
+        if (trim($html) === '') {
+            return $html;
+        }
+
+        $dom     = HtmlDocument::load($html);
+        $changed = false;
+
+        foreach ($dom->getElementsByTagName('img') as $img) {
+            $src    = $img->getAttribute('src');
+            $idAttr = $img->getAttribute(self::ATTRIBUTE);
+            $tagId  = $idAttr !== '' && is_numeric($idAttr) ? (int) $idAttr : null;
+
+            if ($this->idFromLocalUrl($src) !== $mediaId && $tagId !== $mediaId) {
+                continue;
+            }
+
+            $img->setAttribute('src', $newSrc);
+
+            $attrW = $img->hasAttribute('width') && is_numeric($img->getAttribute('width'))
+                ? (int) $img->getAttribute('width')
+                : null;
+            $attrH = $img->hasAttribute('height') && is_numeric($img->getAttribute('height'))
+                ? (int) $img->getAttribute('height')
+                : null;
+
+            $fit = ImageDimensions::fit($attrW, $attrH, $oldW, $oldH, $newW, $newH);
+
+            if ($fit !== null) {
+                $img->setAttribute('width', (string) $fit['width']);
+                $img->setAttribute('height', (string) $fit['height']);
+            }
 
             $changed = true;
         }

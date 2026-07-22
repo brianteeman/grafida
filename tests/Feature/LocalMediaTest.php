@@ -15,6 +15,9 @@ use Boson\Component\Http\Request;
 use Boson\Contracts\Http\ResponseInterface;
 use Grafida\Application\Container;
 use Grafida\Application\Kernel;
+use Grafida\Article\Draft;
+use Grafida\Article\DraftRepository;
+use Grafida\Media\LocalMediaUrl;
 use Grafida\Media\MediaRepository;
 use Grafida\Tests\Support\TestContainer;
 use Grafida\Tests\Support\TestDatabase;
@@ -28,7 +31,9 @@ use PHPUnit\Framework\TestCase;
  * `/api/media/{id}/rename`, `/api/media/{id}/content`, `DELETE
  * /api/media/{id}`), and the changed `POST /api/sites/{id}/media` response
  * shape (step 4's contract change: `{id, url, width, height}`, no more
- * `dataUri`).
+ * `dataUri`) — plus, since gh-43, the server-side resync of any **closed**
+ * draft's stored HTML when a referenced blob's bytes (and therefore
+ * dimensions) change.
  */
 final class LocalMediaTest extends TestCase
 {
@@ -193,6 +198,154 @@ final class LocalMediaTest extends TestCase
 
         $response = $this->raw('GET', '/api/media/' . $id . '/raw');
         self::assertSame(404, (int) (string) $response->status);
+    }
+
+    /** Real PNG bytes of the given size, via GD — replaceData() re-derives dimensions from the actual bytes. */
+    private function png(int $width, int $height): string
+    {
+        $img = imagecreatetruecolor($width, $height);
+        self::assertNotFalse($img);
+
+        ob_start();
+        imagepng($img);
+        $data = ob_get_clean();
+        imagedestroy($img);
+
+        self::assertIsString($data);
+
+        return $data;
+    }
+
+    /** Inserts a bare draft carrying the given HTML and returns its id. */
+    private function seedDraft(int $siteId, string $html): int
+    {
+        $drafts = $this->container->get(DraftRepository::class);
+
+        return $drafts->insert(new Draft(
+            id: null,
+            siteId: $siteId,
+            remoteId: null,
+            title: 'Draft',
+            alias: 'draft',
+            catid: null,
+            access: 1,
+            language: '*',
+            state: 1,
+            html: $html,
+        ));
+    }
+
+    public function testUpdatingContentResyncsAClosedDraftAtIntrinsicSizeToTheNewDimensions(): void
+    {
+        $siteId = $this->seedSite();
+        $media  = $this->container->get(MediaRepository::class);
+        $drafts = $this->container->get(DraftRepository::class);
+
+        $id  = $media->store($siteId, null, 'a.png', 'image/png', 'orig-bytes', 640, 480);
+        $rev = $media->findMeta($id);
+        self::assertNotNull($rev);
+
+        // The article never hand-resized this image: its width/height still
+        // match the blob's OLD intrinsic size exactly.
+        $oldSrc  = LocalMediaUrl::build($id, $rev['updated_at'] ?? $rev['created_at']);
+        $html    = '<p><img src="' . $oldSrc . '" width="640" height="480"></p>';
+        $draftId = $this->seedDraft($siteId, $html);
+
+        // Force a distinct second so the new rev token cannot coincide with
+        // the old one (same rationale as testContentUpdateIsReadableBack…).
+        sleep(1);
+
+        $newBytes = $this->png(1280, 960);
+        [$status, $json] = $this->call(
+            'POST',
+            '/api/media/' . $id . '/content',
+            json_encode(['dataBase64' => base64_encode($newBytes)]),
+        );
+
+        self::assertSame(200, $status);
+        self::assertSame(1280, $json['data']['width']);
+        self::assertSame(960, $json['data']['height']);
+        self::assertSame(640, $json['data']['oldWidth']);
+        self::assertSame(480, $json['data']['oldHeight']);
+
+        $resynced = $drafts->find($draftId);
+        self::assertNotNull($resynced);
+        self::assertStringContainsString('width="1280"', $resynced->html);
+        self::assertStringContainsString('height="960"', $resynced->html);
+        self::assertStringContainsString($json['data']['url'], $resynced->html);
+        self::assertStringNotContainsString($oldSrc, $resynced->html);
+    }
+
+    public function testUpdatingContentPreservesAHandSetWidthAndReRatiosTheHeight(): void
+    {
+        $siteId = $this->seedSite();
+        $media  = $this->container->get(MediaRepository::class);
+        $drafts = $this->container->get(DraftRepository::class);
+
+        $id = $media->store($siteId, null, 'a.png', 'image/png', 'orig-bytes', 640, 480);
+
+        // A deliberate in-article size: 300 does not match the blob's OLD
+        // intrinsic width (640), so it must be kept — never adopted wholesale.
+        $draftId = $this->seedDraft(
+            $siteId,
+            '<p><img src="boson://app/api/media/' . $id . '/raw?rev=stale" width="300" height="225"></p>',
+        );
+
+        $newBytes = $this->png(1280, 640);
+        [$status] = $this->call(
+            'POST',
+            '/api/media/' . $id . '/content',
+            json_encode(['dataBase64' => base64_encode($newBytes)]),
+        );
+
+        self::assertSame(200, $status);
+
+        $resynced = $drafts->find($draftId);
+        self::assertNotNull($resynced);
+        // width kept, height re-ratioed: round(300 * 640 / 1280) = 150.
+        self::assertStringContainsString('width="300"', $resynced->html);
+        self::assertStringContainsString('height="150"', $resynced->html);
+    }
+
+    public function testUpdatingContentLeavesADraftReferencingADifferentBlobByteIdentical(): void
+    {
+        $siteId = $this->seedSite();
+        $media  = $this->container->get(MediaRepository::class);
+        $drafts = $this->container->get(DraftRepository::class);
+
+        $editedId    = $media->store($siteId, null, 'a.png', 'image/png', 'orig-bytes', 640, 480);
+        $untouchedId = $media->store($siteId, null, 'b.png', 'image/png', 'other-bytes', 200, 100);
+
+        $untouchedHtml = '<p><img src="boson://app/api/media/' . $untouchedId . '/raw?rev=xyz" width="200" height="100"></p>';
+        $draftId       = $this->seedDraft($siteId, $untouchedHtml);
+
+        [$status] = $this->call(
+            'POST',
+            '/api/media/' . $editedId . '/content',
+            json_encode(['dataBase64' => base64_encode($this->png(1280, 960))]),
+        );
+
+        self::assertSame(200, $status);
+
+        $after = $drafts->find($draftId);
+        self::assertNotNull($after);
+        self::assertSame($untouchedHtml, $after->html, 'a draft referencing a different blob must be byte-identical afterwards');
+    }
+
+    public function testMediaBlobEndpointReturnsFilenameMimeAndDimensionsAlongsideDataUri(): void
+    {
+        $siteId = $this->seedSite();
+        $media  = $this->container->get(MediaRepository::class);
+        $id     = $media->store($siteId, null, 'photo.png', 'image/png', 'raw-image-bytes', 640, 480);
+
+        [$status, $json] = $this->call('GET', '/api/media/' . $id);
+
+        self::assertSame(200, $status);
+        self::assertArrayHasKey('dataUri', $json['data']);
+        self::assertSame('photo.png', $json['data']['filename']);
+        self::assertSame('image/png', $json['data']['mime']);
+        self::assertSame(640, $json['data']['width']);
+        self::assertSame(480, $json['data']['height']);
     }
 
     public function testUploadOfflineMediaReturnsIdUrlWidthHeightNotDataUri(): void

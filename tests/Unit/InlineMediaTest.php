@@ -177,4 +177,99 @@ final class InlineMediaTest extends TestCase
 
         self::assertSame($html, $out);
     }
+
+    public function testResyncLocalImageUpdatesSrcAndAdoptsNewSizeWhenNeverHandResized(): void
+    {
+        $html = '<p><img src="boson://app/api/media/5/raw?rev=old" width="640" height="480"></p>';
+
+        $out = (new InlineMedia())->resyncLocalImage(
+            $html,
+            5,
+            'boson://app/api/media/5/raw?rev=new',
+            640,
+            480,
+            1280,
+            960,
+        );
+
+        self::assertStringContainsString('src="boson://app/api/media/5/raw?rev=new"', $out);
+        self::assertStringContainsString('width="1280"', $out);
+        self::assertStringContainsString('height="960"', $out);
+    }
+
+    public function testResyncLocalImageKeepsHandResizedWidthAndReRatiosHeight(): void
+    {
+        $html = '<p><img src="boson://app/api/media/5/raw?rev=old" width="300" height="225"></p>';
+
+        $out = (new InlineMedia())->resyncLocalImage(
+            $html,
+            5,
+            'boson://app/api/media/5/raw?rev=new',
+            640,
+            480,
+            1280,
+            640,
+        );
+
+        self::assertStringContainsString('src="boson://app/api/media/5/raw?rev=new"', $out);
+        self::assertStringContainsString('width="300"', $out);
+        self::assertStringContainsString('height="150"', $out);
+    }
+
+    public function testResyncLocalImageMatchesByTagWhenSrcDoesNotParse(): void
+    {
+        // Mirrors the tolerance rewriteOfflineImages() already has: a stale
+        // or otherwise unparsable src must not stop the tag-based match.
+        $html = '<p><img src="about:blank" data-grafida-media-id="5" width="640" height="480"></p>';
+
+        $out = (new InlineMedia())->resyncLocalImage(
+            $html,
+            5,
+            'boson://app/api/media/5/raw?rev=new',
+            640,
+            480,
+            1280,
+            960,
+        );
+
+        self::assertStringContainsString('src="boson://app/api/media/5/raw?rev=new"', $out);
+        self::assertStringContainsString('width="1280"', $out);
+        self::assertStringContainsString('height="960"', $out);
+    }
+
+    public function testResyncLocalImageLeavesUntouchedWhenNoImageMatchesTheId(): void
+    {
+        $html = '<p><img src="boson://app/api/media/11/raw?rev=old" width="640" height="480"></p>';
+
+        $out = (new InlineMedia())->resyncLocalImage(
+            $html,
+            5,
+            'boson://app/api/media/5/raw?rev=new',
+            640,
+            480,
+            1280,
+            960,
+        );
+
+        self::assertSame($html, $out);
+    }
+
+    public function testResyncLocalImageUpdatesSrcWithoutTouchingSizeWhenNoSizeAttributes(): void
+    {
+        $html = '<p><img src="boson://app/api/media/5/raw?rev=old"></p>';
+
+        $out = (new InlineMedia())->resyncLocalImage(
+            $html,
+            5,
+            'boson://app/api/media/5/raw?rev=new',
+            640,
+            480,
+            1280,
+            960,
+        );
+
+        self::assertStringContainsString('src="boson://app/api/media/5/raw?rev=new"', $out);
+        self::assertStringNotContainsString('width=', $out);
+        self::assertStringNotContainsString('height=', $out);
+    }
 }
