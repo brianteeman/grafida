@@ -864,14 +864,20 @@ window-free in tests (a null dialog makes the endpoint return 503).
   `helpShortcutText()` mirrors the help plugin's own `convertText()` so our rows render as
   ⌘/⌃/⇧ glyphs on macOS and `Ctrl + …` elsewhere, and its output is therefore HTML (escape a
   sentence *before* interpolating a shortcut into its `%s`).
-  ⚠️ **The built-in `plugins` tab is deliberately *not* in that list** (gh-21). A link in a TinyMCE
-  dialog is a `target="_blank"` anchor, and nothing in this app can open one: Boson's webview opens
-  no new window, and the SPA routes every external URL through `api.openUrl()` explicitly. That tab
-  is a list of links and nothing else — including TinyMCE's advertisement for the premium plugins we
-  neither ship nor can load — so every last item in it is inert. (This replaced a first attempt at
-  gh-21 that registered Grafida's own editor features — the slash-command menu, the AI assistant —
-  as empty plugins answering `getMetadata()` so they would be *named* there; with the tab gone, so
-  is that machinery. Should the tab ever come back, the same applies to any other dialog link.)
+  ⚠️ **No link in that dialog can be opened, so neither built-in tab made of links is shipped as it
+  comes** (gh-21). A TinyMCE dialog renders a link as a `target="_blank"` anchor and nothing in this
+  app answers that: Boson's webview opens no new window, and the SPA routes every external URL
+  through `api.openUrl()` explicitly. So **`plugins` is dropped outright** — it is a list of links
+  and nothing else, headed by TinyMCE's advertisement for the premium plugins we neither ship nor
+  can load — and **`versions` is replaced by `versionHelpTab()`**, which repeats the built-in tab
+  verbatim minus the anchor (`help_tabs` lets a tab *object* named `versions` replace the built-in
+  of that name). The version sentence is kept rather than dropped with it because it is what someone
+  quotes when filing a bug, and it is translated through **TinyMCE's** catalogue, not ours — it is a
+  sentence about TinyMCE that already ships in every language pack. Anything added to the dialog
+  later has to clear the same bar. (This replaced a first attempt at gh-21 that registered Grafida's
+  own editor features — the slash-command menu, the AI assistant — as empty plugins answering
+  `getMetadata()` so they would be *named* in the plugins tab; with the tab gone, so is that
+  machinery.)
   ⚠️ **A shortcut's modifier gate is `hasPrimaryModifier()`, never `e.ctrlKey || e.metaKey`**: on
   Windows `metaKey` is the **Windows key**, whose chords belong to the OS (Win+S opens Windows
   Search), so accepting either key on every platform binds us to a chord we don't own (gh-13). It

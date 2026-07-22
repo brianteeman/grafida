@@ -3271,21 +3271,57 @@ function aiHelpTab() {
 }
 
 /**
+ * The Help dialog's "Version" tab, rebuilt without its link (gh-21).
+ *
+ * The stock tab is one sentence — "You are using TinyMCE 8.2.0" — in which the
+ * version itself is an anchor to tiny.cloud's changelog, and that anchor does
+ * nothing in this app (see editorHelpTabs() below). The sentence is still worth
+ * having: it is what someone reports when they file a bug. So this repeats the
+ * built-in tab verbatim, minus the anchor, which help_tabs allows because a tab
+ * *object* named `versions` replaces the built-in one of that name.
+ *
+ * Both the version arithmetic and the phrasing are taken from the help plugin's
+ * own version tab, translated through TinyMCE's catalogue rather than ours: the
+ * sentence is about TinyMCE and already ships in every language pack.
+ */
+function versionHelpTab() {
+    const manager = tinymce.EditorManager;
+    // The '@' guard is the plugin's own: an unreplaced build placeholder.
+    const version = manager.majorVersion.indexOf('@') === 0
+        ? 'X.X.X'
+        : manager.majorVersion + '.' + manager.minorVersion;
+    const sentence = tinymce.util.I18n.translate(['You are using {0}', 'TinyMCE ' + version]);
+
+    return {
+        name: 'versions',
+        title: 'Version',
+        items: [{
+            type: 'htmlpanel',
+            presets: 'document',
+            // htmlpanel is innerHTML; the sentence comes from a language pack.
+            html: '<p>' + escapeHtmlText(sentence) + '</p>',
+        }],
+    };
+}
+
+/**
  * The Help dialog's tab list. help_tabs *replaces* the default list rather than
  * extending it, so the built-in names have to be repeated to keep them.
  *
- * The built-in "Plugins" tab is deliberately absent (gh-21). It is a list of
- * links and nothing else, and a link in a TinyMCE dialog is a target="_blank"
- * anchor: Boson's webview opens no new window, and the SPA routes every
- * external URL through api.openUrl() explicitly, so not one of them does
- * anything when clicked. What it does show is TinyMCE's advertisement for the
- * premium plugins we neither ship nor can load — an unclickable price list is
- * worse than no tab at all.
+ * ⚠️ No link in this dialog can be opened (gh-21). A TinyMCE dialog renders one
+ * as a target="_blank" anchor, and nothing in this app answers that: Boson's
+ * webview opens no new window, and the SPA routes every external URL through
+ * api.openUrl() explicitly. So the two built-in tabs that are made of links are
+ * dealt with here rather than shipped inert — the "Plugins" tab is dropped
+ * outright (it is a list of links and nothing else, headed by TinyMCE's
+ * advertisement for the premium plugins we neither ship nor can load), and
+ * "Version" is replaced by versionHelpTab() above, which keeps the sentence and
+ * loses the anchor. Anything added here later has to clear the same bar.
  */
 function editorHelpTabs(hasAiService) {
     const tabs = ['shortcuts', grafidaHelpTab()];
     if (hasAiService) tabs.push(aiHelpTab());
-    return tabs.concat(['keyboardnav', 'versions']);
+    return tabs.concat(['keyboardnav', versionHelpTab()]);
 }
 
 /**
