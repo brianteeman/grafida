@@ -2238,6 +2238,17 @@ function buildArticleFilterBar() {
     });
     bar.appendChild(el('div', 'articles-filter-search', search));
 
+    // Search help button (tooltip only, no visible text).
+    const helpBtn = iconBtn('circle-question', '', 'btn', 'btn-secondary', 'btn-md');
+    helpBtn.type = 'button';
+    helpBtn.setAttribute('aria-label', t('GRAFIDA_BTN_SEARCH'));
+    helpBtn.setAttribute('data-bs-toggle', 'tooltip');
+    helpBtn.setAttribute('data-bs-placement', 'bottom');
+    helpBtn.setAttribute('data-bs-html', 'true');
+    helpBtn.setAttribute('title', t('GRAFIDA_BTN_SEARCH_HELP'));
+
+    bar.appendChild(el('div', 'articles-filter-search-help', helpBtn));
+
     // Sort column + direction.
     bar.appendChild(filterSelect('GRAFIDA_LBL_SORT_BY',
         ARTICLE_SORT_COLUMNS.map(([v, k]) => [v, t(k)]), q.ordering, false,
