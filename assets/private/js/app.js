@@ -2244,7 +2244,6 @@ function buildArticleFilterBar() {
     helpBtn.setAttribute('aria-label', t('GRAFIDA_BTN_SEARCH'));
     helpBtn.setAttribute('data-bs-toggle', 'tooltip');
     helpBtn.setAttribute('data-bs-placement', 'bottom');
-    helpBtn.setAttribute('data-bs-html', 'true');
     helpBtn.setAttribute('title', t('GRAFIDA_BTN_SEARCH_HELP'));
 
     bar.appendChild(el('div', 'articles-filter-search-help', helpBtn));
