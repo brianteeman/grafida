@@ -2239,7 +2239,7 @@ function buildArticleFilterBar() {
     bar.appendChild(el('div', 'articles-filter-search', search));
 
     // Search help button (tooltip only, no visible text).
-    const helpBtn = iconBtn('circle-question', '', 'btn', 'btn-secondary', 'btn-md');
+    const helpBtn = iconBtn('circle-question', '', 'btn', 'btn-secondary', 'btn-lg');
     helpBtn.type = 'button';
     helpBtn.setAttribute('aria-label', t('GRAFIDA_BTN_SEARCH'));
     helpBtn.setAttribute('data-bs-toggle', 'tooltip');
