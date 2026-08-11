@@ -171,6 +171,14 @@ ship inside the app.
   `tests/js/slashtools.test.mjs` covers the filtering, separator collapse, off switch and what each
   command inserts. The read-more item shares `app.js`'s `insertReadMore()` with the toolbar button
   (which is what refuses a second separator).
+  ⚠️ **There is more than one spelling of the read-more marker, and `READMORE_SELECTOR` is the only
+  place that knows them all** (gh-71). Grafida inserts `<hr class="readmore">`, but Joomla's own
+  editor writes `<hr id="system-readmore">` — the only form `Table\Content::check()` splits on — so
+  an article imported from a site carries whichever it was written with. That selector drives both
+  the duplicate check in `insertReadMore()` and the `content_style` rule that makes the marker
+  visible, and `Html\ContentSplitter` accepts the same set on publish. An unrecognised marker is not
+  merely unstyled: it is *invisible*, and the split then never happens, so the read-more silently
+  disappears from the published article.
   **The Help dialog is the only in-app editor documentation**, so `menu.tools.items` keeps the
   stock `help` item (the overridden Tools menu would otherwise drop it, leaving the dialog
   reachable by its keyboard chord alone), and `help_tabs` (`editorHelpTabs()` in `app.js`) adds a

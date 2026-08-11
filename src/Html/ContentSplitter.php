@@ -13,13 +13,26 @@ namespace Grafida\Html;
 
 /**
  * Splits article HTML into Joomla's introtext / fulltext on the "read more"
- * marker — an `<hr>` element carrying the `readmore` class.
+ * marker — an `<hr>` element carrying the `readmore` class, or Joomla's own
+ * `<hr id="system-readmore">`.
+ *
+ * Both spellings are accepted, and equally (gh-71): Grafida's editor inserts the
+ * class form, but Joomla's own editor — and therefore anything that reaches us
+ * from a site or through a paste — writes the id form, which is the only one
+ * Joomla itself splits on (`Table\Content::check()`). A marker we do not
+ * recognise is not merely unstyled: the split then never happens and the
+ * read-more silently disappears on publish.
  *
  * Everything before the marker is the introtext; everything after is the
  * fulltext. If there is no marker the whole content is introtext.
  */
 final class ContentSplitter
 {
+    /**
+     * The marker tokens, accepted in either the `class` or the `id` attribute.
+     */
+    private const MARKER_TOKENS = ['readmore', 'system-readmore'];
+
     /**
      * @return array{introtext: string, fulltext: string}
      */
@@ -76,7 +89,7 @@ final class ContentSplitter
         $count = 0;
 
         foreach ($dom->getElementsByTagName('hr') as $hr) {
-            if ($this->hasReadMoreClass($hr)) {
+            if ($this->isMarker($hr)) {
                 ++$count;
             }
         }
@@ -89,7 +102,7 @@ final class ContentSplitter
         foreach ($body->childNodes as $node) {
             if ($node instanceof \DOMElement
                 && strtolower($node->nodeName) === 'hr'
-                && $this->hasReadMoreClass($node)) {
+                && $this->isMarker($node)) {
                 return $node;
             }
         }
@@ -97,11 +110,20 @@ final class ContentSplitter
         return null;
     }
 
-    private function hasReadMoreClass(\DOMElement $element): bool
+    /**
+     * Is this `<hr>` a read-more marker? Either attribute, either spelling.
+     */
+    private function isMarker(\DOMElement $element): bool
     {
-        $splitResult = preg_split('/\s+/', $element->getAttribute('class'));
-        $classes     = $splitResult !== false ? $splitResult : [];
+        foreach (['class', 'id'] as $attribute) {
+            $splitResult = preg_split('/\s+/', $element->getAttribute($attribute));
+            $tokens      = $splitResult !== false ? $splitResult : [];
 
-        return in_array('readmore', $classes, true);
+            if (array_intersect(self::MARKER_TOKENS, $tokens) !== []) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

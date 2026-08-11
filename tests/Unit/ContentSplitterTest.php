@@ -27,6 +27,23 @@ final class ContentSplitterTest extends TestCase
         self::assertStringNotContainsString('readmore', $result['introtext'] . $result['fulltext']);
     }
 
+    /**
+     * Joomla's own marker is an id, not a class (gh-71), and it must split just
+     * as our class form does — otherwise the read-more silently disappears the
+     * first time an article written in Joomla is published from Grafida.
+     */
+    public function testSplitsOnJoomlaIdMarker(): void
+    {
+        $splitter = new ContentSplitter();
+
+        $result = $splitter->split('<p>Intro paragraph.</p><hr id="system-readmore" /><p>The rest.</p>');
+
+        self::assertStringContainsString('Intro paragraph.', $result['introtext']);
+        self::assertStringNotContainsString('The rest.', $result['introtext']);
+        self::assertStringContainsString('The rest.', $result['fulltext']);
+        self::assertStringNotContainsString('readmore', $result['introtext'] . $result['fulltext']);
+    }
+
     public function testWholeContentIsIntrotextWithoutMarker(): void
     {
         $splitter = new ContentSplitter();
@@ -44,6 +61,9 @@ final class ContentSplitterTest extends TestCase
         self::assertSame(0, $splitter->countMarkers('<p>x</p>'));
         self::assertSame(1, $splitter->countMarkers('<p>a</p><hr class="readmore"><p>b</p>'));
         self::assertSame(2, $splitter->countMarkers('<hr class="readmore"><hr class="foo readmore">'));
+        self::assertSame(1, $splitter->countMarkers('<p>a</p><hr id="system-readmore"><p>b</p>'));
+        self::assertSame(2, $splitter->countMarkers('<hr class="readmore"><hr id="system-readmore">'));
+        self::assertSame(0, $splitter->countMarkers('<hr class="notreadmore"><hr id="readmore-ish">'));
     }
 
     public function testHandlesUtf8(): void

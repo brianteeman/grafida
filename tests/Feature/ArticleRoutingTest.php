@@ -274,6 +274,43 @@ final class ArticleRoutingTest extends TestCase
     }
 
     /**
+     * Joomla writes its read-more as `<hr id="system-readmore">`, and the combined
+     * `text` attribute an article arrives in may carry it (gh-71). The split has to
+     * be recovered from that marker, not only from the "\r\n \r\n" heuristic, or the
+     * read-more is lost on the way back out.
+     */
+    public function testRemoteArticleSplitsOnJoomlaReadMoreMarker(): void
+    {
+        $fake   = new FakeTransport();
+        $kernel = $this->kernelWithFakeTransport($fake);
+        $siteId = $this->seedConnectedSite();
+
+        $payload = json_encode([
+            'data' => [
+                'type'       => 'articles',
+                'id'         => '18',
+                'attributes' => [
+                    'id'    => 18,
+                    'title' => 'With a read more',
+                    'alias' => 'with-a-read-more',
+                    'text'  => '<p>Intro.</p><hr id="system-readmore" /><p>The rest.</p>',
+                ],
+            ],
+        ], JSON_THROW_ON_ERROR);
+
+        $fake->on(self::API_BASE . '/v1/content/articles/18', new HttpResponse(200, $payload));
+
+        [$status, $json] = $this->call($kernel, 'GET', "/api/sites/{$siteId}/articles/18");
+
+        self::assertSame(200, $status);
+        self::assertTrue($json['ok']);
+        self::assertSame(
+            "<p>Intro.</p>\n<hr class=\"readmore\">\n<p>The rest.</p>",
+            $json['data']['html']
+        );
+    }
+
+    /**
      * @param list<array<string, mixed>> $fields
      */
     private function seedFieldDefinitions(int $siteId, array $fields): void

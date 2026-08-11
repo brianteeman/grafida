@@ -239,6 +239,13 @@ window-free in tests (a null dialog makes the endpoint return 503).
   because the API never fires `onContentNormaliseRequestData`, so leaving an optional one out is
   strictly safer than overwriting it with our snapshot.
 - `src/Html/` — `ContentSplitter` (read-more split), `CssRebaser`, `InlineMedia`, `HtmlDocument`.
+  ⚠️ **The read-more marker has two spellings and they are equals** (gh-71): Grafida's editor
+  inserts `<hr class="readmore">`, but Joomla's own writes `<hr id="system-readmore">` — the only
+  form `Table\Content::check()` splits on — so an article imported from a site carries whichever it
+  was written with. `ContentSplitter` matches either token in either attribute; the SPA mirrors the
+  set in `READMORE_SELECTOR` (styling + duplicate check), and `ArticleController::remoteArticleBody()`
+  splits an incoming combined `text` on the marker before falling back to its `"\r\n \r\n"`
+  heuristic. A marker we do not recognise is *invisible* in the editor and lost on publish.
 - `src/Update/UpdateService.php` — the **update checker**. On startup the SPA calls
   `GET /api/update` (`api.checkUpdate()`) **fire-and-forget after the initial render**, so a slow
   fetch never blocks start-up. `UpdateService::status()` refreshes a per-user cache of the

@@ -17,6 +17,7 @@ use Grafida\Http\Json;
 use Grafida\Http\RouteContext;
 use Grafida\Http\Router;
 use Grafida\Field\FieldCategoryScope;
+use Grafida\Html\ContentSplitter;
 use Grafida\Http\SiteContext;
 use Grafida\Joomla\ApiClient;
 use Grafida\Reference\ReferenceService;
@@ -45,6 +46,7 @@ final class ArticleController extends Controller
         private readonly ReferenceService $references,
         private readonly ApiClient $apiClient,
         private readonly FieldCategoryScope $fieldScope = new FieldCategoryScope(),
+        private readonly ContentSplitter $splitter = new ContentSplitter(),
     ) {}
 
     public function registerRoutes(Router $router): void
@@ -203,12 +205,16 @@ final class ArticleController extends Controller
      *
      * Joomla's article API currently only returns the combined `text` attribute. A
      * pending Joomla PR would expose discrete `introtext` / `fulltext` attributes;
-     * we prefer those if present so we pick up the improvement automatically. Until
-     * then we fall back to a heuristic: Joomla joins the two parts with
-     * "\r\n \r\n" (CRLF, space, CRLF) in the combined text, which is a reliable
-     * separator in most articles. (The API does not preserve the read-more marker,
-     * so an article whose body genuinely lacks that sequence is treated as
-     * intro-only — the worst case is a missing split, never lost content.)
+     * we prefer those if present so we pick up the improvement automatically.
+     *
+     * Failing that, the combined text is split on a read-more marker if it carries
+     * one — Joomla writes its own `<hr id="system-readmore">` there (gh-71), and
+     * {@see ContentSplitter} accepts that spelling as readily as our own class
+     * form. Only when there is no marker at all do we fall back to a heuristic:
+     * Joomla joins the two parts with "\r\n \r\n" (CRLF, space, CRLF) in the
+     * combined text, which is a reliable separator in most articles. (An article
+     * whose body has neither a marker nor that sequence is treated as intro-only —
+     * the worst case is a missing split, never lost content.)
      *
      * @param array<string, mixed> $article
      */
@@ -218,9 +224,17 @@ final class ArticleController extends Controller
             $intro = $this->str($article, 'introtext');
             $full  = $this->str($article, 'fulltext');
         } else {
-            $parts = explode("\r\n \r\n", $this->str($article, 'text'), 2);
-            $intro = $parts[0];
-            $full  = $parts[1] ?? '';
+            $text  = $this->str($article, 'text');
+            $split = $this->splitter->split($text);
+
+            if (trim($split['fulltext']) !== '') {
+                $intro = $split['introtext'];
+                $full  = $split['fulltext'];
+            } else {
+                $parts = explode("\r\n \r\n", $text, 2);
+                $intro = $parts[0];
+                $full  = $parts[1] ?? '';
+            }
         }
 
         if (trim($full) === '') {

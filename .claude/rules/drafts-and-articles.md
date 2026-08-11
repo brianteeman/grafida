@@ -60,11 +60,13 @@ and two-space continuation indent are the original bullet formatting.
   alias is empty (never clobbering a hand-edited one), while the button always regenerates.
   Joomla re-slugifies whatever alias we send on publish, so this is a faithful preview.
   Editing a remote article fetches its full content via `GET /api/sites/{id}/articles/{articleId}`
-  (body recovered by `ApiController::remoteArticleBody()`: it prefers discrete `introtext` /
+  (body recovered by `ArticleController::remoteArticleBody()`: it prefers discrete `introtext` /
   `fulltext` attributes if the API ever exposes them — a Joomla PR proposes this — otherwise it
-  falls back to the combined `text` attribute and heuristically splits intro/full on the
-  `"\r\n \r\n"` separator Joomla inserts between them; the recovered split is re-emitted as the
-  editor's `<hr class="readmore">` marker so it survives the round-trip to publishing; category
+  splits the combined `text` attribute on a read-more marker it carries (`ContentSplitter`, which
+  since gh-71 accepts Joomla's own `<hr id="system-readmore">` as readily as our class form), and
+  only failing *that* on the `"\r\n \r\n"` separator Joomla inserts between the two parts; the
+  recovered split is re-emitted as the editor's `<hr class="readmore">` marker so it survives the
+  round-trip to publishing; category
   and tags come from the JSON:API `relationships` block, which `ApiClient::flatten()` preserves,
   tag IDs resolved to titles) and
   ⚠️ **`remoteFieldValues()` brings the article's custom field values across too, unsupported types

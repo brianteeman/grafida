@@ -3980,13 +3980,22 @@ function editorHelpTabs(hasAiService) {
 }
 
 /**
+ * Every spelling of the read-more marker (gh-71). Grafida inserts the class
+ * form, but Joomla's own editor writes `<hr id="system-readmore">`, and an
+ * article imported from a site carries whichever it was written with. The two
+ * must be treated as equals — by the styling, by the duplicate check here, and
+ * by Html\ContentSplitter on publish.
+ */
+const READMORE_SELECTOR = 'hr.readmore, hr.system-readmore, hr#readmore, hr#system-readmore';
+
+/**
  * Inserts the "Read more" separator, refusing a second one — Joomla splits an
  * article on the first separator, so a second is meaningless.
  *
  * Shared by the toolbar button and the slash-command menu.
  */
 function insertReadMore(editor) {
-    if (editor.dom.select('hr.readmore').length >= 1) {
+    if (editor.dom.select(READMORE_SELECTOR).length >= 1) {
         editor.notificationManager.open({
             text: t('GRAFIDA_MSG_READMORE_EXISTS'),
             type: 'warning',
@@ -4204,8 +4213,11 @@ async function initTinyMCE(draft) {
         // Make the read-more break clearly visible inside the editor: a thick
         // dashed coloured line that reads on both light and dark site CSS.
         // (::before/::after can't be used here — <hr> is a void element.)
+        // Every spelling of the marker is styled, Joomla's id form included
+        // (gh-71) — an unstyled marker is invisible, which is how a read-more
+        // came to be lost without anyone seeing it go.
         content_style:
-            'hr.readmore {' +
+            READMORE_SELECTOR + ' {' +
             '  height: 0;' +
             '  border: 0;' +
             '  border-top: 3px dashed #ff7a45;' +
