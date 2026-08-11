@@ -1,0 +1,23 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<p>Intro.</p>",
+    "fulltext": "<p>Rest.</p>",
+    "created_by_alias": "",
+    "alias": "corpus-article",
+    "images": {
+        "image_intro": "images/intro.jpg",
+        "image_intro_alt": "A field at dawn",
+        "image_intro_alt_empty": "",
+        "float_intro": "left",
+        "image_intro_caption": "Dawn",
+        "image_fulltext": "images/full.jpg",
+        "image_fulltext_alt": "",
+        "image_fulltext_alt_empty": "1",
+        "float_fulltext": "",
+        "image_fulltext_caption": ""
+    }
+}

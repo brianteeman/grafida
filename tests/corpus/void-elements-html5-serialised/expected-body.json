@@ -1,0 +1,11 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<p>Line<br>break</p><hr><img src=\"images/x.png\" alt=\"\"><input type=\"text\" name=\"q\" value=\"a &amp; b\">",
+    "fulltext": "<p>Then<wbr>more<br>lines</p>",
+    "created_by_alias": "",
+    "alias": "corpus-article"
+}

@@ -1,0 +1,4 @@
+{
+    "description": "An empty body publishes as empty introtext and empty fulltext rather than as a parser artefact.",
+    "source": "edge case"
+}

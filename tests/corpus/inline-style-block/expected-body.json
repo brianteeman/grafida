@@ -1,0 +1,11 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<style>\n.callout { border: 1px solid #ccc; padding: 1rem }\n.callout > p:first-child { margin-top: 0 }\n</style>\n<div class=\"callout\"><p>Note this.</p></div>",
+    "fulltext": "<p>And the rest.</p>",
+    "created_by_alias": "",
+    "alias": "corpus-article"
+}

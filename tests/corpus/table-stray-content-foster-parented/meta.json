@@ -1,0 +1,4 @@
+{
+    "description": "Content between <table> and <tr> is foster-parented out of the table, which is what a browser shows; libxml2 left it inside, so the article looked different once published.",
+    "source": "WHATWG tree construction"
+}

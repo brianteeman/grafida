@@ -1,0 +1,4 @@
+{
+    "description": "The marker is recognised by class token, not by the whole class attribute, so an editor that added its own classes still splits.",
+    "source": "gh-71"
+}

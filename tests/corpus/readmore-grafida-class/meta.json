@@ -1,0 +1,4 @@
+{
+    "description": "Grafida's own marker: <hr class=\"readmore\">. Everything before it is introtext, everything after is fulltext, and the marker itself is dropped.",
+    "source": "gh-71"
+}

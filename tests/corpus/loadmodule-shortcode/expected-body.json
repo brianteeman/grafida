@@ -1,0 +1,11 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<p>Sign up below.</p>\n<p>{loadmodule mod_finder,Search}</p>\n<p>{loadmoduleid 42}</p>",
+    "fulltext": "<p>{loadmodule mod_articles_latest}</p>",
+    "created_by_alias": "",
+    "alias": "corpus-article"
+}

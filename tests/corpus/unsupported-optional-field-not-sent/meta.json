@@ -1,0 +1,4 @@
+{
+    "description": "An optional custom field of a type Grafida cannot edit is left out of com_fields entirely — the API keeps the site's stored value for an omitted key, so omitting it is safer than echoing our snapshot back.",
+    "source": "gh-59"
+}

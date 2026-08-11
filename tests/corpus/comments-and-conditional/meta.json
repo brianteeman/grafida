@@ -1,0 +1,4 @@
+{
+    "description": "HTML comments — including Word's downlevel-revealed conditional blocks — are preserved verbatim rather than dropped or re-escaped.",
+    "source": "Word paste"
+}

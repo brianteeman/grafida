@@ -1,0 +1,4 @@
+{
+    "description": "Void elements serialise HTML5-style, without the XHTML self-closing slash, whichever way they were written in the source.",
+    "source": "WHATWG serialisation"
+}

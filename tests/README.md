@@ -21,6 +21,19 @@ are not configured, so a clean checkout is green.
 | **integration** (`tests/Integration/`) | Boson application stubs, plus the **live AI provider tests** below. |
 | **js** (`tests/js/`) | The AI transport, `assets/private/js/ai/providers.js`. |
 
+### The conformance corpus
+
+`tests/corpus/` is a language-neutral corpus of real, ugly article bodies — Word-pasted tables,
+`{loadmodule}` shortcodes, misnested inline tags, foster-parented table content — each with the
+introtext/fulltext `ContentSplitter` must produce for it and the flat JSON body `PublishService`
+must POST/PATCH. `tests/Unit/ConformanceCorpusTest.php` runs it.
+
+It is a **cross-implementation contract**, not a snapshot: it exists so a second implementation of
+Grafida (parsing the same HTML with a different HTML5 parser) can be written against something
+executable. So a failing case is a question about which output is right, never a file to
+regenerate. The format — and the seven rules a case has to obey — is documented in
+`.claude/rules/media-and-publish.md`.
+
 ### Why there is a JavaScript suite
 
 The AI provider call **runs in the SPA's JavaScript**, not in PHP — that is what makes streaming

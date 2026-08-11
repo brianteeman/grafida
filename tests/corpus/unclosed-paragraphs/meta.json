@@ -1,0 +1,4 @@
+{
+    "description": "Unclosed paragraphs and list items are closed where HTML5 says they close, not where a repair heuristic guesses.",
+    "source": "WHATWG tree construction"
+}

@@ -1,0 +1,4 @@
+{
+    "description": "Misnested inline tags are repaired by the HTML5 adoption agency algorithm — <b><i>x</b>y</i> becomes <b><i>x</i></b><i>y</i>, which is what a browser shows.",
+    "source": "WHATWG tree construction"
+}

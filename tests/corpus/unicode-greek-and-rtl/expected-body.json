@@ -1,0 +1,11 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<p>Καλημέρα κόσμε 👋</p><p dir=\"rtl\" lang=\"ar\">مرحبا بالعالم</p>",
+    "fulltext": "<p lang=\"el\">Το υπόλοιπο άρθρο.</p>",
+    "created_by_alias": "",
+    "alias": "corpus-article"
+}

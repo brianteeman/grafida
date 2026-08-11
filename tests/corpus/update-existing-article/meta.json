@@ -1,0 +1,4 @@
+{
+    "description": "A draft that mirrors a remote article PATCHes it, and the body carries introtext/fulltext as discrete columns — sending the combined articletext instead silently reverts the body on an update.",
+    "source": "Joomla API contract"
+}

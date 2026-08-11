@@ -1,9 +1,10 @@
 ---
-description: Grafida's offline media blobs and the publish pipeline — inline image references, the gh-36/gh-43 image rules, upload-on-publish rewriting, and the Media Manager screen. Lifted verbatim from CLAUDE.md's Layout section.
+description: Grafida's offline media blobs and the publish pipeline — inline image references, the gh-36/gh-43 image rules, upload-on-publish rewriting, the Media Manager screen, and the tests/corpus/ round-trip conformance format. Lifted verbatim from CLAUDE.md's Layout section.
 paths:
   - "src/Media/**"
   - "src/Publish/**"
   - "src/Html/**"
+  - "tests/corpus/**"
 ---
 
 # Media & publishing
@@ -313,3 +314,75 @@ two-space continuation indent are the original bullet formatting.
   also **writes the rewritten HTML back into the local draft** (so the stored draft mirrors what was
   published and a re-publish does not upload the images again); `data-path` is added to the editor's
   `extended_valid_elements` so it survives a TinyMCE round-trip.
+
+## `tests/corpus/` — the round-trip conformance corpus
+
+The publish pipeline's two purely deterministic halves — `Html\ContentSplitter` and the
+body-building half of `Publish\PublishService` — decide what an article *is* on someone's live
+website. Until this corpus existed nothing anywhere asserted their behaviour on arbitrary HTML;
+it was pinned only by a handful of `assertStringContainsString()` calls on hand-written snippets.
+
+⚠️ **The corpus is written in a language-neutral format on purpose: it is the contract a second
+implementation is written against, not a PHP fixture.** Grafida's iPad app parses the same article
+bodies with WebKit's HTML5 parser rather than PHP's, so "does it agree with the desktop app" has to
+be an executable question, answerable without running PHP. Anything that would make a case readable
+only from PHP — a serialised object, a PHP-callable in a fixture, a case that depends on
+`App::VERSION` — defeats the point of it existing.
+
+`Tests\Unit\ConformanceCorpusTest` runs every case; `Tests\Unit\Support\CorpusRunner` is the harness
+both it and any regeneration tooling go through.
+
+### One directory per case
+
+```
+tests/corpus/<case-name>/
+    input.html              REQUIRED  the article body as it arrives
+    expected-intro.html     REQUIRED  introtext after ContentSplitter
+    expected-full.html      optional  fulltext after ContentSplitter
+    expected-body.json      REQUIRED  the flat top-level JSON object PublishService POSTs/PATCHes
+    expected-request.json   optional  { "method": "POST"|"PATCH", "path": "/v1/content/articles[/id]" }
+    meta.json               REQUIRED  { "description": "...", "source": "gh-57" | "real article" | ... }
+    draft.json              optional  partial override of the standard draft
+    site-fields.json        optional  the custom field definitions the site reports
+    site-tags.json          optional  the tags the site already has
+```
+
+Seven rules, none of them guessable from the files:
+
+- **Every `.html` file carries exactly one trailing newline, which is not part of the value.**
+  `CorpusRunner::read()` strips a single `\n` from the end of `input.html` and of both
+  `expected-*.html`, so the round trip through the filesystem adds nothing to either side and git
+  still gets newline-terminated files. A second implementation must strip the same one newline.
+- ⚠️ **An absent `expected-full.html` means "no read-more marker", which is not the same statement
+  as an empty fulltext** — the file is omitted rather than written empty, so the two cases stay
+  distinguishable by looking at the directory. The test compares against `''` either way.
+- ⚠️ **`expected-body.json` omits `version_note`.** It is built from `App::VERSION`, so keeping it
+  would make every expectation stale on the next release while saying nothing about how the
+  *content* is built. That it is sent at all is pinned by gh-17's own tests, not here.
+- **`draft.json` is a partial override of one standard draft** (`CorpusRunner::DRAFT_DEFAULTS`):
+  title `Corpus article`, alias `corpus-article`, catid `2`, access `1`, state `1`, language
+  `en-GB`, everything else empty, `remoteId` null. A case is about the *body*; anything it does not
+  mention must not vary between cases. Setting `remoteId` is what turns the write into a PATCH.
+- ⚠️ **No case may need the network.** The publish runs against a `FakeTransport` answering exactly
+  one URL — the article write — so a case must not contain an offline image (`boson://` or `data:`),
+  and must not name a tag that `site-tags.json` does not already carry, or the publish will try to
+  upload/create it and the case will fail with a 404 rather than a useful diff. That is a deliberate
+  fence: media upload and tag creation are network behaviour and belong in their own tests.
+- **A case that exercises the *parser* needs a read-more marker in it.** `ContentSplitter::split()`
+  returns `trim($html)` **byte-identical** when there is no marker — it never parses at all — so a
+  tree-construction or serialisation case written without one silently asserts nothing. (That
+  fast path is itself a documented property, pinned by `no-marker-is-untouched`.)
+- **`meta.json`'s `description` is the argument for the case**, in a sentence, and `source` says
+  where the HTML came from (`gh-NN`, `real article`, `Word paste`, `WHATWG tree construction`, …).
+  `ConformanceCorpusTest::testCaseIsWellFormed()` enforces both, because a case nobody can argue
+  about later is a case that will eventually be regenerated to make a suite green.
+
+### Changing an expectation
+
+⚠️ **A failing case is a question, not a file to regenerate.** The whole value of the corpus is
+that it says what the two implementations must agree on; bulk-rewriting the expectations to match
+whatever the code now does converts it into a description of the current bug. Read the diff, decide
+which output is *more correct* (the spec and what a browser renders are the tie-breakers, not what
+the code used to do), and change the one expectation with the reason in the commit message. If the
+new output really is better, the iPad implementation has to change with it — which is exactly the
+conversation the corpus exists to force.

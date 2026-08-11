@@ -1,0 +1,4 @@
+{
+    "description": "HTML5 named references decode to their characters (the HTML4 table does not carry them all), and a literal ampersand is re-escaped on the way out.",
+    "source": "WHATWG named character references"
+}

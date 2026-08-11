@@ -1,0 +1,11 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<p><b><i>Bold italic</i></b><i>italic only</i> plain</p>",
+    "fulltext": "<p><em>Then <strong>this</strong></em><strong> too</strong>.</p>",
+    "created_by_alias": "",
+    "alias": "corpus-article"
+}

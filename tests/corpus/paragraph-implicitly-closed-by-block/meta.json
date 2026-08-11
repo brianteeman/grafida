@@ -1,0 +1,4 @@
+{
+    "description": "A block-level element inside an open <p> closes it, per HTML5 — libxml2 left it nested, which put the same article in two different shapes depending on who parsed it. The stray </p> that follows becomes an empty <p></p>, which is also what the spec says: an end tag with no open p inserts one.",
+    "source": "WHATWG tree construction"
+}

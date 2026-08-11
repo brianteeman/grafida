@@ -1,0 +1,4 @@
+{
+    "description": "A media custom field still holding a Joomla 3 bare path is re-encoded as a full accessiblemedia record, never left as the bare string.",
+    "source": "plg_fields_media::checkValue()"
+}

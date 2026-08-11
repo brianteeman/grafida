@@ -97,10 +97,10 @@ final class ContentSplitter
         return $count;
     }
 
-    private function findMarker(\DOMNode $body): ?\DOMElement
+    private function findMarker(\Dom\Node $body): ?\Dom\Element
     {
         foreach ($body->childNodes as $node) {
-            if ($node instanceof \DOMElement
+            if ($node instanceof \Dom\Element
                 && strtolower($node->nodeName) === 'hr'
                 && $this->isMarker($node)) {
                 return $node;
@@ -113,10 +113,12 @@ final class ContentSplitter
     /**
      * Is this `<hr>` a read-more marker? Either attribute, either spelling.
      */
-    private function isMarker(\DOMElement $element): bool
+    private function isMarker(\Dom\Element $element): bool
     {
         foreach (['class', 'id'] as $attribute) {
-            $splitResult = preg_split('/\s+/', $element->getAttribute($attribute));
+            // ⚠️ \Dom\Element::getAttribute() answers **null** for an absent
+            // attribute, where \DOMElement answered the empty string.
+            $splitResult = preg_split('/\s+/', $element->getAttribute($attribute) ?? '');
             $tokens      = $splitResult !== false ? $splitResult : [];
 
             if (array_intersect(self::MARKER_TOKENS, $tokens) !== []) {

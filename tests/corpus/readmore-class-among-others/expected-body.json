@@ -1,0 +1,11 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<p>Intro.</p>",
+    "fulltext": "<p>Rest.</p>",
+    "created_by_alias": "",
+    "alias": "corpus-article"
+}

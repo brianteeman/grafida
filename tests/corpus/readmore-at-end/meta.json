@@ -1,0 +1,4 @@
+{
+    "description": "A marker with nothing after it gives an empty fulltext — the whole body is introtext, but the marker itself is still consumed.",
+    "source": "edge case"
+}

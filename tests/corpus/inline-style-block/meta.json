@@ -1,0 +1,4 @@
+{
+    "description": "A <style> block at the very start of the body stays in the body. Parsed as a document it would land in the implied <head> and vanish; the fragment wrapper is what stops that.",
+    "source": "real article"
+}

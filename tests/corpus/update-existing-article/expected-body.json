@@ -1,0 +1,13 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<p>Updated intro.</p>",
+    "fulltext": "<p>Updated rest.</p>",
+    "created_by_alias": "A. Ghost Writer",
+    "alias": "corpus-article",
+    "metadesc": "A meta description",
+    "metakey": "one, two"
+}

@@ -1,0 +1,4 @@
+{
+    "description": "A <script> body is raw text: its < and & are not escaped on the way out, or the script would arrive at the site broken.",
+    "source": "real article"
+}

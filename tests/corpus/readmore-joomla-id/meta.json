@@ -1,0 +1,4 @@
+{
+    "description": "Joomla writes <hr id=\"system-readmore\"> — the only form Table\\Content::check() splits on — and it must split exactly as our class form does.",
+    "source": "gh-71"
+}

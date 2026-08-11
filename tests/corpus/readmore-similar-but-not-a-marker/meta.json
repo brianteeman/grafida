@@ -1,0 +1,4 @@
+{
+    "description": "Tokens that merely contain \"readmore\" — a notreadmore class, a readmore-ish id, a <div class=\"readmore\"> — are not markers and must not split the article.",
+    "source": "gh-71"
+}

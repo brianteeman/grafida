@@ -1,0 +1,4 @@
+{
+    "description": "A marker with nothing before it gives an empty introtext, which Joomla renders as an article that is all \"read more\".",
+    "source": "edge case"
+}

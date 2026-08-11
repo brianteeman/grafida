@@ -1,0 +1,4 @@
+{
+    "description": "Significant whitespace inside <pre>/<code> — leading newline, indentation, tabs — is preserved exactly.",
+    "source": "real article"
+}

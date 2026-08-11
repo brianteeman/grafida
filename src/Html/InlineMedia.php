@@ -69,7 +69,7 @@ final class InlineMedia
         $changed = false;
 
         foreach ($dom->getElementsByTagName('img') as $img) {
-            $src = $img->getAttribute('src');
+            $src = $img->getAttribute('src') ?? '';
 
             $mediaId = null;
             $dataUri = null;
@@ -80,7 +80,7 @@ final class InlineMedia
                 // data-grafida-media-id attribute when both are present.
                 $mediaId = $this->idFromLocalUrl($src);
             } elseif (str_starts_with($src, 'data:')) {
-                $idAttr  = $img->getAttribute(self::ATTRIBUTE);
+                $idAttr  = $img->getAttribute(self::ATTRIBUTE) ?? '';
                 $mediaId = $idAttr !== '' && is_numeric($idAttr) ? (int) $idAttr : null;
                 $dataUri = $src;
             } else {
@@ -130,7 +130,7 @@ final class InlineMedia
         $changed = false;
 
         foreach ($dom->getElementsByTagName('img') as $img) {
-            $src = $img->getAttribute('src');
+            $src = $img->getAttribute('src') ?? '';
 
             if (!str_starts_with($src, 'data:')) {
                 // Already a local-media URL, a real site URL, or an external image —
@@ -138,7 +138,7 @@ final class InlineMedia
                 continue;
             }
 
-            $idAttr  = $img->getAttribute(self::ATTRIBUTE);
+            $idAttr  = $img->getAttribute(self::ATTRIBUTE) ?? '';
             $mediaId = $idAttr !== '' && is_numeric($idAttr) ? (int) $idAttr : null;
 
             $this->applyResult($img, $convert($mediaId, $src));
@@ -191,8 +191,8 @@ final class InlineMedia
         $changed = false;
 
         foreach ($dom->getElementsByTagName('img') as $img) {
-            $src    = $img->getAttribute('src');
-            $idAttr = $img->getAttribute(self::ATTRIBUTE);
+            $src    = $img->getAttribute('src') ?? '';
+            $idAttr = $img->getAttribute(self::ATTRIBUTE) ?? '';
             $tagId  = $idAttr !== '' && is_numeric($idAttr) ? (int) $idAttr : null;
 
             if ($this->idFromLocalUrl($src) !== $mediaId && $tagId !== $mediaId) {
@@ -229,7 +229,7 @@ final class InlineMedia
      *
      * @param array{src: string, dataPath?: ?string, width?: ?int, height?: ?int} $result
      */
-    private function applyResult(\DOMElement $img, array $result): void
+    private function applyResult(\Dom\Element $img, array $result): void
     {
         $img->setAttribute('src', $result['src']);
         $img->removeAttribute(self::ATTRIBUTE);

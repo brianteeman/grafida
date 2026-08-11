@@ -239,6 +239,27 @@ window-free in tests (a null dialog makes the endpoint return 503).
   because the API never fires `onContentNormaliseRequestData`, so leaving an optional one out is
   strictly safer than overwriting it with our snapshot.
 - `src/Html/` — `ContentSplitter` (read-more split), `CssRebaser`, `InlineMedia`, `HtmlDocument`.
+  ⚠️ **`HtmlDocument` is PHP 8.4's `\Dom\HTMLDocument` — a real WHATWG HTML5 parser (Lexbor) — and
+  never `\DOMDocument`**, whose HTML support is libxml2's HTML4 parser with a custom, unspecified
+  tree-construction algorithm. The difference is not cosmetic for article HTML: HTML4 leaves
+  `<section>`/`<figure>` nested inside an open `<p>`, leaves stray content between `<table>` and
+  `<tr>` where it stands instead of foster-parenting it out, implies no `<tbody>`, repairs misnested
+  inline tags ad hoc rather than by the adoption agency algorithm, knows only the HTML4 entity
+  table, and assumes ISO-8859-1 without a `<meta charset>` — each of which publishes a *different
+  article* from the one the browser (and Joomla) shows. Two traps in the port: `\Dom\Element::
+  getAttribute()` answers **null** for an absent attribute where `\DOMElement` answered the empty
+  string (a silent behaviour change wherever the result was compared or `preg_*`'d), and the
+  fragment is deliberately parsed inside a `<div id="grafida-root">` wrapper — not as a bare
+  document, which would place a leading `<style>` or `<meta>` in the implied `<head>`, where the
+  body serialiser would never see it again. ⚠️ **A stray `</div>` closes that wrapper**, leaving
+  everything after it a sibling of it and so invisible to both the marker search and the serialiser
+  — an article silently truncated at the stray tag, which unbalanced page-builder/Word markup
+  produces routinely. `load()` therefore unwraps the wrapper whenever anything escaped it (the tell
+  is the body having more than the one child we gave it) and falls back to the body itself. The libxml2-era `<?xml encoding="UTF-8">` prologue and
+  `LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD` flags are **gone**, not ported.
+  ⚠️ **`tests/corpus/` is the round-trip contract and is language-neutral on purpose** — its format
+  is documented in `.claude/rules/media-and-publish.md` and run by `ConformanceCorpusTest`. A
+  failing case is a question about which behaviour is right, never a file to regenerate.
   ⚠️ **The read-more marker has two spellings and they are equals** (gh-71): Grafida's editor
   inserts `<hr class="readmore">`, but Joomla's own writes `<hr id="system-readmore">` — the only
   form `Table\Content::check()` splits on — so an article imported from a site carries whichever it

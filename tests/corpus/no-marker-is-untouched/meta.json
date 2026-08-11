@@ -1,0 +1,4 @@
+{
+    "description": "A body with no read-more marker is returned trimmed but otherwise byte-identical — it is never round-tripped through the parser, so nothing about it can be normalised away.",
+    "source": "ContentSplitter::split()"
+}

@@ -1,0 +1,11 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<pre><code class=\"language-php\">\nif ($x &lt; 1) {\n\techo 'hi';\n}\n</code></pre>",
+    "fulltext": "<p>That is the <code>  spacing  </code> to keep.</p>",
+    "created_by_alias": "",
+    "alias": "corpus-article"
+}

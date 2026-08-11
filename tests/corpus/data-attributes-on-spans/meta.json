@@ -1,0 +1,4 @@
+{
+    "description": "data-* attributes on inline spans (a page builder's or a plugin's hooks) are preserved with their values and quoting intact.",
+    "source": "real article"
+}

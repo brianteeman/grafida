@@ -1,0 +1,4 @@
+{
+    "description": "Tag titles are resolved to Joomla ids against the cached tag list, case-insensitively, and travel as an array of integers.",
+    "source": "real article"
+}

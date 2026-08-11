@@ -1,0 +1,4 @@
+{
+    "description": "A {loadmodule} shortcode is plain text to the parser and must reach the site character-for-character, braces and all.",
+    "source": "Joomla content plugin"
+}

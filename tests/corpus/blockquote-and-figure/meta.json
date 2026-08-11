@@ -1,0 +1,4 @@
+{
+    "description": "A figure/figcaption and a cited blockquote survive intact — including the figure implicitly closing the paragraph it was opened inside.",
+    "source": "real article"
+}

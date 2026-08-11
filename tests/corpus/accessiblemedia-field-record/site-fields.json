@@ -1,0 +1,9 @@
+[
+    {
+        "id": 7,
+        "name": "sidebar_picture",
+        "title": "Sidebar picture",
+        "type": "media",
+        "required": 0
+    }
+]

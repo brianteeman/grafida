@@ -1,0 +1,4 @@
+{
+    "description": "A marker nested inside a <div> does NOT split: findMarker() walks only the body's own children. Joomla behaves the same way, and an article laid out in wrapper divs must not silently lose its second half.",
+    "source": "ContentSplitter::findMarker()"
+}

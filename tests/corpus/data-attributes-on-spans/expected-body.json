@@ -1,0 +1,11 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<p>Price: <span class=\"price\" data-currency=\"EUR\" data-amount=\"19.99\" data-vat-included=\"\">19,99&nbsp;€</span></p>",
+    "fulltext": "<p data-role=\"note\">Including VAT.</p>",
+    "created_by_alias": "",
+    "alias": "corpus-article"
+}

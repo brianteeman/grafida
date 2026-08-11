@@ -1,0 +1,11 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "Stray text<table><tbody><tr><td>Cell</td></tr></tbody></table>",
+    "fulltext": "<p>After the table.</p>",
+    "created_by_alias": "",
+    "alias": "corpus-article"
+}

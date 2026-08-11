@@ -1,0 +1,4 @@
+{
+    "description": "Nested lists, including a sub-list that is a sibling rather than a child of its <li>, keep the structure the parser gives them.",
+    "source": "real article"
+}

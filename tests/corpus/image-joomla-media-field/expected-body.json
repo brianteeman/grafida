@@ -1,0 +1,11 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<p><img src=\"images/grafida/12-photo.jpg\" width=\"1600\" height=\"900\" loading=\"lazy\" data-path=\"local-images:/grafida/12-photo.jpg\" alt=\"A photo\"></p>",
+    "fulltext": "<p><img src=\"https://cdn.example.net/external.png\" alt=\"External\" class=\"img-fluid\"></p>",
+    "created_by_alias": "",
+    "alias": "corpus-article"
+}

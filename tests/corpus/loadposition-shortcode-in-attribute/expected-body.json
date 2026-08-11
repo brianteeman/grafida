@@ -1,0 +1,11 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<div class=\"sidebar\" title=\"{loadposition sidebar-a, none}\">{loadposition sidebar-a}</div>",
+    "fulltext": "<p>{loadposition sidebar-b}</p>",
+    "created_by_alias": "",
+    "alias": "corpus-article"
+}

@@ -1,0 +1,4 @@
+{
+    "description": "A stray </div> — routine in a body that has been through a page builder or a Word paste — must not truncate the article. It closes the parser's fragment wrapper, so everything after it parses as a sibling of the wrapper; HtmlDocument unwraps in that case so nothing is lost, and the read-more marker is still found at the top level.",
+    "source": "real article"
+}

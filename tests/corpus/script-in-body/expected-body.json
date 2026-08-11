@@ -1,0 +1,11 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<p>Chart:</p><script>var a = 1 < 2 && 3 > 2; document.write(\"<b>hi</b>\");</script>",
+    "fulltext": "<p>Chart above.</p>",
+    "created_by_alias": "",
+    "alias": "corpus-article"
+}

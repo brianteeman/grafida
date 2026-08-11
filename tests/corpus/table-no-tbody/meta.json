@@ -1,0 +1,4 @@
+{
+    "description": "A <tr> written without a <tbody> gets one, per HTML5 tree construction — libxml2 implied nothing, so the published table differed from the one the browser rendered.",
+    "source": "WHATWG tree construction"
+}

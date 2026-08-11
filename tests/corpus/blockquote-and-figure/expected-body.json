@@ -1,0 +1,11 @@
+{
+    "title": "Corpus article",
+    "catid": 2,
+    "access": 1,
+    "state": 1,
+    "language": "en-GB",
+    "introtext": "<p>He put it best:</p><figure class=\"quote\"><blockquote cite=\"https://example.com/talk\"><p>Ship it.</p></blockquote><figcaption>— A. Person</figcaption></figure>",
+    "fulltext": "<p>And then he shipped it.</p>",
+    "created_by_alias": "",
+    "alias": "corpus-article"
+}

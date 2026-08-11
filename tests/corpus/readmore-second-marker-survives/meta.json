@@ -1,0 +1,4 @@
+{
+    "description": "Only the first marker splits; a second one is ordinary content and travels into the fulltext untouched.",
+    "source": "edge case"
+}

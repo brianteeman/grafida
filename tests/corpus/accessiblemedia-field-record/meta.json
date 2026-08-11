@@ -1,0 +1,4 @@
+{
+    "description": "A media custom field value travels as the whole accessiblemedia record (imagefile, alt_text, alt_empty), JSON-encoded — a partial record is no save at all.",
+    "source": "gh-56"
+}

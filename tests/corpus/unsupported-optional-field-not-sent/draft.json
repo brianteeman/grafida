@@ -1,0 +1,6 @@
+{
+    "fields": {
+        "blurb": "A supported text value",
+        "repeater": "{\"row0\":{\"a\":\"1\"}}"
+    }
+}

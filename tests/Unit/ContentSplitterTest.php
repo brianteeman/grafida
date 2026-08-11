@@ -66,6 +66,46 @@ final class ContentSplitterTest extends TestCase
         self::assertSame(0, $splitter->countMarkers('<hr class="notreadmore"><hr id="readmore-ish">'));
     }
 
+    /**
+     * A stray `</div>` closes the wrapper the fragment is parsed inside, which
+     * would leave everything after it a sibling of that wrapper — invisible to
+     * both the marker search and the serialiser, i.e. an article silently
+     * truncated at the stray tag. Unbalanced markup like this is routine in a
+     * body that has been through a page builder or a Word paste.
+     */
+    public function testStrayClosingDivDoesNotTruncateTheArticle(): void
+    {
+        $splitter = new ContentSplitter();
+
+        $result = $splitter->split('<p>One.</p></div><p>Two.</p><hr class="readmore"><p>Three.</p>');
+
+        self::assertSame('<p>One.</p><p>Two.</p>', $result['introtext']);
+        self::assertSame('<p>Three.</p>', $result['fulltext']);
+    }
+
+    /**
+     * HTML5 tree construction, not libxml2's HTML4 repair: a block-level
+     * element inside an open `<p>` closes it, misnested inline tags go through
+     * the adoption agency algorithm, and a `<tr>` gets its implied `<tbody>`.
+     * The full corpus is `tests/corpus/`; this pins the headline cases where
+     * they are easiest to read.
+     */
+    public function testParsesToTheHtml5TreeConstructionRules(): void
+    {
+        $splitter = new ContentSplitter();
+
+        $result = $splitter->split(
+            '<p>Before<section>In</section></p><hr class="readmore">'
+            . '<b><i>x</b>y</i><table><tr><td>c</td></tr></table>'
+        );
+
+        self::assertSame('<p>Before</p><section>In</section><p></p>', $result['introtext']);
+        self::assertSame(
+            '<b><i>x</i></b><i>y</i><table><tbody><tr><td>c</td></tr></tbody></table>',
+            $result['fulltext'],
+        );
+    }
+
     public function testHandlesUtf8(): void
     {
         $splitter = new ContentSplitter();

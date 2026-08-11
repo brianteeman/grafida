@@ -1,0 +1,4 @@
+{
+    "description": "Non-ASCII text — Greek, Arabic, an emoji — survives as UTF-8 and is not entity-encoded, and a dir=\"rtl\" attribute is preserved.",
+    "source": "real article"
+}

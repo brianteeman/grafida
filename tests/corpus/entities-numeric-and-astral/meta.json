@@ -1,0 +1,4 @@
+{
+    "description": "Numeric character references — including astral-plane ones — decode to UTF-8 text and are serialised as raw UTF-8, not re-encoded as entities.",
+    "source": "edge case"
+}

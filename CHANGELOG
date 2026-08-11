@@ -28,6 +28,8 @@ Grafida 0.3
 + MiniMax is now a built-in AI service provider
 + Documentation: Secrets security — how API tokens and AI keys are kept in the OS secret store, and what that protects against (gh-55)
 + Documentation: Translation — the INI format, the glossaries, and how to add or test a language (gh-55)
+~ Article HTML is parsed and written with a standards-compliant HTML5 parser, so an article is published in the shape a browser shows it
+~ New conformance test corpus pinning how arbitrary article HTML is split into introtext/fulltext and published
 ~ Documentation: Connection Troubleshooting now explains what "no working API endpoint" actually means — broken third-party plugins, WAFs and rate limiters, and how to read the Diagnose Connection output (gh-46, gh-55)
 ~ The editor's Help dialog now opens with Ctrl+Alt+0 (macOS) / Shift+Alt+0 instead of Alt+0, which clashed with typing "@" on a French AZERTY keyboard
 ~ The editor's Help dialog no longer has a Plugins tab, and its Version tab no longer links to TinyMCE's website; no link in that dialog could be opened from the app (gh-21)
@@ -49,6 +51,7 @@ Grafida 0.3
 # [HIGH] The editor showed every custom field the site has, not the ones the article's category uses — and a required field belonging to another category made publishing impossible (gh-56)
 # [HIGH] New Article opened with no editor at all, or with the article you had just backed out of — a single custom field the sidebar could not render took the whole editor down with it
 # [HIGH] A list, radio or checkboxes custom field could not be rendered at all, because Joomla does not store its options as a list
+# [HIGH] An article containing a stray closing tag was truncated at that tag when saved or published
 # [MEDIUM] Published images were uploaded to the site's files folder instead of its images folder (gh-57)
 # [MEDIUM] An untouched article asked to be saved on the way out, when the site's custom fields arrived after it opened
 # [MEDIUM] Offline, the whole Articles screen was replaced by an error — even the Local articles tab, which needs no network (gh-29)

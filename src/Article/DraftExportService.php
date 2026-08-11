@@ -268,7 +268,7 @@ final class DraftExportService
         $refsByMediaId = [];
 
         foreach ($dom->getElementsByTagName('img') as $img) {
-            $src = $img->getAttribute('src');
+            $src = $img->getAttribute('src') ?? '';
 
             if (!str_starts_with($src, InlineMedia::LOCAL_URL_PREFIX)) {
                 continue;
@@ -485,7 +485,7 @@ final class DraftExportService
         $changed = false;
 
         foreach ($dom->getElementsByTagName('img') as $img) {
-            $src = $img->getAttribute('src');
+            $src = $img->getAttribute('src') ?? '';
 
             if (!str_starts_with($src, self::EXPORT_REF_PREFIX)) {
                 continue;

@@ -1,0 +1,4 @@
+{
+    "description": "A {loadposition} shortcode inside an attribute value survives with its comma and spacing, and the surrounding quoting is not rewritten around it.",
+    "source": "Joomla content plugin"
+}
