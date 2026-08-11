@@ -3862,6 +3862,101 @@ function versionHelpTab() {
 }
 
 /**
+ * Rebinds the Help dialog off Alt+0.
+ *
+ * TinyMCE's help plugin binds the dialog to Alt+0, which is a hostile chord on
+ * any layout where Alt is a character modifier. A French AZERTY user types "@"
+ * with AltGr + 0 on Windows/Linux and with Option (⌥) + 0 on macOS — so on
+ * macOS the shortcut swallows the keystroke and opens Help instead of typing
+ * the sign, and the address halfway through an email link cannot be typed at
+ * all. Access + 0 is TinyMCE's own portable modifier (Ctrl+Alt on macOS,
+ * Shift+Alt elsewhere), already reserved by the editor for its block-format
+ * chords (Access + 1…9), so it collides with no layout's character map.
+ *
+ * ⚠️ This must run *after* the plugin has registered its own binding, i.e. on
+ * the editor's `init` event and not in `setup` — plugins are initialised
+ * between the two, so removing the shortcut any earlier removes nothing. Same
+ * reason for re-registering the `help` menu item: the plugin's version, which
+ * advertises "Alt+0" underneath Tools ▸ Help, would otherwise win. The menu
+ * spec has no spaces around the "+" (the theme joins the segments verbatim);
+ * the Help dialog's table spec does — see shortcutsHelpTab().
+ */
+function rebindHelpShortcut(editor) {
+    editor.shortcuts.remove('alt+0');
+    editor.shortcuts.add('access+0', 'Open help dialog', 'mceHelp');
+
+    editor.ui.registry.addMenuItem('help', {
+        text: 'Help',
+        icon: 'help',
+        shortcut: 'Access+0',
+        onAction: () => editor.execCommand('mceHelp'),
+        context: 'any',
+    });
+}
+
+/**
+ * The Help dialog's "Handy Shortcuts" tab, rebuilt so that it can tell the
+ * truth about the chord that opens it.
+ *
+ * The built-in tab is a hard-coded table — it does not read the editor's
+ * shortcut registry — and one of its rows is the Alt+0 binding that
+ * rebindHelpShortcut() takes away, so shipping the stock tab would advertise a
+ * chord that no longer does anything. A tab *object* named `shortcuts` replaces
+ * the built-in of that name, exactly as versionHelpTab() does for `versions`.
+ *
+ * ⚠️ Everything here except the "Open help dialog" row is a verbatim mirror of
+ * the help plugin's own list, so **re-check it against
+ * `js/tinymce/plugins/help/plugin.js` after a TinyMCE upgrade** — nothing warns
+ * us when upstream adds a shortcut. The action labels stay in TinyMCE's English
+ * on purpose: a dialog table cell is run through TinyMCE's translate(), so the
+ * literal upstream string is what its language packs already carry, and they
+ * are the strings this table is about.
+ */
+function shortcutsHelpTab() {
+    // [[shortcut spec, …], action]. Several specs render joined by "or".
+    const rows = [
+        [['Meta + B'], 'Bold'],
+        [['Meta + I'], 'Italic'],
+        [['Meta + U'], 'Underline'],
+        [['Meta + A'], 'Select all'],
+        [['Meta + Y', 'Meta + Shift + Z'], 'Redo'],
+        [['Meta + Z'], 'Undo'],
+        [['Access + 1'], 'Heading 1'],
+        [['Access + 2'], 'Heading 2'],
+        [['Access + 3'], 'Heading 3'],
+        [['Access + 4'], 'Heading 4'],
+        [['Access + 5'], 'Heading 5'],
+        [['Access + 6'], 'Heading 6'],
+        [['Access + 7'], 'Paragraph'],
+        [['Access + 8'], 'Div'],
+        [['Access + 9'], 'Address'],
+        // Upstream says "Alt + 0" here; see rebindHelpShortcut().
+        [['Access + 0'], 'Open help dialog'],
+        [['Alt + F9'], 'Focus to menubar'],
+        [['Alt + F10'], 'Focus to toolbar'],
+        [['Alt + F11'], 'Focus to element path'],
+        [['Alt + F12'], 'Focus to notification'],
+        [['Ctrl + F9'], 'Focus to contextual toolbar'],
+        [['Shift + Enter'], 'Open popup menu for split buttons'],
+        [['Meta + K'], 'Insert link (if link plugin activated)'],
+        [['Meta + S'], 'Save (if save plugin activated)'],
+        [['Meta + F'], 'Find (if searchreplace plugin activated)'],
+        [['Meta + Shift + F'], 'Switch to or from fullscreen mode'],
+    ];
+
+    return {
+        name: 'shortcuts',
+        title: 'Handy Shortcuts',
+        items: [{
+            type: 'table',
+            header: ['Action', 'Shortcut'],
+            cells: rows.map(([specs, action]) =>
+                [action, specs.map(helpShortcutText).join(' or ')]),
+        }],
+    };
+}
+
+/**
  * The Help dialog's tab list. help_tabs *replaces* the default list rather than
  * extending it, so the built-in names have to be repeated to keep them.
  *
@@ -3874,9 +3969,12 @@ function versionHelpTab() {
  * advertisement for the premium plugins we neither ship nor can load), and
  * "Version" is replaced by versionHelpTab() above, which keeps the sentence and
  * loses the anchor. Anything added here later has to clear the same bar.
+ *
+ * "Handy Shortcuts" is likewise replaced rather than named, so that its help
+ * row matches the chord rebindHelpShortcut() actually binds.
  */
 function editorHelpTabs(hasAiService) {
-    const tabs = ['shortcuts', grafidaHelpTab()];
+    const tabs = [shortcutsHelpTab(), grafidaHelpTab()];
     if (hasAiService) tabs.push(aiHelpTab());
     return tabs.concat(['keyboardnav', versionHelpTab()]);
 }
@@ -4090,7 +4188,8 @@ async function initTinyMCE(draft) {
         // Tools menu: our "sourcecode" item replaces the dropped "code" item.
         // "help" is the stock item the overridden menu would otherwise drop —
         // the help dialog is the only in-app editor documentation, and without
-        // this it is reachable by Alt+0 alone.
+        // this it is reachable by its keyboard chord alone (Access + 0, see
+        // rebindHelpShortcut(), which also re-registers this item).
         menu: {
             tools: { title: 'Tools', items: 'sourcecode wordcount | help' },
         },
@@ -4537,6 +4636,7 @@ async function initTinyMCE(draft) {
             });
 
             editor.on('init', () => {
+                rebindHelpShortcut(editor);
                 editor.setContent(draft.html || '');
             });
 

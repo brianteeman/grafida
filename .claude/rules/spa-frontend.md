@@ -173,10 +173,10 @@ ship inside the app.
   (which is what refuses a second separator).
   **The Help dialog is the only in-app editor documentation**, so `menu.tools.items` keeps the
   stock `help` item (the overridden Tools menu would otherwise drop it, leaving the dialog
-  reachable by Alt+0 alone), and `help_tabs` (`editorHelpTabs()` in `app.js`) adds a **Grafida**
-  tab listing the app's own shortcuts plus, when an AI service is configured, an **AI assistant**
-  tab (gh-13). Two traps: `help_tabs` **replaces** the default tab list rather than extending it,
-  so the built-in names (`shortcuts`, `keyboardnav`, `versions`) must be repeated to
+  reachable by its keyboard chord alone), and `help_tabs` (`editorHelpTabs()` in `app.js`) adds a
+  **Grafida** tab listing the app's own shortcuts plus, when an AI service is configured, an **AI
+  assistant** tab (gh-13). Two traps: `help_tabs` **replaces** the default tab list rather than
+  extending it, so the built-in names (`shortcuts`, `keyboardnav`, `versions`) must be repeated to
   keep them; and the built-in "Handy Shortcuts" tab is a **hard-coded table** — it does not read
   the editor's shortcut registry, which is why an `addShortcut()` never appears there and Grafida
   needs a tab of its own. A dialog `table` cell and an `htmlpanel` are both set via **innerHTML**,
@@ -184,6 +184,25 @@ ship inside the app.
   `helpShortcutText()` mirrors the help plugin's own `convertText()` so our rows render as
   ⌘/⌃/⇧ glyphs on macOS and `Ctrl + …` elsewhere, and its output is therefore HTML (escape a
   sentence *before* interpolating a shortcut into its `%s`).
+  ⚠️ **The dialog's own chord is rebound off Alt+0** (`rebindHelpShortcut()`) to **Access + 0** —
+  TinyMCE's portable modifier, `Ctrl+Alt` on macOS and `Shift+Alt` elsewhere, the one it already
+  reserves for `Access + 1…9`. Alt is a *character* modifier on layouts such as French AZERTY,
+  where "@" is `AltGr + 0` (`⌥ + 0` on a Mac), so the stock binding swallowed an ordinary
+  keystroke. Three things had to move together, and missing any one of them leaves the app
+  advertising a chord that does nothing:
+  - the binding itself — `shortcuts.remove('alt+0')` then `shortcuts.add('access+0', …)`, which
+    **must run on the editor's `init` event, not in `setup`**: plugins are initialised between the
+    two, so an earlier `remove()` removes nothing;
+  - the **`help` menu item**, re-registered in the same place because the plugin's version (which
+    prints "Alt+0" under Tools ▸ Help) would otherwise win. Its `shortcut` spec has **no spaces**
+    around the `+` (the theme joins the segments verbatim), unlike the dialog table's;
+  - the **"Handy Shortcuts" tab**, replaced by `shortcutsHelpTab()` — a tab *object* named
+    `shortcuts` displaces the built-in of that name, the same trick `versionHelpTab()` uses. It is a
+    **verbatim mirror** of the help plugin's hard-coded list with the one row changed, so
+    ⚠️ re-check it against `js/tinymce/plugins/help/plugin.js` after a TinyMCE upgrade — nothing
+    warns us when upstream adds a shortcut. Its action labels stay in TinyMCE's English on purpose:
+    a dialog table cell is run through TinyMCE's `translate()`, so the upstream literal is what its
+    language packs already carry.
   ⚠️ **No link in that dialog can be opened, so neither built-in tab made of links is shipped as it
   comes** (gh-21). A TinyMCE dialog renders a link as a `target="_blank"` anchor and nothing in this
   app answers that: Boson's webview opens no new window, and the SPA routes every external URL

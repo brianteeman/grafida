@@ -170,6 +170,13 @@ that is all you get. There is no mode to switch on first and no second <kbd>Ctrl
 > in applications that have an Edit menu. Grafida has no menu bar, so before this shortcut existed
 > the key combination did nothing but beep.
 
+The editor's own shortcuts are listed in the same **Help** dialog, on its **Handy Shortcuts** tab.
+One of them has been changed: the dialog itself opens with <kbd>Shift</kbd> + <kbd>Alt</kbd> +
+<kbd>0</kbd> on Windows and Linux, and <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>0</kbd> on macOS,
+instead of TinyMCE's stock <kbd>Alt</kbd> + <kbd>0</kbd>. On a French AZERTY keyboard the “@” sign
+is typed with <kbd>AltGr</kbd> + <kbd>0</kbd> — or <kbd>⌥</kbd> + <kbd>0</kbd> on a Mac — so the
+stock chord fought with an ordinary character.
+
 ## Images in the article body
 
 There are four ways to get a picture into the article body.
