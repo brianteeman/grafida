@@ -28,6 +28,7 @@ Grafida 0.3
 + MiniMax is now a built-in AI service provider
 + Documentation: Secrets security — how API tokens and AI keys are kept in the OS secret store, and what that protects against (gh-55)
 + Documentation: Translation — the INI format, the glossaries, and how to add or test a language (gh-55)
+~ The image URL field now shows where a picture picked from your computer will be published, instead of staying empty until it is (gh-72)
 ~ Article HTML is parsed and written with a standards-compliant HTML5 parser, so an article is published in the shape a browser shows it
 ~ New conformance test corpus pinning how arbitrary article HTML is split into introtext/fulltext and published
 ~ Documentation: Connection Troubleshooting now explains what "no working API endpoint" actually means — broken third-party plugins, WAFs and rate limiters, and how to read the Diagnose Connection output (gh-46, gh-55)
@@ -53,6 +54,7 @@ Grafida 0.3
 # [HIGH] A list, radio or checkboxes custom field could not be rendered at all, because Joomla does not store its options as a list
 # [HIGH] An article containing a stray closing tag was truncated at that tag when saved or published
 # [MEDIUM] Published images were uploaded to the site's files folder instead of its images folder (gh-57)
+# [MEDIUM] Picking an intro or full article image from the media browser's Local media tab published a broken image
 # [MEDIUM] An untouched article asked to be saved on the way out, when the site's custom fields arrived after it opened
 # [MEDIUM] Offline, the whole Articles screen was replaced by an error — even the Local articles tab, which needs no network (gh-29)
 # [MEDIUM] The webview could cache Grafida's own API responses, showing stale data even after a restart (gh-35)

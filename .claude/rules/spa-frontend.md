@@ -398,8 +398,9 @@ ship inside the app.
   the collected object is JSON-compared against `State.editorBaseline`, so a control that
   re-serialised its keys in a different order would read as an edit nobody made. The control itself
   is deliberately `buildImageBlock()` minus the parts `accessiblemedia` has no room for (no caption,
-  no CSS class — those are `#__content.images` subfields) and with **one** Browse button rather than
-  two, since `openMediaBrowser(siteId, {allowUpload: true})`'s own footer already covers picking a
+  no CSS class — those are `#__content.images` subfields), with its path box built by the shared
+  `buildImagePathGroup()` (read-only + "expected path" for an offline blob, gh-72 — see
+  `.claude/rules/media-and-publish.md`), and with **one** Browse button rather than two, since `openMediaBrowser(siteId, {allowUpload: true})`'s own footer already covers picking a
   file off this machine. A local pick is held as the shared `grafida-media://N` sentinel and its
   local URL cached in `State.mediaPreviews`, exactly as the intro/full-text picker does.
   ⚠️ **`collectDraftFormData()` therefore cannot build `fields` from the rendered inputs alone.**

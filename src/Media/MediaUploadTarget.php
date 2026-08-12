@@ -73,6 +73,74 @@ final class MediaUploadTarget
     }
 
     /**
+     * The site-root-relative public path an offline blob is *expected* to end up
+     * at, e.g. `images/grafida/12-photo.png` — what the editor shows in the image
+     * URL field before the blob has ever been uploaded (gh-72).
+     *
+     * ⚠️ **This is a prediction and the UI must say so.** Two of its three parts
+     * are only settled at publish time: an adapter left to automatic resolution is
+     * whatever the *site* reports (this method never asks — it must answer offline,
+     * per keystroke), and the file name is whatever com_media decides to store the
+     * upload under. Only `pathFor()` + the upload response give the real answer,
+     * which is why a blob that has already been uploaded is answered from its
+     * recorded `remote_url` instead of from here.
+     */
+    public function predictedPublicPath(Site $site, string $filename, int $mediaId): string
+    {
+        $adapter = self::normaliseAdapter($site->mediaAdapter);
+
+        if ($adapter === '') {
+            // A previously discovered adapter is a better guess than the preferred
+            // one; discovery having failed (the empty string) is not, since that
+            // means "let Joomla pick" and we cannot say what it would pick.
+            $discovered = $this->resolved[$site->id ?? 0] ?? '';
+            $adapter    = $discovered !== '' ? $discovered : self::normaliseAdapter(self::PREFERRED_ADAPTER);
+        }
+
+        return self::publicPath($adapter . $this->relativePathFor($site, self::safeName($filename, $mediaId)));
+    }
+
+    /**
+     * Turns a Media Manager path into a site-root-relative public one:
+     * "local-images:/grafida/x.jpg" → "images/grafida/x.jpg", the adapter name
+     * minus its "local-" prefix being the public sub-path. A path with no
+     * adapter is already relative to whatever root Joomla chose, so it is
+     * returned as-is — the best we can say about it.
+     */
+    public static function publicPath(string $path): string
+    {
+        if (!str_contains($path, ':')) {
+            return ltrim($path, '/');
+        }
+
+        [$adapter, $rel] = explode(':', $path, 2);
+        $filePath        = preg_replace('#^local-#', '', $adapter) ?? $adapter;
+
+        return trim($filePath, '/') . '/' . ltrim($rel, '/');
+    }
+
+    /**
+     * A file name safe to upload, derived from the one the blob was stored under.
+     *
+     * The blob id is prefixed deliberately: two articles built from two different
+     * screenshots both called `Screenshot.png` must not collide in the target
+     * folder, and Joomla would answer the second upload by overwriting the first.
+     */
+    public static function safeName(string $filename, int $mediaId): string
+    {
+        $name = preg_replace('/[^A-Za-z0-9._-]+/', '-', $filename) ?? 'image';
+        $name = trim($name, '-');
+
+        if ($name === '' || !str_contains($name, '.')) {
+            $name = $mediaId . '-' . ($name === '' ? 'image.png' : $name . '.png');
+        } else {
+            $name = $mediaId . '-' . $name;
+        }
+
+        return $name;
+    }
+
+    /**
      * The upload path **without** the adapter, e.g. `grafida/photo.png` — what a
      * caller needs when it has to guess a public URL from the path it sent.
      */

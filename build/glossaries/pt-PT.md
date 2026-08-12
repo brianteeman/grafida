@@ -52,6 +52,7 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | CSS class | Classe CSS | Free-text CSS class(es) for an inline body image (image context-toolbar action). |
 | media library | Multimédia | The site's Media Manager, browsed when picking an image. |
 | decorative image | imagem decorativa | image_*_alt_empty: alt text intentionally empty. |
+| image path (predicted) | caminho da imagem | O caminho onde uma imagem local será publicada; «previsão», não um valor definitivo (gh-72). |
 | display mode | modo de apresentação | Light/dark theme preference setting. |
 | follow system | seguir o sistema | Display mode that follows the OS light/dark setting. |
 | light (theme) | claro | Light display theme. |

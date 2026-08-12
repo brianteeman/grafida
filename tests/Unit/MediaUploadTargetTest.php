@@ -183,4 +183,39 @@ final class MediaUploadTargetTest extends TestCase
     {
         self::assertSame($expected, MediaUploadTarget::normaliseFolder($stored));
     }
+    /**
+     * gh-72: the editor shows this path in the image URL field before the blob
+     * has ever left the machine, so it must be answerable with the site
+     * unreachable — hence a `FakeTransport` that answers nothing at all.
+     */
+    public function testPredictedPublicPathAssumesTheImagesAdapterWhenTheSiteNamesNone(): void
+    {
+        $target = new MediaUploadTarget(new ApiClient(new FakeTransport()));
+
+        self::assertSame(
+            'images/grafida/12-photo.png',
+            $target->predictedPublicPath($this->site(), 'photo.png', 12),
+        );
+    }
+
+    public function testPredictedPublicPathFollowsThePerSiteAdapterAndFolder(): void
+    {
+        $target = new MediaUploadTarget(new ApiClient(new FakeTransport()));
+
+        self::assertSame(
+            'cdn/blog/7-my-photo.jpg',
+            $target->predictedPublicPath($this->site('local-cdn', 'blog'), 'my photo.jpg', 7),
+        );
+    }
+
+    /** The prediction sanitises the name exactly as the upload will. */
+    public function testPredictedPublicPathSanitisesTheFileName(): void
+    {
+        $target = new MediaUploadTarget(new ApiClient(new FakeTransport()));
+
+        self::assertSame(
+            'images/grafida/3-a-b.png',
+            $target->predictedPublicPath($this->site(), 'a b.png', 3),
+        );
+    }
 }

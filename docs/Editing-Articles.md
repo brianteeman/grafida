@@ -249,6 +249,17 @@ can pick a file from your computer, browse your site's Media Manager, or paste a
 alt text, caption and CSS class. The *Image is decorative* checkbox empties the alt text and marks
 the picture so a screen reader skips it.
 
+The **Image URL** box shows where the picture lives on your site. Pick one from your site's Media
+Manager and it shows that picture's path; leave the picture empty and you can type or paste an
+address of your own, which is what to do when your images are served from somewhere other than the
+Media Manager, a CDN for instance.
+
+A picture chosen from your own computer has not been uploaded yet, so it has no address. Grafida
+shows where it is *expected* to go — normally `images/grafida/`, or wherever the site's **Upload
+images to** settings point — and the box is read-only, since the real address is only settled when
+you publish and your site may choose a different one. The ⓘ button beside the label says so too.
+Clear the picture if you would rather type an address by hand.
+
 ![The Intro image block in the properties sidebar](images/editor-properties-images.png)
 
 The *Full article image* block below it is identical.

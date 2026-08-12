@@ -100,6 +100,46 @@ final class LocalMediaTest extends TestCase
         self::assertStringContainsString('no-store', (string) $this->header($response, 'Cache-Control'));
     }
 
+    /**
+     * gh-72: the image URL field is filled from this before the picture has ever
+     * been uploaded, so the answer is a prediction and says so.
+     */
+    public function testTargetEndpointPredictsThePublishPathOfAnUnpublishedBlob(): void
+    {
+        $siteId = $this->seedSite();
+        $media  = $this->container->get(MediaRepository::class);
+        $id     = $media->store($siteId, null, 'my photo.png', 'image/png', 'bytes');
+
+        [$status, $json] = $this->call('GET', '/api/media/' . $id . '/target');
+
+        self::assertSame(200, $status);
+        self::assertTrue($json['data']['predicted']);
+        self::assertSame('images/grafida/' . $id . '-my-photo.png', $json['data']['path']);
+    }
+
+    /** An already-uploaded blob has a real path, and must not be reported as a guess. */
+    public function testTargetEndpointReportsTheRecordedPathOfAPublishedBlob(): void
+    {
+        $siteId = $this->seedSite();
+        $media  = $this->container->get(MediaRepository::class);
+        $id     = $media->store($siteId, null, 'photo.png', 'image/png', 'bytes');
+        $media->markUploaded($id, 'local-images:/grafida/photo.png', 'images/grafida/photo.png');
+
+        [$status, $json] = $this->call('GET', '/api/media/' . $id . '/target');
+
+        self::assertSame(200, $status);
+        self::assertFalse($json['data']['predicted']);
+        self::assertSame('images/grafida/photo.png', $json['data']['path']);
+    }
+
+    public function testTargetEndpointForMissingIdIs404(): void
+    {
+        [$status, $json] = $this->call('GET', '/api/media/999999/target');
+
+        self::assertSame(404, $status);
+        self::assertFalse($json['ok']);
+    }
+
     public function testRawEndpointForMissingIdIs404WithJsonBody(): void
     {
         [$status, $json] = $this->call('GET', '/api/media/999999/raw');

@@ -397,7 +397,7 @@ final class PublishService
             ];
         }
 
-        $name     = $this->safeName($blob['filename'], $mediaId);
+        $name     = MediaUploadTarget::safeName($blob['filename'], $mediaId);
         $path     = $this->mediaTarget->pathFor($site, $base, $token, $name);
         $resource = $this->api->uploadMedia($base, $token, $path, $blob['data']);
         $info     = $this->mediaInfo($resource, $site, $path, $width, $height);
@@ -432,7 +432,7 @@ final class PublishService
         // the path — the one the response reports, or the one we sent.
         $src = $rawUrl !== ''
             ? $this->relativeToSite($rawUrl, $site)
-            : $this->publicPath($adapterPath !== '' ? $adapterPath : $sentPath);
+            : MediaUploadTarget::publicPath($adapterPath !== '' ? $adapterPath : $sentPath);
 
         return [
             'src'      => $src,
@@ -440,25 +440,6 @@ final class PublishService
             'width'    => $width,
             'height'   => $height,
         ];
-    }
-
-    /**
-     * Turns a Media Manager path into a site-root-relative public one:
-     * "local-images:/grafida/x.jpg" → "images/grafida/x.jpg", the adapter name
-     * minus its "local-" prefix being the public sub-path. A path with no
-     * adapter is already relative to whatever root Joomla chose, so it is
-     * returned as-is — the best we can say about it.
-     */
-    private function publicPath(string $path): string
-    {
-        if (!str_contains($path, ':')) {
-            return ltrim($path, '/');
-        }
-
-        [$adapter, $rel] = explode(':', $path, 2);
-        $filePath        = preg_replace('#^local-#', '', $adapter) ?? $adapter;
-
-        return trim($filePath, '/') . '/' . ltrim($rel, '/');
     }
 
     /** Strips the site root (or scheme+host) from an absolute media URL. */
@@ -704,17 +685,4 @@ final class PublishService
         );
     }
 
-    private function safeName(string $filename, int $mediaId): string
-    {
-        $name = preg_replace('/[^A-Za-z0-9._-]+/', '-', $filename) ?? 'image';
-        $name = trim($name, '-');
-
-        if ($name === '' || !str_contains($name, '.')) {
-            $name = $mediaId . '-' . ($name === '' ? 'image.png' : $name . '.png');
-        } else {
-            $name = $mediaId . '-' . $name;
-        }
-
-        return $name;
-    }
 }

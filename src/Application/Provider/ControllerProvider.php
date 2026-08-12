@@ -48,6 +48,7 @@ use Grafida\Markdown\MarkdownService;
 use Grafida\Media\InlineImageExtractor;
 use Grafida\Media\LocalMediaSync;
 use Grafida\Media\MediaRepository;
+use Grafida\Media\MediaUploadTarget;
 use Grafida\Media\SiteImageFetcher;
 use Grafida\Publish\PublishService;
 use Grafida\Reference\EditorCssService;
@@ -131,6 +132,7 @@ final class ControllerProvider implements ServiceProviderInterface
                 media: $c->get(MediaRepository::class),
                 siteImages: $c->get(SiteImageFetcher::class),
                 localMediaSync: $c->get(LocalMediaSync::class),
+                mediaTarget: $c->get(MediaUploadTarget::class),
             );
         });
 

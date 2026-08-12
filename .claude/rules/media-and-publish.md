@@ -18,7 +18,9 @@ two-space continuation indent are the original bullet formatting.
   article image for a multimodal AI request — see the AI facts). `ApiClient::listMedia()` browses the
   site's Media Manager (`GET /v1/media/files`); `ApiController` exposes it as
   `GET /api/sites/{id}/media?path=…` and serves an offline blob's data: URI back to the SPA
-  via `GET /api/media/{id}` (to preview a not-yet-published intro/full-text image).
+  via `GET /api/media/{id}` (to preview a not-yet-published intro/full-text image);
+  `GET /api/media/{id}/target` answers where that blob will be published (gh-72, see the
+  "Image URL" note under `src/Publish/` below).
   ⚠️ **A pasted/dropped/picked image is no longer inlined as a `data:` URI in the article body**
   (gh-36): `MediaRepository` still stores the bytes in `media_blobs` (now also carrying
   `updated_at`/`width`/`height`/`size`, added by `storage/migrations/07_media_blobs_local.sql` —
@@ -187,7 +189,29 @@ two-space continuation indent are the original bullet formatting.
   intro/full-text image picked from a local file is stored as a `grafida-media://N` sentinel that
   `resolveImages()` uploads (via the shared offline-blob upload) and swaps for a public URL on publish.
   The SPA's editor "Images" section lets you pick a local file, browse the site's media, or paste a URL,
-  and includes Joomla's `image_*_alt_empty` "decorative image" toggle. The same picker backs TinyMCE's
+  and includes Joomla's `image_*_alt_empty` "decorative image" toggle.
+  ⚠️ **The "Image URL" box is one control with two modes, and `buildImagePathGroup()` is the single
+  implementation of both** — the Images section and the `media` custom field share it (gh-72). With a
+  hand-typed or site-media value it is an ordinary editable input, which is the only way to reference a
+  picture served from outside the Media Manager (a CDN, which is why the field is editable at all).
+  With a `grafida-media://N` sentinel it is **read-only**, filled from `GET /api/media/{id}/target`
+  (cached in `State.mediaTargets`) with the path the blob is *expected* to be published under, and
+  carries an ⓘ button explaining that. Three things about it:
+  - **Read-only is not a nicety.** What the box shows is not the stored value — the sentinel is — so an
+    edit would swap a picture that exists for a path that does not. Clearing the picture is how the
+    field becomes typeable again.
+  - **It fixes a usability bug, not a missing feature** (Brian Teeman's report): the box used to render
+    *blank* for a local pick, making it the first thing on the panel you could type into after
+    choosing a picture — so alt text kept landing in it.
+  - **The cache must be dropped wherever the answer can change**: a Local Media rename (the file name
+    is part of the path) and a successful publish (every prediction has just become a real path).
+    A crop/resize does not change it.
+  ⚠️ **`browseImageMedia()` must honour `picked.mediaId`.** The media browser's Local Media tab resolves
+  with an offline blob, whose `url` is the local `boson://…/media/{id}/raw` one; adopting that as the
+  image value publishes it verbatim and the picture is broken on the site. It has to become the same
+  `grafida-media://N` sentinel the "Choose file…" button produces — which the `media` custom field's own
+  browse button always did and this one did not.
+  The same picker backs TinyMCE's
   Insert/Edit Image dialog: its Source-field browse button (`file_picker_callback`, gated by
   `file_picker_types: 'image'`) opens the media browser, with a "Choose file…" button for a local file.
   To **edit an already-inserted image** (dimensions, description, alignment, CSS), selecting it shows a

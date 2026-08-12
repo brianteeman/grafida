@@ -126,6 +126,12 @@ const State = {
     // localMediaUrl(), gh-36) for offline image blobs, keyed by their
     // `grafida-media://N` reference, so a re-render doesn't re-derive them.
     mediaPreviews: {},
+    // Cache of `{path, predicted}` answers from GET /api/media/{id}/target — the
+    // site path an offline blob will be published under — keyed by the same
+    // `grafida-media://N` reference (gh-72). Cleared wherever the answer can
+    // change: a rename (the file name is part of the path) and a publish (which
+    // turns the prediction into the real thing).
+    mediaTargets: {},
     // Maps a data: URI inserted into TinyMCE this session to the offline blob id
     // it came from, so inline images get tagged with data-grafida-media-id and
     // are uploaded to the site on publish (see the editor's tagging handler).
@@ -737,6 +743,7 @@ const api = {
     openFile: (filter) => apiFetch('POST', '/api/dialog/open-file', { filter }),
     browseMedia: (siteId, path = '') => apiFetch('GET', `/api/sites/${siteId}/media?path=${encodeURIComponent(path)}`),
     getMediaBlob: (id) => apiFetch('GET', `/api/media/${id}`),
+    getMediaTarget: (id) => apiFetch('GET', `/api/media/${id}/target`),
     getMediaAdapters: (siteId) => apiFetch('GET', `/api/sites/${siteId}/media/adapters`),
     getMediaFile: (siteId, path) => apiFetch('GET', `/api/sites/${siteId}/media/file?path=${encodeURIComponent(path)}`),
     getSiteImage: (siteId, url) => apiFetch('GET', `/api/sites/${siteId}/image?url=${encodeURIComponent(url)}`),
@@ -4934,18 +4941,10 @@ function buildImageBlock(kind, siteId) {
     }
     block.appendChild(actions);
 
-    // Editable URL / path (a pasted image address, or a browsed media path). An
-    // offline blob shows blank here; typing replaces it with the typed address.
-    const urlInput = document.createElement('input');
-    urlInput.type = 'text';
-    urlInput.className = 'form-control';
-    urlInput.value = value.startsWith(MEDIA_REF_PREFIX) ? '' : value;
-    urlInput.addEventListener('input', () => {
-        const v = urlInput.value.trim();
+    block.appendChild(buildImagePathGroup(value, (v) => {
         State.editorImages[imgKey] = v;
         showPreview(imagePreviewUrl(v, siteId));
-    });
-    block.appendChild(formGroup(t('GRAFIDA_LBL_IMAGE_URL'), urlInput));
+    }));
 
     // Alt text, the "decorative" toggle (Joomla's image_*_alt_empty), caption and
     // image CSS class — all write straight back to the working copy. (Joomla's
@@ -4977,6 +4976,110 @@ function buildDecorativeToggle(key, altInput) {
     wrap.appendChild(cb);
     wrap.appendChild(el('span', null, t('GRAFIDA_LBL_IMAGE_DECORATIVE')));
     return wrap;
+}
+
+/**
+ * The "Image URL" form group, shared by the Images section and the `media`
+ * custom field: the site path the picture is published under.
+ *
+ * It is editable while the value is a hand-typed address or a path browsed out
+ * of the site's Media Manager — the field exists for the sites that reference an
+ * image by a CDN URL rather than through the Media Manager, and that is the only
+ * way to give it one.
+ *
+ * ⚠️ **An offline blob is shown its *expected* path, read-only** (gh-72). Such a
+ * picture has no URL yet — it is uploaded when the article is published — and the
+ * field used to be left blank, which made it the first thing on the panel you
+ * could type into after choosing a picture, so alt text landed in it. Two rules
+ * follow from the value being a prediction:
+ * - **The input must stay read-only.** What it shows is not the stored value (the
+ *   `grafida-media://N` sentinel is), so an edit here would replace the sentinel
+ *   with a path pointing at a file nobody has uploaded. Clearing the picture is
+ *   how you get the field back.
+ * - **The prediction must say it is one**, hence the info button — `MediaUploadTarget`
+ *   guesses the adapter when the site names none, and the site has the last word on
+ *   the file name. A blob that *has* been uploaded reports its real path instead, and
+ *   `mediaBlobTarget()`'s `predicted` flag is what tells the two apart.
+ */
+function buildImagePathGroup(value, onChange) {
+    const current = value || '';
+    const isRef = current.startsWith(MEDIA_REF_PREFIX);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'form-control';
+    input.value = isRef ? '' : current;
+
+    const group = formGroup(t('GRAFIDA_LBL_IMAGE_URL'), input);
+
+    if (!isRef) {
+        input.addEventListener('input', () => onChange(input.value.trim()));
+
+        return group;
+    }
+
+    input.readOnly = true;
+    input.classList.add('form-control-readonly');
+
+    const info = el('button', 'field-info', icon('circle-info'));
+    info.type = 'button';
+    info.title = t('GRAFIDA_BTN_IMAGE_URL_INFO');
+    info.setAttribute('aria-label', t('GRAFIDA_BTN_IMAGE_URL_INFO'));
+    info.addEventListener('click', () => showImagePathInfo(current));
+
+    const label = group.querySelector('label');
+    label.classList.add('form-label-row');
+    label.appendChild(info);
+
+    fillImagePath(current, input);
+
+    return group;
+}
+
+/**
+ * Fill a read-only image path field from `GET /api/media/{id}/target`, caching
+ * the answer per blob reference.
+ *
+ * Silent on failure: this is a decoration on a picture that is already picked
+ * and previewed, so a blank field is a far better outcome than a toast blaming
+ * the user for something they did not do. The input may well have been detached
+ * by a re-render before the answer arrives — writing to a detached node is
+ * harmless, and the cache means the re-render's own call is free.
+ */
+async function fillImagePath(ref, input) {
+    const cached = State.mediaTargets[ref];
+
+    if (cached) {
+        input.value = cached.path;
+
+        return;
+    }
+
+    const id = parseInt(ref.slice(MEDIA_REF_PREFIX.length), 10);
+
+    if (!id) return;
+
+    try {
+        const res = await api.getMediaTarget(id);
+        State.mediaTargets[ref] = {
+            path: typeof res.path === 'string' ? res.path : '',
+            predicted: res.predicted !== false,
+        };
+        input.value = State.mediaTargets[ref].path;
+    } catch (err) {
+        // Nothing to say and nothing the user can do about it.
+    }
+}
+
+/** Explain where a not-yet-published picture will end up, and how firm that is. */
+function showImagePathInfo(ref) {
+    const target = State.mediaTargets[ref];
+    const predicted = !target || target.predicted;
+    const msg = el('p', null, t(predicted ? 'GRAFIDA_MSG_IMAGE_URL_PREDICTED' : 'GRAFIDA_MSG_IMAGE_URL_PUBLISHED'));
+    const closeBtn = iconBtn('xmark', t('GRAFIDA_BTN_CLOSE'), 'btn', 'btn-secondary');
+    closeBtn.addEventListener('click', closeModal);
+
+    showModal(t('GRAFIDA_MSG_IMAGE_URL_PREDICTED_TITLE'), [msg], [closeBtn]);
 }
 
 /** A text input bound to one image subfield in the working copy. */
@@ -5148,18 +5251,10 @@ function buildMediaFieldBody(record, siteId, rerender) {
     }
     frag.appendChild(actions);
 
-    // The path, editable — a media path typed or pasted by hand is as valid as
-    // a browsed one. An offline blob shows blank, as in the Images section:
-    // `grafida-media://7` is our own bookkeeping, not something to hand-edit.
-    const pathInput = document.createElement('input');
-    pathInput.type = 'text';
-    pathInput.className = 'form-control';
-    pathInput.value = record.imagefile.startsWith(MEDIA_REF_PREFIX) ? '' : record.imagefile;
-    pathInput.addEventListener('input', () => {
-        record.imagefile = pathInput.value.trim();
+    frag.appendChild(buildImagePathGroup(record.imagefile, (v) => {
+        record.imagefile = v;
         showPreview(mediaFieldPreviewUrl(record.imagefile, siteId));
-    });
-    frag.appendChild(formGroup(t('GRAFIDA_LBL_IMAGE_URL'), pathInput));
+    }));
 
     const altInput = document.createElement('input');
     altInput.type = 'text';
@@ -5243,9 +5338,25 @@ function chooseImageFile(kind, siteId) {
 
 /** Browse the site's Media Manager and adopt the chosen file as the image. */
 async function browseImageMedia(kind, siteId) {
-    const file = await openMediaBrowser(siteId);
-    const url = file && typeof file.url === 'string' ? file.url : '';
-    if (url) setImageValue(kind, relativeImagePath(url, siteId), siteId);
+    const picked = await openMediaBrowser(siteId);
+    const url = picked && typeof picked.url === 'string' ? picked.url : '';
+
+    if (!url) return;
+
+    // A Local Media pick is an offline blob, so it must be held as the same
+    // `grafida-media://N` sentinel the "Choose file…" button produces — its
+    // `url` is the local boson:// one, which is meaningless on the site and
+    // would be published verbatim. The `media` custom field's own browse
+    // button has always done this; this one used to miss it.
+    if (picked.mediaId) {
+        const ref = MEDIA_REF_PREFIX + picked.mediaId;
+        State.mediaPreviews[ref] = url;
+        setImageValue(kind, ref, siteId);
+
+        return;
+    }
+
+    setImageValue(kind, relativeImagePath(url, siteId), siteId);
 }
 
 /**
@@ -6153,6 +6264,8 @@ async function localMediaRename(entry) {
     if (!name || name === entry.filename) return;
     try {
         await api.renameLocalMedia(entry.id, name);
+        // The file name is part of the path the blob will be published under.
+        delete State.mediaTargets[MEDIA_REF_PREFIX + entry.id];
         showToast(t('GRAFIDA_MSG_MEDIA_RENAMED'), 'success');
         await loadLocalMediaTab();
     } catch (err) {
@@ -7081,6 +7194,10 @@ async function publishDraft(force = false) {
         if (result && result.remoteId && State.currentDraft) {
             State.currentDraft.remoteId = result.remoteId;
         }
+        // Every image this article carried has just been uploaded, so each
+        // cached *prediction* has become a real path (gh-72). Drop the lot
+        // rather than guessing which blobs took part.
+        State.mediaTargets = {};
         showToast(t('GRAFIDA_MSG_PUBLISH_OK'), 'success');
         showPostPublishDialog();
     } catch (err) {

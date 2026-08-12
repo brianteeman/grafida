@@ -52,6 +52,7 @@ I nomi propri non si traducono: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | CSS class | Classe CSS | Free-text CSS class(es) for an inline body image (image context-toolbar action). |
 | media library | Media | The site's Media Manager, browsed when picking an image. |
 | decorative image | immagine decorativa | image_*_alt_empty: alt text intentionally empty. |
+| image path (predicted) | percorso dell’immagine | Il percorso in cui un’immagine locale verrà pubblicata; «previsione», non un valore definitivo (gh-72). |
 | display mode | modalità di visualizzazione | Light/dark theme preference setting. |
 | follow system | segui il sistema | Display mode that follows the OS light/dark setting. |
 | light (theme) | chiaro | Light display theme. |

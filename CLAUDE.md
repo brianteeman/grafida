@@ -220,7 +220,14 @@ window-free in tests (a null dialog makes the endpoint return 503).
   screen (Site + Local tabs), the in-app crop/resize/rotate/flip image editor, and
   `MediaUploadTarget` — **where a publish uploads to** (gh-57), i.e. the per-site
   `media_adapter`/`media_folder` settings (`storage/migrations/09_sites_media_target.sql`, Sites
-  form) and the automatic resolution behind them.
+  form) and the automatic resolution behind them. It also owns the two statics `PublishService`
+  used to keep privately — `safeName()` (the blob-id-prefixed upload name) and `publicPath()`
+  (adapter path → site-relative URL) — because `predictedPublicPath()`, which answers
+  `GET /api/media/{id}/target` for the editor's image URL field (gh-72), has to produce the *same*
+  path the upload will, offline and without a request. ⚠️ **That answer is a prediction and the
+  endpoint's `predicted` flag is load-bearing**: an unset adapter is only resolved by asking the
+  site, and the file name is ultimately com_media's to choose. An already-uploaded blob answers
+  from its recorded `remote_url` with `predicted: false` instead.
 - `src/Publish/PublishService.php` — the publish pipeline (media upload, tags, fields, split, POST/PATCH).
   ⚠️ **Both are detailed in `.claude/rules/media-and-publish.md`**, which loads when you touch
   `src/Media/`, `src/Publish/` or `src/Html/`. They are one pipeline and are documented together.

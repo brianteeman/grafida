@@ -627,6 +627,40 @@ nav#main-nav a .nav-icon {
     letter-spacing: 0.5px;
 }
 
+/* A label that carries a control of its own — the image path field's "About this
+   path" button (gh-72). The button is pushed to the far end so the label text
+   still reads as a label. */
+.form-group label.form-label-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.field-info {
+    background: none;
+    border: 0;
+    padding: 0;
+    cursor: pointer;
+    color: var(--color-text-muted);
+    font-size: 13px;
+    line-height: 1;
+    transition: color var(--transition);
+}
+
+.field-info:hover {
+    color: var(--color-accent);
+}
+
+/* A value we are showing rather than asking for: the path an image that is still
+   only on this computer is expected to be published under. It must not read as an
+   ordinary editable field — what is in it is not what is stored (gh-72). */
+.form-control-readonly {
+    background: var(--color-surface-2);
+    color: var(--color-text-muted);
+    cursor: default;
+}
+
 /* Explanatory line under a form field, for a setting whose label cannot carry
    the whole story (e.g. the AI Services multimodal toggle). */
 .form-hint {

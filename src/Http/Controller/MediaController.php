@@ -22,6 +22,7 @@ use Grafida\Media\ImageInfo;
 use Grafida\Media\LocalMediaSync;
 use Grafida\Media\LocalMediaUrl;
 use Grafida\Media\MediaRepository;
+use Grafida\Media\MediaUploadTarget;
 use Grafida\Media\SiteImageException;
 use Grafida\Media\SiteImageFetcher;
 
@@ -57,6 +58,7 @@ final class MediaController extends Controller
         private readonly MediaRepository $media,
         private readonly SiteImageFetcher $siteImages,
         private readonly LocalMediaSync $localMediaSync,
+        private readonly MediaUploadTarget $mediaTarget,
     ) {}
 
     public function registerRoutes(Router $router): void
@@ -76,6 +78,7 @@ final class MediaController extends Controller
         // `/api/media/{id}/raw` is a distinct pattern from `/api/media/{id}` above and
         // cannot be swallowed by it — the router tries every registered pattern in turn.
         $router->add('GET', '/api/media/{id}/raw', fn (RouteContext $ctx): ResponseInterface => $this->mediaBlobRaw($ctx->int('id')));
+        $router->add('GET', '/api/media/{id}/target', fn (RouteContext $ctx): ResponseInterface => $this->mediaBlobTarget($ctx->int('id')));
         $router->add('DELETE', '/api/media/{id}', fn (RouteContext $ctx): ResponseInterface => $this->deleteLocalMedia($ctx->int('id')));
         $router->add('POST', '/api/media/{id}/rename', fn (RouteContext $ctx): ResponseInterface => $this->renameLocalMedia($ctx->int('id'), $ctx->body()));
         $router->add('POST', '/api/media/{id}/content', fn (RouteContext $ctx): ResponseInterface => $this->updateLocalMediaContent($ctx->int('id'), $ctx->body()));
@@ -291,6 +294,45 @@ final class MediaController extends Controller
         $this->apiClient->deleteMedia($base, $token, $path);
 
         return Json::ok();
+    }
+
+    /**
+     * The site-root-relative path an offline blob will be published under —
+     * what the editor's image URL field shows for a picture that has been
+     * picked but not yet published (gh-72).
+     *
+     * ⚠️ **`predicted` is the load-bearing half of this answer, not a detail.**
+     * A blob that has already been uploaded (a re-publish, or an image shared
+     * with a published article) has a *real* path, recorded as its
+     * `remote_url`; anything else is `MediaUploadTarget`'s best guess, which
+     * the adapter the site actually reports and the name com_media actually
+     * stores the file under can both contradict. The SPA renders the two the
+     * same way but only offers the "this may change" explanation for a
+     * prediction, so a caller must not collapse the flag.
+     */
+    public function mediaBlobTarget(int $id): ResponseInterface
+    {
+        $meta = $this->media->findMeta($id);
+
+        if ($meta === null) {
+            return Json::error('Media not found', 404);
+        }
+
+        $remote = (string) ($meta['remote_url'] ?? '');
+
+        if ($remote !== '') {
+            return Json::ok(['id' => $id, 'path' => $remote, 'predicted' => false]);
+        }
+
+        // Deliberately no network: this is answered while the editor renders, and
+        // the site may well be unreachable — a guess is the whole point here.
+        $site = $this->siteContext->requireSite($meta['site_id']);
+
+        return Json::ok([
+            'id'        => $id,
+            'path'      => $this->mediaTarget->predictedPublicPath($site, $meta['filename'], $id),
+            'predicted' => true,
+        ]);
     }
 
     /**
