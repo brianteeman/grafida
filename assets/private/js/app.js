@@ -4139,6 +4139,16 @@ async function initTinyMCE(draft) {
         resize: false,
         promotion: false,
         branding: false,
+        // Hide the "Press ⌥0 for help" status-bar hint. The Silver theme adds
+        // it to the editor's accessibility status bar whenever the help plugin
+        // is loaded, rendered through the (platform-dependent) shortcut text
+        // — so we get "Press AltGr+0 for help" on Windows/Linux and "Press
+        // ⌥0 for help" on macOS. Two reasons to drop it: the chord is no
+        // longer the documented way to reach Help (the sidebar Help entry is,
+        // and rebindHelpShortcut() rebinds the dialog to Access+0); and the
+        // line sits in the editor's status bar, where it's noise that takes
+        // away room from the word count and the disabled-by-default branding.
+        help_accessibility: false,
         // TinyMCE 8 sets the editor read-only without a license key (v7 only
         // warned). Grafida is a GPL build, so the self-hosted GPL key applies.
         license_key: 'gpl',

@@ -28,6 +28,7 @@ Grafida 0.3
 + MiniMax is now a built-in AI service provider
 + Documentation: Secrets security — how API tokens and AI keys are kept in the OS secret store, and what that protects against (gh-55)
 + Documentation: Translation — the INI format, the glossaries, and how to add or test a language (gh-55)
+~ The editor's status bar no longer shows the "Press Alt+0 for help" hint (and the platform-dependent rendering of it, "Press ⌥0 for help" on macOS); the help shortcut is now documented through the sidebar Help entry, not the editor's status bar
 ~ The image URL field now shows where a picture picked from your computer will be published, instead of staying empty until it is (gh-72)
 ~ Article HTML is parsed and written with a standards-compliant HTML5 parser, so an article is published in the shape a browser shows it
 ~ New conformance test corpus pinning how arbitrary article HTML is split into introtext/fulltext and published
