@@ -196,7 +196,7 @@ ship inside the app.
   TinyMCE's portable modifier, `Ctrl+Alt` on macOS and `Shift+Alt` elsewhere, the one it already
   reserves for `Access + 1…9`. Alt is a *character* modifier on layouts such as French AZERTY,
   where "@" is `AltGr + 0` (`⌥ + 0` on a Mac), so the stock binding swallowed an ordinary
-  keystroke. Three things had to move together, and missing any one of them leaves the app
+  keystroke. Four things had to move together, and missing any one of them leaves the app
   advertising a chord that does nothing:
   - the binding itself — `shortcuts.remove('alt+0')` then `shortcuts.add('access+0', …)`, which
     **must run on the editor's `init` event, not in `setup`**: plugins are initialised between the
@@ -204,6 +204,12 @@ ship inside the app.
   - the **`help` menu item**, re-registered in the same place because the plugin's version (which
     prints "Alt+0" under Tools ▸ Help) would otherwise win. Its `shortcut` spec has **no spaces**
     around the `+` (the theme joins the segments verbatim), unlike the dialog table's;
+  - the **`help` toolbar button**, a *separate* registry entry from the menu item above (same
+    `name`, different namespace: `addButton` vs `addMenuItem`) — missing this one was gh-73. The
+    Silver theme's own button registration hard-codes `shortcut: 'Alt+0'`, and the theme's tooltip
+    builder appends that shortcut to the button's native title (`"Help (Alt+0)"`), so the toolbar
+    button's OS-level hover tooltip kept advertising the old chord even after the menu item and the
+    Help dialog itself both showed Access+0 correctly;
   - the **"Handy Shortcuts" tab**, replaced by `shortcutsHelpTab()` — a tab *object* named
     `shortcuts` displaces the built-in of that name, the same trick `versionHelpTab()` uses. It is a
     **verbatim mirror** of the help plugin's hard-coded list with the one row changed, so
