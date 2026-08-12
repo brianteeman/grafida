@@ -125,7 +125,7 @@ final class DebugRoutingTest extends TestCase
             $this->kernel(),
             'POST',
             '/api/sites/diagnose',
-            json_encode(['url' => 'http://127.0.0.1:1', 'token' => $token])
+            json_encode(['url' => 'https://127.0.0.1:1', 'token' => $token])
         );
 
         self::assertSame(200, $status);
@@ -150,7 +150,7 @@ final class DebugRoutingTest extends TestCase
             $this->kernel(),
             'POST',
             '/api/sites/diagnose',
-            json_encode(['url' => 'http://127.0.0.1:1', 'token' => 'x'])
+            json_encode(['url' => 'https://127.0.0.1:1', 'token' => 'x'])
         );
 
         self::assertSame(200, $status);

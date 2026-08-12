@@ -14,6 +14,7 @@ namespace Grafida\Joomla;
 use Grafida\Http\HttpClient;
 use Grafida\Http\HttpException;
 use Grafida\Http\HttpResponse;
+use Grafida\Http\InsecureUrlException;
 use Grafida\Http\Transport;
 
 /**
@@ -48,12 +49,29 @@ final class ApiClient
     /**
      * Reduces any URL the user might paste (bare, or with an API suffix already
      * appended) to the bare site root, without a trailing slash.
+     *
+     * Only HTTPS is accepted. Cleartext HTTP would carry the API token in
+     * plaintext across every router between the app and the site, so the URL
+     * is rejected at this boundary — before any outbound request is dispatched
+     * — with {@see InsecureUrlException}.
+     *
+     * @throws InsecureUrlException When the URL is not an HTTPS URL.
      */
     public static function normaliseRoot(string $url): string
     {
         $url = trim($url);
         $url = preg_replace('#\?.*$#', '', $url) ?? $url;   // drop query string
         $url = rtrim($url, '/');
+
+        // Scheme check runs before any suffix stripping, so a malformed input
+        // surfaces a clear "this is not an HTTPS URL" rather than a downstream
+        // cURL/protocol error from a host-less string.
+        $scheme = strtolower((string) parse_url($url, \PHP_URL_SCHEME));
+        if ($scheme !== 'https') {
+            throw new InsecureUrlException(
+                sprintf('Only HTTPS URLs are allowed for sites (got "%s").', $scheme !== '' ? $scheme : 'no scheme')
+            );
+        }
 
         // Strip any API suffix the user may have included, longest first.
         foreach (['/index.php/api', '/api/index.php', '/api', '/index.php'] as $suffix) {

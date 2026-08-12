@@ -1,5 +1,6 @@
 Grafida 0.3
 ================================================================================
+! Security hardening: site URLs must use HTTPS. Test Connection, Diagnose, Create and Edit Site all reject http:// (and any non-HTTPS scheme) with a 400 error before any outbound request is dispatched, so the API token never leaves the process in cleartext
 ! Idle CPU use is down from about half a core to under 1%; the native event loop was a busy wait
 ! macOS 15 Sequoia is now the minimum; the bundled webview library cannot load on macOS 14 or earlier (gh-58)
 + Ctrl/Cmd+N in the Articles view starts a new article (gh-64)

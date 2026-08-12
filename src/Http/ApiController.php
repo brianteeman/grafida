@@ -75,6 +75,8 @@ final class ApiController
             ]);
         } catch (SecureStoreUnavailableException $e) {
             return Json::error($e->getMessage(), 409, ['code' => 'secure_store_unavailable']);
+        } catch (InsecureUrlException $e) {
+            return Json::error($e->getMessage(), 400, ['code' => 'insecure_url']);
         } catch (ApiException $e) {
             return Json::error($e->getMessage(), 502, ['code' => 'joomla_api', 'status' => $e->status]);
         } catch (HttpException $e) {
