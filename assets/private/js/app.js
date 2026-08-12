@@ -3899,20 +3899,6 @@ function rebindHelpShortcut(editor) {
         onAction: () => editor.execCommand('mceHelp'),
         context: 'any',
     });
-
-    // The Silver theme's toolbar button is a *separate* registry entry from
-    // the menu item above (same name, different namespace) and carries its
-    // own hard-coded 'Alt+0' shortcut, which it appends to the button's
-    // native title/tooltip ("Help (Alt+0)"). Left alone it keeps advertising
-    // the old chord even though the menu item and Help dialog are correct
-    // (gh-73).
-    editor.ui.registry.addButton('help', {
-        tooltip: 'Help',
-        icon: 'help',
-        shortcut: 'Access+0',
-        onAction: () => editor.execCommand('mceHelp'),
-        context: 'any',
-    });
 }
 
 /**
