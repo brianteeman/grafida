@@ -32,13 +32,16 @@ use Grafida\Site\LastSiteService;
 use Grafida\Storage\StorageService;
 use Grafida\Support\App;
 use Grafida\Support\UrlOpener;
+use Grafida\Text\ContentNormalisationService;
+use Grafida\Text\ContentNormaliser;
 use Grafida\Update\UpdateService;
 
 /**
  * Handles the miscellaneous settings/system endpoints: language, display
- * mode, the editor's slash commands, storage maintenance, the update checker,
- * Markdown conversion, the native URL opener, the Request Log (gh-37's Debug
- * setting), the OS clipboard reader, and the native file/directory dialogs.
+ * mode, the editor's slash commands, the AI-content clean-up, storage
+ * maintenance, the update checker, Markdown conversion, the native URL opener,
+ * the Request Log (gh-37's Debug setting), the OS clipboard reader, and the
+ * native file/directory dialogs.
  */
 final class SettingsController extends Controller
 {
@@ -49,6 +52,8 @@ final class SettingsController extends Controller
         private readonly SlashToolsService $slashTools,
         private readonly SpellCheckService $spellCheck,
         private readonly AutoCloseTagsService $autoCloseTags,
+        private readonly ContentNormalisationService $normalisation,
+        private readonly ContentNormaliser $normaliser,
         private readonly LastSiteService $lastSite,
         private readonly UrlOpener $urlOpener,
         private readonly UpdateService $updates,
@@ -69,6 +74,7 @@ final class SettingsController extends Controller
         $router->add('POST', '/api/settings/slash-tools', fn (RouteContext $ctx): ResponseInterface => $this->setSlashTools($ctx->body()));
         $router->add('POST', '/api/settings/spell-check', fn (RouteContext $ctx): ResponseInterface => $this->setSpellCheck($ctx->body()));
         $router->add('POST', '/api/settings/auto-close-tags', fn (RouteContext $ctx): ResponseInterface => $this->setAutoCloseTags($ctx->body()));
+        $router->add('POST', '/api/settings/content-normalisation', fn (RouteContext $ctx): ResponseInterface => $this->setContentNormalisation($ctx->body()));
         $router->add('POST', '/api/settings/last-site', fn (RouteContext $ctx): ResponseInterface => $this->setLastSite($ctx->body()));
         $router->add('POST', '/api/settings/request-log', fn (RouteContext $ctx): ResponseInterface => $this->setRequestLog($ctx->body()));
         $router->add('POST', '/api/settings/metadata-cache', fn (RouteContext $ctx): ResponseInterface => $this->setMetadataCache($ctx->body()));
@@ -94,6 +100,11 @@ final class SettingsController extends Controller
      * first. {@see ClipboardService} has the detail. An unreadable clipboard is
      * an error rather than an empty string, so the SPA can tell the user why
      * nothing was pasted instead of silently doing nothing.
+     *
+     * The text is normalised on the way through ({@see ContentNormaliser}):
+     * pasting out of a chatbot's web page is one of the commonest ways an
+     * invisible mark gets into an article, and "paste as plain text" is a
+     * request for the words, not for what is hiding between them.
      */
     public function clipboardText(): ResponseInterface
     {
@@ -103,7 +114,7 @@ final class SettingsController extends Controller
             return Json::error('Could not read the clipboard', 500);
         }
 
-        return Json::ok(['text' => $text]);
+        return Json::ok(['text' => $this->normaliser->apply($text)]);
     }
 
     /** @param array<string, mixed> $body */
@@ -197,10 +208,22 @@ final class SettingsController extends Controller
         };
     }
 
-    /** @param array<string, mixed> $body */
+    /**
+     * Convert imported Markdown to article HTML.
+     *
+     * The source is normalised before it is parsed, not after: a Markdown file
+     * is very often what an AI tool was asked to write, and cleaning it up first
+     * also converts more faithfully. CommonMark wants an *ordinary* space after
+     * a `-` or a `#`, so a document carrying no-break spaces parses its lists as
+     * paragraphs and its headings as body text. {@see ContentNormaliser}.
+     *
+     * @param array<string, mixed> $body
+     */
     public function convertMarkdown(array $body): ResponseInterface
     {
-        return Json::ok(['html' => $this->markdown->toHtml($this->str($body, 'markdown'))]);
+        $markdown = $this->normaliser->apply($this->str($body, 'markdown'));
+
+        return Json::ok(['html' => $this->markdown->toHtml($markdown)]);
     }
 
     /** @param array<string, mixed> $body */
@@ -244,6 +267,14 @@ final class SettingsController extends Controller
         $mode = $this->autoCloseTags->set($this->str($body, 'mode', AutoCloseTagsService::FULL));
 
         return Json::ok(['autoCloseTags' => $mode]);
+    }
+
+    /** @param array<string, mixed> $body */
+    public function setContentNormalisation(array $body): ResponseInterface
+    {
+        $mode = $this->normalisation->set($this->str($body, 'mode', ContentNormalisationService::FULL));
+
+        return Json::ok(['contentNormalisation' => $mode]);
     }
 
     /**

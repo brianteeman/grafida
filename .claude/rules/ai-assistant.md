@@ -177,7 +177,10 @@ The PHP-side service inventory stays in `CLAUDE.md`'s `src/Ai/` Layout bullet.
   configured tools' prompts instead. Because the output is untrusted, rendering is
   **sanitised server-side**: `panel.js`'s `_renderRichText()` shows the raw text as plain text first
   (always-safe placeholder) then calls `POST /api/ai/render`, which `Ai\AiRenderer` turns into safe
-  HTML — auto-detecting Markdown vs HTML, converting Markdown via the existing CommonMark
+  HTML — first stripping the invisible characters models emit (`Text\ContentNormaliser`; **before**
+  the Markdown pass, since CommonMark wants an *ordinary* space after a `-` or `#` and a reply
+  carrying no-break spaces otherwise renders its lists as paragraphs), then auto-detecting Markdown vs HTML, converting Markdown via the
+  existing CommonMark
   `MarkdownService`, and sanitising the result with **Symfony's `HtmlSanitizer`** (the W3C safe-element
   subset + relative links/medias, **plus the `class`/`style` attributes** — article markup relies on
   editor.css classes and inline styling, and Insert drops this same sanitised HTML into the article, so
@@ -216,5 +219,9 @@ The PHP-side service inventory stays in `CLAUDE.md`'s `src/Ai/` Layout bullet.
   **Copy** uses the **raw** model output; **Insert** re-renders it through the same
   `/api/ai/render` pipeline (Markdown→HTML + sanitise) before dropping it into TinyMCE — the reply is
   frequently Markdown (the Generate tool) or loose HTML, and `editor.insertContent()` needs real HTML,
-  so inserting the raw text would leak literal Markdown (`**bold**`, `#` headings, …) into the article. The same `provider`/`tool` config is managed from two
+  so inserting the raw text would leak literal Markdown (`**bold**`, `#` headings, …) into the article.
+  ⚠️ Copy therefore also skips the invisible-character clean-up, which lives on the render path;
+  that is accepted rather than fixed, because anything copied out and pasted back is caught by the
+  sweep `PublishService` runs over the whole article. Do **not** "fix" it by mirroring the character
+  tables into JavaScript — there is one implementation and it is `Text\ContentNormaliser`. The same `provider`/`tool` config is managed from two
   **Settings** cards (AI Services, AI Tools).

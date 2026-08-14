@@ -3,6 +3,7 @@ Grafida 0.3
 ! Security hardening: site URLs must use HTTPS. Test Connection, Diagnose, Create and Edit Site all reject http:// (and any non-HTTPS scheme) with a 400 error before any outbound request is dispatched, so the API token never leaves the process in cleartext
 ! Idle CPU use is down from about half a core to under 1%; the native event loop was a busy wait
 ! macOS 15 Sequoia is now the minimum; the bundled webview library cannot load on macOS 14 or earlier (gh-58)
++ Normalise AI-generated content: strip the invisible characters (zero-width spaces, bidi and tag characters, exotic spaces) AI tools leave in text, from AI replies, imported Markdown, plain-text pastes and everything you publish. On by default, three-way setting
 + Ctrl/Cmd+N in the Articles view starts a new article (gh-64)
 + Custom fields of type Media can now be edited, using Grafida's own media browser — site media or a local picture uploaded on publish
 + Publish anyway: an article from your site can be published even when it has required custom fields Grafida cannot edit (gh-59)

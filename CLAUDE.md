@@ -368,6 +368,30 @@ window-free in tests (a null dialog makes the endpoint return 503).
   The SPA maps the three onto `true` / `{whenOpening: false}` / `false` in `autoCloseTagsOption()`;
   `AUTO_CLOSE_TAGS_CHOICES` in `app.js` must stay in step with `AutoCloseTagsService::AVAILABLE`,
   which snaps an unknown value back to `full`.
+- `src/Text/` — **normalising AI-generated content**: `ContentNormaliser` strips the invisible
+  characters LLMs and web pages leave in text (zero-width family, bidi controls and isolates, tag
+  characters, variation selectors, soft hyphen, the `\p{Cf}` catch-all) and, in the default mode,
+  collapses exotic spaces onto U+0020. Character tables follow "Layer A" of
+  guillaumemeyer/watermarks-remover; **homoglyph folding is deliberately not implemented** (a Greek
+  surname is not a watermark). `ContentNormalisationService` is the setting behind it — `full`
+  (default) / `invisible` / `off`, generic `settings` key `content_normalisation`, **no migration**,
+  sent as `bootstrap`'s `contentNormalisation`, written via `POST /api/settings/content-normalisation`;
+  `AVAILABLE` is mirrored by `CONTENT_NORMALISATION_CHOICES` in `app.js`. It is three-way rather than
+  a toggle because the space half is not as safe as the invisible half: a no-break space is French
+  punctuation and U+3000 is ordinary Japanese.
+  ⚠️ **Some invisible characters are load-bearing and the decision is contextual**: ZWJ/VS16 after an
+  emoji base build 👨‍👩‍👧 and ❤️‍🔥, tag characters after an emoji base spell a subdivision flag, ZWNJ/ZWJ
+  after a letter are Persian/Arabic/Indic orthography, and U+0600–0605 & co. are Arabic number signs.
+  A joiner is judged against **the last character kept**, never the last character *seen* — a stripped
+  character must not lend its meaning to the next one.
+  ⚠️ **There is exactly one implementation and it is in PHP.** It is applied where text crosses a
+  boundary — `AiRenderer::render()` (AI replies, and so Insert), `SettingsController::convertMarkdown()`
+  (imported Markdown), `SettingsController::clipboardText()` (paste as plain text) and
+  `PublishService::publish()` (title/body/metadata, the guarantee point). Do not mirror the tables into
+  JavaScript to catch an ordinary Cmd+V: the publish sweep already covers it, and two tables would
+  drift. It works on **code points**, so an entity spelling (`&#8203;`) survives, and it is applied to
+  HTML as a flat string — none of the characters it touches can occur in HTML syntax, and a string
+  pass cannot reformat the markup the way a parse/serialise round trip would.
 - `src/Help/HelpService.php` — the **in-app documentation** (gh-55). `docs/` is a **single source
   with two consumers**: the sidebar's **Help** screen and the project's **GitHub wiki**, which
   `scripts/sync-wiki.sh` (`phing wiki` / `composer docs:wiki`, and step 4 of `phing release`)

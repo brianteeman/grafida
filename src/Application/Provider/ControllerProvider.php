@@ -61,6 +61,8 @@ use Grafida\Site\SiteService;
 use Grafida\Storage\SettingsRepository;
 use Grafida\Storage\StorageService;
 use Grafida\Support\UrlOpener;
+use Grafida\Text\ContentNormalisationService;
+use Grafida\Text\ContentNormaliser;
 use Grafida\Update\UpdateService;
 use Joomla\DI\ServiceProviderInterface;
 
@@ -84,6 +86,7 @@ final class ControllerProvider implements ServiceProviderInterface
                 slashTools: $c->get(SlashToolsService::class),
                 spellCheck: $c->get(SpellCheckService::class),
                 autoCloseTags: $c->get(AutoCloseTagsService::class),
+                normalisation: $c->get(ContentNormalisationService::class),
                 aiDefaults: $c->get(Defaults::class),
                 aiServices: $c->get(AiServiceManager::class),
                 aiTools: $c->get(AiToolRepository::class),
@@ -164,6 +167,8 @@ final class ControllerProvider implements ServiceProviderInterface
                 slashTools: $c->get(SlashToolsService::class),
                 spellCheck: $c->get(SpellCheckService::class),
                 autoCloseTags: $c->get(AutoCloseTagsService::class),
+                normalisation: $c->get(ContentNormalisationService::class),
+                normaliser: $c->get(ContentNormaliser::class),
                 lastSite: $c->get(LastSiteService::class),
                 urlOpener: $c->get(UrlOpener::class),
                 updates: $c->get(UpdateService::class),

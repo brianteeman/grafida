@@ -27,6 +27,8 @@ use Grafida\Site\Site;
 use Grafida\Site\SiteRepository;
 use Grafida\Site\SiteService;
 use Grafida\Storage\SettingsRepository;
+use Grafida\Text\ContentNormalisationService;
+use Grafida\Text\ContentNormaliser;
 use Grafida\Tests\Support\TestDatabase;
 
 /**
@@ -222,6 +224,7 @@ final class CorpusRunner
             new LanguageService(new SettingsRepository($db), \dirname(__DIR__, 3)),
             new InlineImageExtractor($media),
             new MediaUploadTarget($apiClient),
+            new ContentNormaliser(new ContentNormalisationService(new SettingsRepository($db))),
         );
 
         $publish->publish(self::draft($spec, $input), self::site());

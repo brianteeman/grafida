@@ -68,6 +68,15 @@ sees nothing that leaves the building.
 > you already trust — and it is the price of watching the reply arrive word by word instead of
 > waiting for it in silence.
 
+## Invisible characters in the reply
+
+Models routinely emit characters you cannot see — zero-width spaces, directional marks, tag
+characters — partly as a deliberate watermark and partly as an artefact of the text they were
+trained on. Grafida removes them from every reply as it is inserted, and again from the whole
+article when you publish it, because they are read out by screen readers and break find-in-page.
+The **Normalise AI-generated content** setting governs it; see [Settings](Settings), which also
+explains why removing them does not, and cannot, discharge your duty to disclose that you used AI.
+
 ## Privacy, plainly
 
 * Your article text is sent to the provider you chose, when you ask for it.

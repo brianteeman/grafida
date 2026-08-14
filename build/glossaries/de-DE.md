@@ -178,3 +178,8 @@ Eigennamen (Grafida, Joomla!, API, Markdown, HTML, TinyMCE) werden nicht überse
 | publish blocked | Veröffentlichung blockiert | Titel des Dialogs, der eine Veröffentlichung anhält, weil die Website benutzerdefinierte Pflichtfelder eines nicht unterstützten Typs hat. GRAFIDA_MSG_PUBLISH_BLOCKED_TITLE. |
 | required (field) | Pflichtfeld | Ein Feld, das Joomla! ausgefüllt verlangt; ohne Wert lehnt die Website den Beitrag ab. |
 | clipboard | Zwischenablage | Die Zwischenablage des Betriebssystems. GRAFIDA_MSG_HTML_COPIED. |
+| normalise (content) | normalisieren | Von KI erzeugte Inhalte von unsichtbaren Zeichen befreien. GRAFIDA_LBL_CONTENT_NORMALISATION. |
+| invisible marks | unsichtbare Markierungen | Sammelbegriff für die unsichtbaren Zeichen, die entfernt werden (Nullbreite, Richtung, Tag-Zeichen). GRAFIDA_OPT_CONTENT_NORMALISATION_INVISIBLE. |
+| zero-width space | Leerzeichen ohne Breite | U+200B und Verwandte; nimmt keinen Platz ein, reist aber mit dem Text mit. |
+| watermark | Wasserzeichen | Absichtlich eingebettete, unsichtbare Kennzeichnung von KI-Text. |
+| screen reader | Screenreader | Vorlesesoftware; liest die unsichtbaren Zeichen mit vor — der Barrierefreiheitsgrund für diese Einstellung. |

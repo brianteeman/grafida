@@ -28,6 +28,8 @@ use Grafida\Http\Transport;
 use Grafida\I18n\LanguageService;
 use Grafida\Markdown\MarkdownService;
 use Grafida\Site\LastSiteService;
+use Grafida\Text\ContentNormalisationService;
+use Grafida\Text\ContentNormaliser;
 use Grafida\Storage\SettingsRepository;
 use Grafida\Support\App;
 use Grafida\Support\Paths;
@@ -71,6 +73,16 @@ final class AppProvider implements ServiceProviderInterface
         $container->share(
             AutoCloseTagsService::class,
             static fn (Container $c): AutoCloseTagsService => new AutoCloseTagsService($c->get(SettingsRepository::class))
+        );
+
+        $container->share(
+            ContentNormalisationService::class,
+            static fn (Container $c): ContentNormalisationService => new ContentNormalisationService($c->get(SettingsRepository::class))
+        );
+
+        $container->share(
+            ContentNormaliser::class,
+            static fn (Container $c): ContentNormaliser => new ContentNormaliser($c->get(ContentNormalisationService::class))
         );
 
         $container->share(

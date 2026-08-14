@@ -86,6 +86,12 @@ two-space continuation indent are the original bullet formatting.
   file (`POST /api/dialog/select-directory`): Boson's `DialogApiInterface` has no Save-As
   dialog, so the filename (`grafida-request-log-<timestamp>.json`) is derived and the file
   written server-side instead.
+  `SettingsController` is also where the invisible-character clean-up is *applied*, not just
+  configured (`POST /api/settings/content-normalisation`): `convertMarkdown()` normalises the
+  imported source **before** CommonMark sees it, and `clipboardText()` normalises what it hands
+  back. ⚠️ `ClipboardService` itself stays a dumb reader — the same separation as
+  `HttpClient`/`RecordingTransport` — so the policy lives in the controller and the OS-specific
+  code stays testable without one.
 
 # The native event loop (`src/Application/BosonApplication`, `EventLoopThrottle`)
 

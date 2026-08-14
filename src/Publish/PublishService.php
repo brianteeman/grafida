@@ -28,6 +28,7 @@ use Grafida\Reference\ReferenceService;
 use Grafida\Site\Site;
 use Grafida\Site\SiteService;
 use Grafida\Support\App;
+use Grafida\Text\ContentNormaliser;
 
 /**
  * Publishes a local draft to its Joomla site.
@@ -40,7 +41,9 @@ use Grafida\Support\App;
  *   4. Split the HTML into introtext / fulltext on the read-more marker.
  *   5. Map supported custom-field values into `com_fields`, uploading the offline
  *      picture behind a `media` field the same way as an intro/full-text image.
- *   6. POST a new article (or PATCH an existing one) and remember its remote ID.
+ *   6. Strip the invisible characters AI tools leave in text, so none of them
+ *      reaches the published article.
+ *   7. POST a new article (or PATCH an existing one) and remember its remote ID.
  */
 final class PublishService
 {
@@ -62,6 +65,7 @@ final class PublishService
         private readonly LanguageService $language,
         private readonly InlineImageExtractor $inlineImages,
         private readonly MediaUploadTarget $mediaTarget,
+        private readonly ContentNormaliser $normaliser,
         private readonly FieldSupport $fields = new FieldSupport(),
         private readonly FieldCategoryScope $fieldScope = new FieldCategoryScope(),
         private readonly ContentSplitter $splitter = new ContentSplitter(),
@@ -150,15 +154,24 @@ final class PublishService
         // Sites with com_content's "Save History" off never store it: the plugin checks
         // `save_history` and returns before reading the note, so this is a silent no-op
         // rather than an error.
+        // The invisible-character sweep is here, at the boundary, rather than on
+        // the way into the draft: an AI reply is cleaned as it is inserted, but
+        // text reaches an article by half a dozen other routes — an ordinary
+        // paste out of a chatbot's web page, an imported .grafida file, an
+        // article read back from the site — and this is the one place all of
+        // them pass through. What we publish is what people read, so this is
+        // the place that has to be clean. The draft is left as it is: it is the
+        // user's working copy, and the setting can be changed between one
+        // publish and the next.
         $attributes = [
-            'title'            => $draft->title,
+            'title'            => $this->normaliser->apply($draft->title),
             'catid'            => $draft->catid,
             'access'           => $draft->access,
             'state'            => $draft->state,
             'language'         => $draft->language,
-            'introtext'        => $split['introtext'],
-            'fulltext'         => $split['fulltext'],
-            'created_by_alias' => $draft->createdByAlias,
+            'introtext'        => $this->normaliser->apply($split['introtext']),
+            'fulltext'         => $this->normaliser->apply($split['fulltext']),
+            'created_by_alias' => $this->normaliser->apply($draft->createdByAlias),
             'version_note'     => sprintf(
                 $this->language->translateIn('GRAFIDA_MSG_VERSION_NOTE', $draft->language),
                 App::NAME,
@@ -171,10 +184,10 @@ final class PublishService
             $attributes['alias'] = $draft->alias;
         }
         if ($draft->metadesc !== '') {
-            $attributes['metadesc'] = $draft->metadesc;
+            $attributes['metadesc'] = $this->normaliser->apply($draft->metadesc);
         }
         if ($draft->metakey !== '') {
-            $attributes['metakey'] = $draft->metakey;
+            $attributes['metakey'] = $this->normaliser->apply($draft->metakey);
         }
         $images = $this->resolveImages($draft->images, $site, $base, $token);
         if ($images !== []) {
@@ -196,7 +209,10 @@ final class PublishService
             $created = false;
         }
 
-        $this->assertArticleSaved($article, $draft->title);
+        // The *sent* title, not the draft's: a title the normaliser cleaned no
+        // longer matches the draft, and comparing against the old one would
+        // report a perfectly good write as a failure.
+        $this->assertArticleSaved($article, $attributes['title']);
 
         $articleId = $article['id'] ?? null;
         $remoteId  = is_int($articleId) ? $articleId : (is_numeric($articleId) ? (int) $articleId : ($draft->remoteId ?? 0));

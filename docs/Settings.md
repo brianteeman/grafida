@@ -74,6 +74,61 @@ way.
 The setting is read when the source code editor opens, so it takes effect the next time you open
 it.
 
+## Normalise AI-generated content
+
+Text written or rewritten by an AI almost always carries characters you cannot see. Zero-width
+spaces and joiners, left-to-right and right-to-left marks, the Unicode *tag* characters — which can
+spell out a whole hidden message one code point at a time — variation selectors, soft hyphens and
+several kinds of unusual space. Some of it is a deliberate watermark. Some of it is simply picked
+up by copying out of a web page, which does the same thing by accident.
+
+It is worth removing for reasons that have nothing to do with watermarks:
+
+- A screen reader announces what it finds. Invisible characters are read out, or break a word into
+  two, and the article stops making sense to the person listening to it.
+- A directional override can reverse the reading order of part of a sentence, showing a reader
+  something different from what you wrote.
+- A soft hyphen or a zero-width space inside a word breaks find-in-page and site search for
+  everybody, because the word no longer matches itself.
+
+Grafida strips these characters at every point where text crosses into, or out of, an article:
+
+- replies from the [AI assistant](AI-Overview), as they are inserted;
+- [Markdown you import](Editing-Articles);
+- text pasted with **Paste as plain text**;
+- the title, body and metadata of every article you **publish**.
+
+Your local article is left alone as you work — the clean-up happens on the way out, so what reaches
+your site is clean whether the text came from Grafida's AI assistant, from an ordinary paste out of
+some other AI tool, or from an article you imported from the site itself.
+
+**Invisible marks and unusual spaces** (the default) also collapses no-break, thin, hair,
+ideographic and similar spaces to an ordinary space.
+
+**Invisible marks only** leaves every space exactly as you typed it. Choose this if your typography
+needs those spaces: French punctuation is set with a no-break space before `!`, `?`, `:` and `;`,
+and Japanese and Chinese text is written with the ideographic space. Neither is a watermark.
+
+**Off** touches nothing. This is also the honest choice if you write right-to-left text and place
+directional marks deliberately, because Grafida treats those marks as watermark carriers and
+removes them.
+
+Characters that carry meaning are always kept, in every mode. The joiners that hold an emoji
+sequence together (👨‍👩‍👧 is three people and two invisible joiners), the tag characters that spell out
+a subdivision flag, and the joiners that Persian, Arabic and the Indic scripts need to shape their
+letters correctly are all left where they are.
+
+> [!IMPORTANT]
+> This does **not** conceal the fact that content was generated or processed by AI, and it is not
+> meant to. Removing a watermark does not make text human-written, and there are many other ways
+> the origin of a text can be established.
+>
+> Nor does it relieve you of your responsibility to **disclose** the use of AI where the law
+> requires it. The EU AI Act, and comparable rules in other jurisdictions, impose transparency and
+> labelling obligations on AI-generated or AI-manipulated content — news articles published in the
+> European Union being one prominent case. Editorial codes of practice frequently require the same.
+> Complying with them is your responsibility, and no software setting can discharge it for you.
+
 ## Site metadata
 
 ![Site metadata, Debug and Local storage](images/settings-storage.png)

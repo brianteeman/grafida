@@ -41,6 +41,9 @@ const State = {
     // How the source-code editor closes HTML tags: 'full' (both halves),
     // 'closing' (only the "type </ and it completes" half) or 'off' (gh-52).
     autoCloseTags: 'full',
+    // How thoroughly text is stripped of the invisible characters AI tools leave
+    // behind: 'full' (marks and exotic spaces), 'invisible' (marks only) or 'off'.
+    contentNormalisation: 'full',
     // Whether the Debug "Request Log" is recording site-facing HTTP calls (gh-37).
     // Unlike slashTools/spellCheck this defaults OFF — it is an opt-in diagnostic
     // aid with a memory cost, not something every user wants running.
@@ -764,6 +767,7 @@ const api = {
     setSlashTools: (enabled) => apiFetch('POST', '/api/settings/slash-tools', { enabled }),
     setSpellCheck: (enabled) => apiFetch('POST', '/api/settings/spell-check', { enabled }),
     setAutoCloseTags: (mode) => apiFetch('POST', '/api/settings/auto-close-tags', { mode }),
+    setContentNormalisation: (mode) => apiFetch('POST', '/api/settings/content-normalisation', { mode }),
     setLastSite: (siteId) => apiFetch('POST', '/api/settings/last-site', { siteId }),
     checkUpdate: () => apiFetch('GET', '/api/update'),
     getStorageInfo: () => apiFetch('GET', '/api/settings/storage'),
@@ -7517,6 +7521,7 @@ function renderSettingsScreen() {
     renderSlashToolsSetting();
     renderSpellCheckSetting();
     renderAutoCloseTagsSetting();
+    renderContentNormalisationSetting();
     renderRequestLogSetting();
     renderMetadataTtlSetting();
     renderMetadataResetSetting();
@@ -7603,6 +7608,37 @@ function renderAutoCloseTagsSetting() {
         opt.value = value;
         opt.textContent = t(key);
         if ((State.autoCloseTags || 'full') === value) opt.selected = true;
+        sel.appendChild(opt);
+    });
+}
+
+/**
+ * The AI-content clean-up choices, paired with their language keys.
+ * ⚠️ Must stay in step with `ContentNormalisationService::AVAILABLE` in PHP,
+ * which validates the stored value and snaps an unknown one back to 'full'.
+ */
+const CONTENT_NORMALISATION_CHOICES = [
+    ['full', 'GRAFIDA_OPT_CONTENT_NORMALISATION_FULL'],
+    ['invisible', 'GRAFIDA_OPT_CONTENT_NORMALISATION_INVISIBLE'],
+    ['off', 'GRAFIDA_OPT_CONTENT_NORMALISATION_OFF'],
+];
+
+/**
+ * Populates the AI-content clean-up selector, reflecting the stored preference.
+ * Three choices rather than on/off because the exotic-space half of the job is
+ * not as safe as the invisible-character half: a no-break space is French
+ * punctuation and U+3000 is ordinary Japanese, and neither is a watermark.
+ */
+function renderContentNormalisationSetting() {
+    const sel = document.getElementById('settings-content-normalisation-select');
+    if (!sel) return;
+    clearNode(sel);
+
+    CONTENT_NORMALISATION_CHOICES.forEach(([value, key]) => {
+        const opt = document.createElement('option');
+        opt.value = value;
+        opt.textContent = t(key);
+        if ((State.contentNormalisation || 'full') === value) opt.selected = true;
         sel.appendChild(opt);
     });
 }
@@ -9246,6 +9282,27 @@ async function applyAutoCloseTagsChange(mode) {
 }
 
 /**
+ * Persists the AI-content clean-up preference. Nothing needs applying live: the
+ * clean-up runs in PHP, at the moments content crosses a boundary — an AI reply
+ * being inserted, Markdown being imported, the clipboard being read, an article
+ * being published — so the next such moment already uses the new setting.
+ *
+ * Re-renders the selector unconditionally, like the tag auto-closing one: PHP
+ * validates the mode and may hand back a different one than we sent.
+ */
+async function applyContentNormalisationChange(mode) {
+    try {
+        const result = await api.setContentNormalisation(mode);
+        State.contentNormalisation = result.contentNormalisation || 'full';
+        showToast(t('GRAFIDA_MSG_SAVED'), 'success');
+    } catch (err) {
+        showToast(err.message, 'error');
+    } finally {
+        renderContentNormalisationSetting();
+    }
+}
+
+/**
  * Persists the Request Log (Debug) preference. The sidebar item appears/
  * disappears immediately (renderSidebarNav()); turning it off also empties
  * the buffer server-side (SettingsController::setRequestLog()) and, if the
@@ -9354,6 +9411,7 @@ async function bootstrap() {
         State.slashTools = data.slashTools !== false;
         State.spellCheck = data.spellCheck !== false;
         State.autoCloseTags = data.autoCloseTags || 'full';
+        State.contentNormalisation = data.contentNormalisation || 'full';
         // Inverted default vs. the two flags above: Request Log defaults OFF.
         State.requestLog = data.requestLog === true;
         // Inverted default, like requestLog: the startup reset is opt-in (gh-42).
@@ -9762,6 +9820,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const autoCloseTagsSel = document.getElementById('settings-auto-close-tags-select');
     if (autoCloseTagsSel) {
         autoCloseTagsSel.addEventListener('change', () => applyAutoCloseTagsChange(autoCloseTagsSel.value));
+    }
+
+    const contentNormalisationSel = document.getElementById('settings-content-normalisation-select');
+    if (contentNormalisationSel) {
+        contentNormalisationSel.addEventListener('change', () => applyContentNormalisationChange(contentNormalisationSel.value));
     }
 
     const spellCheckSel = document.getElementById('settings-spell-check-select');

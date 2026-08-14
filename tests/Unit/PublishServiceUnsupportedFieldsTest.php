@@ -27,6 +27,8 @@ use Grafida\Site\Site;
 use Grafida\Site\SiteRepository;
 use Grafida\Site\SiteService;
 use Grafida\Storage\SettingsRepository;
+use Grafida\Text\ContentNormalisationService;
+use Grafida\Text\ContentNormaliser;
 use Grafida\Tests\Unit\Support\FakeTransport;
 use Grafida\Tests\Support\TestDatabase;
 use Joomla\Database\DatabaseInterface;
@@ -110,6 +112,7 @@ final class PublishServiceUnsupportedFieldsTest extends TestCase
             $language,
             new InlineImageExtractor($media),
             new MediaUploadTarget($apiClient),
+            new ContentNormaliser(new ContentNormalisationService(new SettingsRepository($this->db))),
         );
     }
 

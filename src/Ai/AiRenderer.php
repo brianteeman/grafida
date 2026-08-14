@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace Grafida\Ai;
 
 use Grafida\Markdown\MarkdownService;
+use Grafida\Text\ContentNormaliser;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizer;
 use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
 
@@ -24,7 +25,14 @@ use Symfony\Component\HtmlSanitizer\HtmlSanitizerConfig;
  * drop it into the article — without ever exposing the user to script/iframe/
  * event-handler injection:
  *
- *   - Markdown input is converted with CommonMark ({@see MarkdownService}) first.
+ *   - The reply is first stripped of the invisible characters models emit
+ *     ({@see ContentNormaliser}) — this is the point where AI text enters an
+ *     article, so it is the point where the clean-up has to happen. Doing it
+ *     before the Markdown pass also converts more faithfully: CommonMark wants
+ *     an ordinary space after a `-` or a `#`, so a reply pasted together with
+ *     no-break spaces renders its list as a paragraph and its heading as body
+ *     text.
+ *   - Markdown input is converted with CommonMark ({@see MarkdownService}) next.
  *   - The resulting (or already-HTML) markup is run through Symfony's
  *     HtmlSanitizer, restricted to the W3C "safe" element/attribute subset plus
  *     the `class`/`style` attributes article markup needs (see the constructor).
@@ -36,8 +44,10 @@ final class AiRenderer
 {
     private readonly HtmlSanitizer $sanitizer;
 
-    public function __construct(private readonly MarkdownService $markdown)
-    {
+    public function __construct(
+        private readonly MarkdownService $markdown,
+        private readonly ContentNormaliser $normaliser,
+    ) {
         // The W3C-defined safe subset (headings, paragraphs, lists, tables,
         // links, images, inline formatting, code/pre, blockquote, …) is exactly
         // the article-grade markup we want; relative URLs keep site-root-relative
@@ -70,6 +80,8 @@ final class AiRenderer
      */
     public function render(string $content, string $format = 'auto'): string
     {
+        $content = $this->normaliser->apply($content);
+
         $isMarkdown = match ($format) {
             'markdown' => true,
             'html'     => false,

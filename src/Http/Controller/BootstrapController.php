@@ -32,6 +32,7 @@ use Grafida\Reference\MetadataCacheService;
 use Grafida\Site\LastSiteService;
 use Grafida\Site\SiteService;
 use Grafida\Support\App;
+use Grafida\Text\ContentNormalisationService;
 
 /** Handles `GET /api/bootstrap`, the app-state payload the SPA loads at start-up. */
 final class BootstrapController extends Controller
@@ -45,6 +46,7 @@ final class BootstrapController extends Controller
         private readonly SlashToolsService $slashTools,
         private readonly SpellCheckService $spellCheck,
         private readonly AutoCloseTagsService $autoCloseTags,
+        private readonly ContentNormalisationService $normalisation,
         private readonly Defaults $aiDefaults,
         private readonly AiServiceManager $aiServices,
         private readonly AiToolRepository $aiTools,
@@ -84,6 +86,7 @@ final class BootstrapController extends Controller
             'slashTools'          => $this->slashTools->current(),
             'spellCheck'          => $this->spellCheck->current(),
             'autoCloseTags'       => $this->autoCloseTags->current(),
+            'contentNormalisation' => $this->normalisation->current(),
             'requestLog'          => $this->requestLogService->current(),
             'metadataResetOnStart' => $this->metadataCache->resetOnStart(),
             'metadataCacheTtl'     => $this->metadataCache->ttlMinutes(),

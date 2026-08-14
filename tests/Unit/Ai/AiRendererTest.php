@@ -13,7 +13,11 @@ namespace Grafida\Tests\Unit\Ai;
 
 use Grafida\Ai\AiRenderer;
 use Grafida\Markdown\MarkdownService;
+use Grafida\Storage\SettingsRepository;
+use Grafida\Tests\Support\TestDatabase;
 use Grafida\Tests\Unit\TestCase;
+use Grafida\Text\ContentNormalisationService;
+use Grafida\Text\ContentNormaliser;
 
 /**
  * Verifies that AiRenderer renders assistant replies to *formatted* HTML while
@@ -24,7 +28,9 @@ final class AiRendererTest extends TestCase
 {
     private function renderer(): AiRenderer
     {
-        return new AiRenderer(new MarkdownService());
+        $settings = new ContentNormalisationService(new SettingsRepository(TestDatabase::memory()));
+
+        return new AiRenderer(new MarkdownService(), new ContentNormaliser($settings));
     }
 
     public function testKeepsSafeHtmlFormatting(): void

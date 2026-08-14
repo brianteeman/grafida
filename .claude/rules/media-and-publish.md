@@ -338,6 +338,18 @@ two-space continuation indent are the original bullet formatting.
   also **writes the rewritten HTML back into the local draft** (so the stored draft mirrors what was
   published and a re-publish does not upload the images again); `data-path` is added to the editor's
   `extended_valid_elements` so it survives a TinyMCE round-trip.
+  ⚠️ **The last thing `publish()` does to the payload is strip invisible characters**
+  (`Text\ContentNormaliser`, applied to `title`, `introtext`, `fulltext`, `created_by_alias`,
+  `metadesc` and `metakey` — **not** to `com_fields` values, which stay out of scope). It is here,
+  and not on the way into a draft, because publishing is the one step every route into an article
+  passes through: an AI reply, an ordinary paste out of a chatbot's web page, an imported
+  `.grafida`, an article read back from the site. Two consequences to keep: the **draft is left
+  alone** (unlike the media rewrite above, which writes back — there is no equivalent reason to,
+  and the setting may change between one publish and the next), and `assertArticleSaved()` must be
+  handed **`$attributes['title']`, never `$draft->title`** — a title the sweep cleaned no longer
+  equals the draft's, and comparing the wrong one reports a perfectly good write as a failure.
+  The `full` mode also collapses exotic spaces onto U+0020, so the corpus below is written in
+  ordinary spaces; a case that needs a no-break space would have to pin the mode.
 
 ## `tests/corpus/` — the round-trip conformance corpus
 

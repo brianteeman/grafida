@@ -170,3 +170,8 @@ Proper nouns kept as-is: Grafida, Joomla!, API, Markdown, HTML, TinyMCE.
 | publish anyway | Publicar mesmo assim | Botão que publica apesar de existirem campos personalizados obrigatórios que o Grafida não consegue editar, reenviando inalterados os valores lidos no site (gh-59). GRAFIDA_BTN_PUBLISH_ANYWAY. |
 | publish blocked | Publicação bloqueada | Título da caixa de diálogo que interrompe uma publicação porque o site exige campos personalizados de um tipo não suportado. GRAFIDA_MSG_PUBLISH_BLOCKED_TITLE. |
 | required (field) | obrigatório | Campo que o Joomla! exige preenchido; sem valor, o site rejeita o artigo. |
+| normalise (content) | normalizar | Limpar o conteúdo gerado por IA dos caracteres invisíveis. GRAFIDA_LBL_CONTENT_NORMALISATION. |
+| invisible marks | marcas invisíveis | Termo colectivo para os caracteres invisíveis removidos (largura zero, direcionais, de etiqueta). GRAFIDA_OPT_CONTENT_NORMALISATION_INVISIBLE. |
+| zero-width space | espaço de largura zero | U+200B e afins; não ocupa espaço, mas viaja com o texto. |
+| watermark | marca de água | Marcação invisível incorporada de propósito no texto de uma IA. |
+| screen reader | leitor de ecrã | Software de leitura de ecrã; anuncia também os caracteres invisíveis — a razão de acessibilidade desta definição. |

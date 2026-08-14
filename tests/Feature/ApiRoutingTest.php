@@ -264,6 +264,65 @@ final class ApiRoutingTest extends TestCase
         self::assertSame('full', $boot['data']['autoCloseTags']);
     }
 
+    public function testContentNormalisationDefaultsToFull(): void
+    {
+        [, $boot] = $this->call($this->kernel(), 'GET', '/api/bootstrap');
+
+        self::assertSame('full', $boot['data']['contentNormalisation']);
+    }
+
+    public function testContentNormalisationPersists(): void
+    {
+        $kernel = $this->kernel();
+
+        [$status, $json] = $this->call($kernel, 'POST', '/api/settings/content-normalisation', json_encode(['mode' => 'invisible']));
+
+        self::assertSame(200, $status);
+        self::assertSame('invisible', $json['data']['contentNormalisation']);
+
+        [, $boot] = $this->call($kernel, 'GET', '/api/bootstrap');
+        self::assertSame('invisible', $boot['data']['contentNormalisation']);
+
+        [, $json] = $this->call($kernel, 'POST', '/api/settings/content-normalisation', json_encode(['mode' => 'off']));
+        self::assertSame('off', $json['data']['contentNormalisation']);
+    }
+
+    /** An unknown mode must snap back to the default rather than be stored as-is. */
+    public function testContentNormalisationRejectsUnknownMode(): void
+    {
+        $kernel = $this->kernel();
+
+        [, $json] = $this->call($kernel, 'POST', '/api/settings/content-normalisation', json_encode(['mode' => 'sometimes']));
+        self::assertSame('full', $json['data']['contentNormalisation']);
+    }
+
+    /**
+     * Imported Markdown is cleaned **before** it is parsed, not after — which is
+     * not merely tidier: CommonMark wants an ordinary space after a `-`, so the
+     * no-break space a chatbot's page hands you turns the list into a paragraph.
+     */
+    public function testMarkdownImportStripsInvisibleCharacters(): void
+    {
+        $kernel = $this->kernel();
+        $source = "A cla\u{200B}im\u{FEFF}:\n\n-\u{00A0}first\n-\u{00A0}second";
+
+        [$status, $json] = $this->call($kernel, 'POST', '/api/markdown', json_encode(['markdown' => $source]));
+
+        self::assertSame(200, $status);
+        self::assertStringContainsString('<li>first</li>', $json['data']['html']);
+        self::assertStringNotContainsString("\u{200B}", $json['data']['html']);
+        self::assertStringNotContainsString("\u{FEFF}", $json['data']['html']);
+        self::assertStringNotContainsString("\u{00A0}", $json['data']['html']);
+
+        // …and the setting governs it: with the clean-up off, nothing is touched
+        // — down to the list never being recognised as one.
+        $this->call($kernel, 'POST', '/api/settings/content-normalisation', json_encode(['mode' => 'off']));
+
+        [, $json] = $this->call($kernel, 'POST', '/api/markdown', json_encode(['markdown' => $source]));
+        self::assertStringContainsString("\u{200B}", $json['data']['html']);
+        self::assertStringNotContainsString('<li>', $json['data']['html']);
+    }
+
     public function testSpellCheckDefaultsToEnabled(): void
     {
         [, $boot] = $this->call($this->kernel(), 'GET', '/api/bootstrap');

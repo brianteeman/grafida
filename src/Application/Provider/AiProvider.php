@@ -20,6 +20,7 @@ use Grafida\Application\Container;
 use Grafida\Http\Transport;
 use Grafida\Markdown\MarkdownService;
 use Grafida\Secret\SecretStore;
+use Grafida\Text\ContentNormaliser;
 use Joomla\DI\ServiceProviderInterface;
 
 /**
@@ -48,7 +49,10 @@ final class AiProvider implements ServiceProviderInterface
 
         $container->share(
             AiRenderer::class,
-            static fn (Container $c): AiRenderer => new AiRenderer($c->get(MarkdownService::class))
+            static fn (Container $c): AiRenderer => new AiRenderer(
+                $c->get(MarkdownService::class),
+                $c->get(ContentNormaliser::class),
+            )
         );
     }
 }

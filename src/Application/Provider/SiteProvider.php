@@ -39,6 +39,7 @@ use Grafida\Site\FaviconService;
 use Grafida\Site\SiteRepository;
 use Grafida\Site\SiteService;
 use Grafida\Storage\SettingsRepository;
+use Grafida\Text\ContentNormaliser;
 use Joomla\DI\ServiceProviderInterface;
 
 /**
@@ -166,6 +167,7 @@ final class SiteProvider implements ServiceProviderInterface
                 language: $c->get(LanguageService::class),
                 inlineImages: $c->get(InlineImageExtractor::class),
                 mediaTarget: $c->get(MediaUploadTarget::class),
+                normaliser: $c->get(ContentNormaliser::class),
             );
         });
 
