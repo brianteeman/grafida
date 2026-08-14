@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================================
 # Grafida — build & package everything, for every supported platform.
-# Edit Joomla! articles on your desktop.
+# Joomla content editing, untethered.
 #
 # Copyright (c) 2026 Nicholas K. Dionysopoulos
 # License: GNU General Public License version 3, or later

@@ -2,7 +2,7 @@
 Type=Application
 Name=Grafida
 GenericName=Joomla! Article Editor
-Comment=Edit Joomla! articles on your desktop
+Comment=Joomla content editing, untethered.
 Exec=grafida
 Icon=grafida
 Terminal=false

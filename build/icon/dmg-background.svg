@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Grafida — edit Joomla! articles on your desktop.
+  Grafida — Joomla content editing, untethered.
   Copyright (c) 2026 Nicholas K. Dionysopoulos
   GNU General Public License version 3, or later.
 
@@ -65,7 +65,7 @@
   <!-- Tagline -->
   <text x="320" y="112" text-anchor="middle"
         font-family="-apple-system, 'Helvetica Neue', Arial, sans-serif"
-        font-size="17" fill="#5a6480">Edit Joomla! articles on your desktop</text>
+        font-size="17" fill="#5a6480">Joomla content editing, untethered.</text>
 
   <!-- Install arrow: sits at y=210 in the gap between the app icon (~x=224) and
        the Applications folder (~x=416). -->

@@ -1,6 +1,6 @@
 # Grafida
 
-**Edit Joomla! content on your desktop.**
+**Joomla content editing, untethered.**
 
 Grafida is a cross-platform desktop application for creating and editing [Joomla!](https://www.joomla.org) articles. 
 
